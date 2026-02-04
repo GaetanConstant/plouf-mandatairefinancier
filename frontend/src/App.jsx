@@ -17,7 +17,8 @@ import {
   LogOut,
   Settings,
   Shield,
-  FileCheck
+  FileCheck,
+  Droplets
 } from 'lucide-react';
 import { cn } from './lib/utils'; // Keep this relative import!
 import { Modal, Button } from './components/ui/Components';
@@ -165,8 +166,8 @@ function App() {
         {/* Sidebar */}
         <aside className="w-64 border-r border-border p-6 flex flex-col bg-card">
           <div className="flex items-center gap-2 mb-8">
-            <Wallet className="w-8 h-8 text-primary" />
-            <span className="font-bold text-xl tracking-tight">Campagne 2026</span>
+            <Droplets className="w-8 h-8 text-primary" />
+            <span className="font-bold text-xl tracking-tight">Plouf</span>
           </div>
 
 
