@@ -18,7 +18,8 @@ import {
   Settings,
   Shield,
   FileCheck,
-  Droplets
+  Droplets,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from './lib/utils'; // Keep this relative import!
 import { Modal, Button } from './components/ui/Components';
@@ -28,16 +29,18 @@ import { RevenueForm } from './components/RevenueForm';
 import { DepensesList } from './components/DepensesList';
 import { RevenueList } from './components/RevenueList';
 import { JustificatifsList } from './components/JustificatifsList';
-import { AttestationsPage } from './components/AttestationsPage';
 import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { CampaignPage } from './pages/CampaignPage';
 
 const API_URL = 'http://localhost:8000';
+axios.defaults.withCredentials = true;
 
 function App() {
   const queryClient = useQueryClient();
 
   const [user, setUser] = useState(null);
+  const [campaign, setCampaign] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -99,31 +102,31 @@ function App() {
 
 
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['stats'],
+    queryKey: ['stats', campaign?.id],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/stats`);
       return response.data;
     },
     refetchInterval: 5000,
-    enabled: !!user // Only fetch if user is logged in
+    enabled: !!user && !!campaign // Only fetch if user is logged in and campaign selected
   });
 
   const { data: depenses } = useQuery({
-    queryKey: ['depenses'],
+    queryKey: ['depenses', campaign?.id],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/depenses`);
       return response.data;
     },
-    enabled: !!user
+    enabled: !!user && !!campaign
   });
 
   const { data: recettes } = useQuery({
-    queryKey: ['recettes'],
+    queryKey: ['recettes', campaign?.id],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/recettes`);
       return response.data;
     },
-    enabled: !!user
+    enabled: !!user && !!campaign
   });
 
   if (authLoading) {
@@ -132,6 +135,10 @@ function App() {
 
   if (!user) {
     return <LoginPage onLogin={setUser} />;
+  }
+
+  if (!campaign) {
+    return <CampaignPage onSelect={setCampaign} user={user} />;
   }
 
   if (statsLoading && !stats) { // Check !stats to avoid full page loader on refresh if cache exists
@@ -167,7 +174,10 @@ function App() {
         <aside className="w-64 border-r border-border p-6 flex flex-col bg-card">
           <div className="flex items-center gap-2 mb-8">
             <Droplets className="w-8 h-8 text-primary" />
-            <span className="font-bold text-xl tracking-tight">Plouf</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-xl tracking-tight leading-none">Plouf</span>
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{campaign.name}</span>
+            </div>
           </div>
 
 
@@ -196,6 +206,13 @@ function App() {
               </div>
               <div className="text-xs text-muted-foreground/80">Villeurbanne</div>
             </div>
+
+            <button
+              onClick={() => setCampaign(null)}
+              className="w-full flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+            >
+              <ChevronRight className="w-3 h-3 rotate-180" /> Changer de campagne
+            </button>
 
             <button
               onClick={handleLogout}

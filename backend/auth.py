@@ -6,7 +6,6 @@ import jwt
 from fastapi import Request, HTTPException, status
 
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
-from database import get_db_connection
 
 def verify_password(plain_password, hashed_password):
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -40,7 +39,8 @@ def get_current_user(request: Request):
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         
-        with get_db_connection() as conn:
+        from database import get_central_db_connection
+        with get_central_db_connection() as conn:
             user_row = conn.execute("SELECT username, full_name, hashed_password, role FROM users WHERE username = ?", [username]).fetchone()
             
         if user_row is None:

@@ -26,7 +26,7 @@ export function AttestationsPage() {
     const { data: recettes, isLoading } = useQuery({
         queryKey: ['recettes'],
         queryFn: async () => {
-            const response = await axios.get(`${API_URL}/recettes`, { withCredentials: true });
+            const response = await axios.get(`${API_URL}/recettes`);
             return response.data;
         }
     });

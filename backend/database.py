@@ -2,10 +2,47 @@ import duckdb
 import os
 from contextlib import contextmanager
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "campagne.db")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+CAMPAIGNS_DIR = os.path.join(DATA_DIR, "campaigns")
+CENTRAL_DB_PATH = os.path.join(DATA_DIR, "central.db")
 
-def init_db():
-    conn = duckdb.connect(DB_PATH)
+if not os.path.exists(CAMPAIGNS_DIR):
+    os.makedirs(CAMPAIGNS_DIR)
+
+def init_central_db():
+    conn = duckdb.connect(CENTRAL_DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username VARCHAR PRIMARY KEY,
+            full_name VARCHAR,
+            hashed_password VARCHAR,
+            role VARCHAR DEFAULT 'user'
+        );
+        
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id VARCHAR PRIMARY KEY,
+            name VARCHAR,
+            db_path VARCHAR
+        );
+        
+        CREATE TABLE IF NOT EXISTS user_campaigns (
+            username VARCHAR,
+            campaign_id VARCHAR,
+            PRIMARY KEY (username, campaign_id)
+        );
+    """)
+    
+    # Seed default user if central DB is empty
+    user_exists = conn.execute("SELECT 1 FROM users WHERE username = 'gconstant'").fetchone()
+    if not user_exists:
+        conn.execute("INSERT INTO users (username, full_name, hashed_password, role) VALUES ('gconstant', 'Gaëtan CONSTANT MAGNARD', '$2b$12$8kzD/lZzrzY5N1SbcHyQC.xW9a1.9aLeazpcR7N5RV/YxbyGJ48tO', 'admin')")
+        conn.execute("INSERT INTO users (username, full_name, hashed_password, role) VALUES ('mgarabedian', 'Mathieu Garabedian', '$2b$12$8kzD/lZzrzY5N1SbcHyQC.xW9a1.9aLeazpcR7N5RV/YxbyGJ48tO', 'user')")
+        
+    conn.close()
+
+def init_campaign_db(campaign_db_name):
+    db_path = os.path.join(CAMPAIGNS_DIR, campaign_db_name)
+    conn = duckdb.connect(db_path)
     conn.execute("""
         CREATE SEQUENCE IF NOT EXISTS seq_recettes_id START 1;
         CREATE SEQUENCE IF NOT EXISTS seq_depenses_id START 1;
@@ -21,7 +58,6 @@ def init_db():
             date_envoi VARCHAR
         );
         
-
         CREATE TABLE IF NOT EXISTS depenses (
             id INTEGER PRIMARY KEY DEFAULT nextval('seq_depenses_id'),
             date DATE,
@@ -29,47 +65,47 @@ def init_db():
             fournisseur VARCHAR,
             montant_ttc DOUBLE,
             tva DOUBLE,
-            categorie_cnccfp VARCHAR,
+            categorie_cnccFP VARCHAR,
             statut VARCHAR,
             justificatif_path VARCHAR,
             is_nature BOOLEAN DEFAULT FALSE
         );
-
-        CREATE TABLE IF NOT EXISTS users (
-            username VARCHAR PRIMARY KEY,
-            full_name VARCHAR,
-            hashed_password VARCHAR,
-            role VARCHAR DEFAULT 'user'
-        );
-        
-        -- Seed default admin if not exists
-        INSERT INTO users (username, full_name, hashed_password, role)
-        SELECT 'gconstant', 'Gaëtan CONSTANT MAGNARD', '$2b$12$8kzD/lZzrzY5N1SbcHyQC.xW9a1.9aLeazpcR7N5RV/YxbyGJ48tO', 'admin'
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'gconstant');
-
-        -- Seed default user if not exists
-        INSERT INTO users (username, full_name, hashed_password, role)
-        SELECT 'mgarabedian', 'Mathieu Garabedian', '$2b$12$8kzD/lZzrzY5N1SbcHyQC.xW9a1.9aLeazpcR7N5RV/YxbyGJ48tO', 'user'
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'mgarabedian');
     """)
-    
-    # Simple migration for existing database
-    try:
-        conn.execute("ALTER TABLE recettes ADD COLUMN date_envoi VARCHAR")
-    except:
-        pass
-        
     conn.close()
 
 @contextmanager
-def get_db_connection():
-    conn = duckdb.connect(DB_PATH)
+def get_central_db_connection():
+    conn = duckdb.connect(CENTRAL_DB_PATH)
     try:
         yield conn
     finally:
         conn.close()
 
-def update_db_from_excel(excel_path):
+@contextmanager
+def get_db_connection(campaign_id=None):
+    if not campaign_id:
+        # Fallback or default if needed, but usually we want a specific one
+        # For compatibility with existing code during transition, we might use a default
+        db_path = os.path.join(DATA_DIR, "campagne.db") 
+    else:
+        # Resolve campaign_id to db_path from central db
+        with get_central_db_connection() as central_conn:
+            res = central_conn.execute("SELECT db_path FROM campaigns WHERE id = ?", [campaign_id]).fetchone()
+            if not res:
+                raise ValueError(f"Campaign {campaign_id} not found")
+            db_path = os.path.join(CAMPAIGNS_DIR, res[0])
+            
+    # Ensure initialized
+    if not os.path.exists(db_path):
+        init_campaign_db(os.path.basename(db_path))
+        
+    conn = duckdb.connect(db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+def update_db_from_excel(excel_path, campaign_id=None):
     import pandas as pd
     
     if not os.path.exists(excel_path):
@@ -84,7 +120,7 @@ def update_db_from_excel(excel_path):
     except Exception as e:
         return f"Erreur de lecture Excel : {e}"
 
-    with get_db_connection() as conn:
+    with get_db_connection(campaign_id) as conn:
         # LOGIQUE D'INIT : On repart sur une base propre pour les données
         conn.execute("BEGIN TRANSACTION")
         try:
@@ -175,12 +211,12 @@ def update_db_from_excel(excel_path):
             conn.execute("ROLLBACK")
             return f"Erreur SQL lors de l'import : {str(e)}"
 
-def push_db_to_excel_and_cloud(hostname, username, password, remote_filename):
+def push_db_to_excel_and_cloud(hostname, username, password, remote_filename, campaign_id=None):
     import pandas as pd
     import owncloud
     import tempfile
     
-    with get_db_connection() as conn:
+    with get_db_connection(campaign_id) as conn:
         df_depenses = conn.execute("SELECT * FROM depenses").fetchdf()
         df_recettes = conn.execute("SELECT * FROM recettes").fetchdf()
     
