@@ -1,0 +1,25 @@
+# Logiciel de gestion Mandataire Financier
+
+# Data & Database (Strictly excluded)
+data/
+*.db
+*.xlsx
+*.xls
+backend/__pycache__/
+frontend/node_modules/
+backend/.venv/
+.venv/
+
+# Uploads & Signatures
+signature\ mandataire.png
+data/uploads/
+
+# OS
+.DS_Store
+
+# Frontend builds
+dist/
+frontend/dist/
+
+# Sensitive
+.env
