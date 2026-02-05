@@ -17,14 +17,14 @@ import { Edit2 } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000';
 
-export function AttestationsPage() {
+export function AttestationsPage({ campaignId }) {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [editingItem, setEditingItem] = useState(null);
     const [editFormData, setEditFormData] = useState({ nom_donateur: '', rue: '', cp: '69100', ville: 'Villeurbanne' });
 
     const { data: recettes, isLoading } = useQuery({
-        queryKey: ['recettes'],
+        queryKey: ['recettes', campaignId],
         queryFn: async () => {
             const response = await axios.get(`${API_URL}/recettes`);
             return response.data;
@@ -37,7 +37,7 @@ export function AttestationsPage() {
             await axios.put(`${API_URL}/recettes/${id}`, { ...original, ...data }, { withCredentials: true });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['recettes']);
+            queryClient.invalidateQueries(['recettes', campaignId]);
             setEditingItem(null);
         }
     });
@@ -47,12 +47,16 @@ export function AttestationsPage() {
             await axios.post(`${API_URL}/attestations/recette/${id}/sent`, {}, { withCredentials: true });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['recettes']);
+            queryClient.invalidateQueries(['recettes', campaignId]);
         }
     });
 
     const handleDownload = (id) => {
-        window.open(`${API_URL}/attestations/recette/${id}`, '_blank');
+        // Use window.location.href to ensure cookies are sent if opening in same tab, 
+        // or _blank relies on browser cookie policy. 
+        // Usually plain window.open works for cookie auth on same domain/localhost.
+        // We'll append a timestamp to prevent caching issues.
+        window.open(`${API_URL}/attestations/recette/${id}?t=${Date.now()}`, '_blank');
     };
 
     const startEditing = (item) => {
@@ -158,7 +162,7 @@ export function AttestationsPage() {
                                         {(!item.adresse || item.adresse === 'Import Excel') ? "Adresse à compléter" : item.adresse}
                                     </span>
                                     <span>•</span>
-                                    <span>{new Date(item.date).toLocaleDateString('fr-FR')}</span>
+                                    <span>{item.date ? new Date(item.date).toLocaleDateString('fr-FR') : 'Date inconnue'}</span>
                                     {item.date_envoi && (
                                         <span className="flex items-center gap-1 text-green-600 font-medium italic">
                                             <Send className="w-3.5 h-3.5 ml-1" /> Envoyé le {item.date_envoi}

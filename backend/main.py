@@ -340,9 +340,9 @@ def list_recettes(campaign_id: str = Depends(get_campaign_conn)):
         df = conn.execute("SELECT * FROM recettes ORDER BY date DESC").fetchdf()
         # Ensure date is string for JSON
         if not df.empty and 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         # Replace NaN with None for JSON serialization
-        df = df.where(pd.notnull(df), None)
+        df = df.astype(object).where(pd.notnull(df), None)
         return df.to_dict(orient="records")
 
 @app.post("/depenses")
@@ -364,9 +364,9 @@ def list_depenses(campaign_id: str = Depends(get_campaign_conn)):
         df = conn.execute("SELECT * FROM depenses ORDER BY date DESC").fetchdf()
         # Ensure date is string for JSON
         if not df.empty and 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         # Replace NaN with None for JSON serialization
-        df = df.where(pd.notnull(df), None)
+        df = df.astype(object).where(pd.notnull(df), None)
         return df.to_dict(orient="records")
 
 @app.get("/fournisseurs")
@@ -573,11 +573,11 @@ def mark_recette_sent(recette_id: int, current_user: dict = Depends(get_current_
     with get_db_connection(campaign_id) as conn:
         current = conn.execute("SELECT date_envoi FROM recettes WHERE id = ?", [recette_id]).fetchone()
         if current and current[0]:
-            conn.execute("UPDATE recettes SET date_envoi = NULL WHERE id = ?", [recette_id])
+            conn.execute("UPDATE recettes SET date_envoi = NULL, recu_genere = FALSE WHERE id = ?", [recette_id])
             return {"message": "Marquage annulé", "date_envoi": None}
         else:
             today = datetime.now().strftime('%d/%m/%Y %H:%M')
-            conn.execute("UPDATE recettes SET date_envoi = ? WHERE id = ?", [today, recette_id])
+            conn.execute("UPDATE recettes SET date_envoi = ?, recu_genere = TRUE WHERE id = ?", [today, recette_id])
             return {"message": "Attestation marquée comme envoyée", "date_envoi": today}
 
 

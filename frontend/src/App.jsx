@@ -19,7 +19,9 @@ import {
   Shield,
   FileCheck,
   Droplets,
-  ChevronRight
+  ChevronRight,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { cn } from './lib/utils'; // Keep this relative import!
 import { Modal, Button } from './components/ui/Components';
@@ -32,6 +34,7 @@ import { JustificatifsList } from './components/JustificatifsList';
 import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { CampaignPage } from './pages/CampaignPage';
+import { AttestationsPage } from './components/AttestationsPage';
 
 const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
@@ -48,6 +51,25 @@ function App() {
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [prefilledData, setPrefilledData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
+
+  // Theme management
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') || 'light';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   // Check auth status on mount
   useEffect(() => {
@@ -205,7 +227,16 @@ function App() {
                 <span>{user.full_name}</span>
               </div>
               <div className="text-xs text-muted-foreground/80">Villeurbanne</div>
+
             </div>
+            <button
+              onClick={toggleTheme}
+              className="w-full flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {theme === 'light' ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />}
+              {theme === 'light' ? 'Mode Sombre' : 'Mode Clair'}
+            </button>
+
 
             <button
               onClick={() => setCampaign(null)}
@@ -359,7 +390,7 @@ function App() {
           {activeTab === 'depenses' && user.role === 'admin' && <DepensesList />}
           {activeTab === 'recettes' && user.role === 'admin' && <RevenueList />}
           {activeTab === 'justificatifs' && user.role === 'admin' && <JustificatifsList />}
-          {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage />}
+          {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage campaignId={campaign.id} />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
         </main>
