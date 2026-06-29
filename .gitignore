@@ -3,12 +3,15 @@
 # Data & Database (Strictly excluded)
 data/
 *.db
+*.sqlite
 *.xlsx
 *.xls
-backend/__pycache__/
+__pycache__/
+*.pyc
 frontend/node_modules/
 backend/.venv/
 .venv/
+uv.lock
 
 # Uploads & Signatures
 signature\ mandataire.png
