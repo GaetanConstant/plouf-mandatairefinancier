@@ -1,8 +1,9 @@
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 import io
 import pdf_utils
 from database import init_central_db, get_central_db_connection, get_db_connection, update_db_from_excel, push_db_to_excel_and_cloud, CAMPAIGNS_DIR
@@ -10,6 +11,8 @@ from dl_owncloud import download_file_from_owncloud
 from models import Recette, Depense, SpendingStats
 from typing import List
 import os
+import re
+import uuid
 import shutil
 import zipfile
 import tempfile
@@ -20,9 +23,25 @@ from pydantic import BaseModel
 
 # Auth imports
 from auth import verify_password, create_access_token, get_current_user, get_password_hash
-from config import ACCESS_TOKEN_EXPIRE_MINUTES, OWNCLOUD_HOSTNAME, OWNCLOUD_USERNAME, OWNCLOUD_PASSWORD
+from config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    OWNCLOUD_HOSTNAME,
+    OWNCLOUD_USERNAME,
+    OWNCLOUD_PASSWORD,
+    OWNCLOUD_SHARE_URL,
+    OWNCLOUD_SHARE_PASSWORD,
+    BUDGET_REMOTE_FILENAME,
+)
 
-app = FastAPI(title="Gestion Budget Campagne", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup : initialiser la base centrale
+    init_central_db()
+    yield
+    # Shutdown : rien à nettoyer pour l'instant
+
+
+app = FastAPI(title="Gestion Budget Campagne", version="1.0.0", lifespan=lifespan)
 
 class LoginRequest(BaseModel):
     username: str
@@ -63,11 +82,6 @@ if not os.path.exists(UPLOADS_DIR):
 app.mount("/docs", StaticFiles(directory=UPLOADS_DIR), name="justificatifs")
 
 SIGNATURE_PATH = os.path.join(ROOT_DIR, "signature mandataire.png")
-
-# Initialize database on startup
-@app.on_event("startup")
-def start_db():
-    init_central_db()
 
 def get_active_campaign(request: Request):
     campaign_id = request.cookies.get("campaign_id")
@@ -376,15 +390,25 @@ def list_fournisseurs(campaign_id: str = Depends(get_campaign_conn)):
         rows = conn.execute("SELECT DISTINCT fournisseur FROM depenses WHERE fournisseur IS NOT NULL AND fournisseur != '' ORDER BY fournisseur ASC").fetchall()
         return [row[0] for row in rows]
 
+def safe_upload_name(original_name: str) -> str:
+    """Assainit un nom de fichier et le rend unique (anti path-traversal / collision)."""
+    base = os.path.basename(original_name or "fichier")
+    stem, ext = os.path.splitext(base)
+    # On ne garde que des caractères sûrs dans le nom
+    stem = re.sub(r"[^A-Za-z0-9._-]", "_", stem).strip("._") or "fichier"
+    ext = re.sub(r"[^A-Za-z0-9.]", "", ext)
+    return f"{stem}_{uuid.uuid4().hex[:8]}{ext}"
+
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "uploads")
-    if not os.path.exists(uploads_dir):
-        os.makedirs(uploads_dir)
-    file_location = os.path.join(uploads_dir, file.filename)
+async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    if not os.path.exists(UPLOADS_DIR):
+        os.makedirs(UPLOADS_DIR)
+    filename = safe_upload_name(file.filename)
+    file_location = os.path.join(UPLOADS_DIR, filename)
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
-    return {"filename": file.filename, "path": file_location}
+    return {"filename": filename, "path": file_location}
 
 @app.get("/justificatifs")
 def list_justificatifs(current_user: dict = Depends(get_current_user)):
@@ -441,7 +465,7 @@ def export_data(campaign_id: str = Depends(get_campaign_conn)):
 from ocr_utils import extract_text_from_file, analyze_receipt_text
 
 @app.post("/analyze-document")
-async def analyze_document(file: UploadFile = File(...)):
+async def analyze_document(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """
     Analyze uploded file (PDF primarily) to extract expense data.
     """
@@ -463,17 +487,23 @@ async def sync_budget(current_user: dict = Depends(get_current_user), campaign_i
     """
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Seul un administrateur peut synchroniser le budget")
-    
-    # Configuration du téléchargement
-    downloaded_url = "https://nouveau.cloud117.fr/s/NLEHT4s8rBCZYpQ"
-    password = 't88M^v$@scFE' 
-    remote_filename = 'Budget 2026.xlsx'
-    local_filename = 'Budget 2026.xlsx'
-    
+
+    # Configuration du téléchargement (lien de partage public, depuis .env)
+    downloaded_url = OWNCLOUD_SHARE_URL
+    password = OWNCLOUD_SHARE_PASSWORD
+    remote_filename = BUDGET_REMOTE_FILENAME
+    local_filename = BUDGET_REMOTE_FILENAME
+
+    if not downloaded_url or not password:
+        raise HTTPException(
+            status_code=500,
+            detail="Configuration OwnCloud manquante : définir OWNCLOUD_SHARE_URL et OWNCLOUD_SHARE_PASSWORD dans le fichier .env",
+        )
+
     # Chemin local racine du projet
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     local_file_path = os.path.join(root_dir, local_filename)
-    
+
     try:
         # 1. Télécharger le fichier
         download_file_from_owncloud(downloaded_url, password, remote_filename, local_file_path)
