@@ -22,6 +22,7 @@ import {
   BookOpen,
   BookText,
   ClipboardList,
+  Archive,
   Droplets,
   ChevronRight,
   Sun,
@@ -43,6 +44,7 @@ import { CarnetsPage } from './components/CarnetsPage';
 import { ConformitePage } from './components/ConformitePage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
+import { DepotPage } from './components/DepotPage';
 
 const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
@@ -224,6 +226,7 @@ function App() {
                 <NavItem icon={FileCheck} label="Attestations" active={activeTab === 'attestations'} onClick={() => setActiveTab('attestations')} />
                 <NavItem icon={BookOpen} label="Reçus-dons" active={activeTab === 'carnets'} onClick={() => setActiveTab('carnets')} />
                 <NavItem icon={ShieldCheck} label="Conformité" active={activeTab === 'conformite'} onClick={() => setActiveTab('conformite')} />
+                <NavItem icon={Archive} label="Dépôt" active={activeTab === 'depot'} onClick={() => setActiveTab('depot')} />
               </>
             )}
 
@@ -407,6 +410,7 @@ function App() {
           {activeTab === 'conformite' && user.role === 'admin' && <ConformitePage />}
           {activeTab === 'maincourante' && user.role === 'admin' && <MainCourantePage />}
           {activeTab === 'identite' && user.role === 'admin' && <IdentitePage />}
+          {activeTab === 'depot' && user.role === 'admin' && <DepotPage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
         </main>

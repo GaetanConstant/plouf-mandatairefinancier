@@ -14,6 +14,7 @@ import recus
 import conformite
 import maincourante
 import identite
+import depot
 from db import provision_campaign_db
 from typing import List
 import os
@@ -619,6 +620,38 @@ def put_expert(payload: identite.ExpertComptableIn, current_user: dict = Depends
 @app.put("/identite/compte-bancaire")
 def put_compte(payload: identite.CompteBancaireIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return identite.save_compte(campaign_id, payload)
+
+
+# --- Constitution et dépôt du dossier (Bloc F) ---
+
+class DocumentUpdate(BaseModel):
+    enveloppe: str | None = None
+    type: str | None = None
+
+
+@app.get("/documents")
+def list_documents(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return depot.list_documents(campaign_id)
+
+
+@app.put("/documents/{doc_id}")
+def update_document(doc_id: int, payload: DocumentUpdate, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return depot.set_document(campaign_id, doc_id, payload.enveloppe, payload.type)
+
+
+@app.get("/depot")
+def get_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return depot.get_depot(campaign_id)
+
+
+@app.get("/depot/export")
+def export_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    pdf = depot.export_bordereau_pdf(campaign_id)
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=bordereau_depot_{campaign_id}.pdf"},
+    )
 
 
 if __name__ == "__main__":
