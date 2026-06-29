@@ -18,7 +18,17 @@ import unicodedata
 
 from sqlalchemy import select
 
-from db.models import Depense, Donateur, Election, Recette, RecuDon
+from db.models import (
+    Candidat,
+    CompteBancaire,
+    Depense,
+    Donateur,
+    Election,
+    ExpertComptable,
+    Mandataire,
+    Recette,
+    RecuDon,
+)
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
 
@@ -163,6 +173,39 @@ def run_checks(campaign_id: str) -> dict:
             alertes.append(_alerte("compte_decouvert", AVERTISSEMENT,
                 f"Trésorerie négative ({solde:.0f} €) : le compte doit être à l'équilibre ou excédentaire.",
                 "global", None))
+
+        # ── Identité administrative (formalités substantielles) ───────────
+        candidat = s.scalars(select(Candidat)).first()
+        mandataire = s.scalars(select(Mandataire)).first()
+        expert = s.scalars(select(ExpertComptable)).first()
+        compte = s.scalars(select(CompteBancaire)).first()
+
+        if not candidat or not (candidat.nom and candidat.prenom and candidat.adresse_postale
+                                and candidat.code_postal and candidat.ville and candidat.email):
+            alertes.append(_alerte("candidat_incomplet", AVERTISSEMENT,
+                "Identité du candidat incomplète (nom, prénom, adresse, email obligatoires).", "candidat", None))
+
+        if not mandataire:
+            alertes.append(_alerte("mandataire_absent", AVERTISSEMENT,
+                "Mandataire non renseigné.", "mandataire", None))
+        else:
+            if mandataire.interdiction_bancaire:
+                alertes.append(_alerte("mandataire_interdiction_bancaire", BLOQUANT,
+                    "Le mandataire fait l'objet d'une interdiction bancaire.", "mandataire", None))
+            if not mandataire.incompatibilites_verifiees:
+                alertes.append(_alerte("mandataire_incompatibilites", AVERTISSEMENT,
+                    "Incompatibilités du mandataire non vérifiées.", "mandataire", None))
+            if not mandataire.date_declaration_prefecture:
+                alertes.append(_alerte("mandataire_declaration", AVERTISSEMENT,
+                    "Date de déclaration du mandataire en préfecture manquante.", "mandataire", None))
+
+        if expert and not expert.dispense and not expert.nom:
+            alertes.append(_alerte("expert_incomplet", AVERTISSEMENT,
+                "Expert-comptable non renseigné (et compte non dispensé).", "expert_comptable", None))
+
+        if not compte or not compte.date_ouverture:
+            alertes.append(_alerte("compte_bancaire_manquant", AVERTISSEMENT,
+                "Compte bancaire dédié non renseigné (date d'ouverture manquante).", "compte_bancaire", None))
 
     compteurs = {
         BLOQUANT: sum(1 for a in alertes if a["niveau"] == BLOQUANT),

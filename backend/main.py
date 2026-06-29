@@ -13,6 +13,7 @@ import comptes
 import recus
 import conformite
 import maincourante
+import identite
 from db import provision_campaign_db
 from typing import List
 import os
@@ -586,6 +587,38 @@ def export_main_courante(current_user: dict = Depends(get_current_user), campaig
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# --- Identité administrative (socle §6.1) ---
+
+@app.get("/identite")
+def get_identite(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return identite.get_identite(campaign_id)
+
+
+@app.put("/identite/election")
+def put_election(payload: identite.ElectionIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return identite.save_election(campaign_id, payload)
+
+
+@app.put("/identite/candidat")
+def put_candidat(payload: identite.CandidatIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return identite.save_candidat(campaign_id, payload)
+
+
+@app.put("/identite/mandataire")
+def put_mandataire(payload: identite.MandataireIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return identite.save_mandataire(campaign_id, payload)
+
+
+@app.put("/identite/expert-comptable")
+def put_expert(payload: identite.ExpertComptableIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return identite.save_expert(campaign_id, payload)
+
+
+@app.put("/identite/compte-bancaire")
+def put_compte(payload: identite.CompteBancaireIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return identite.save_compte(campaign_id, payload)
 
 
 if __name__ == "__main__":
