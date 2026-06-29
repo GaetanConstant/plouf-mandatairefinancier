@@ -29,6 +29,7 @@ import {
   Users2,
   Droplets,
   ChevronRight,
+  ChevronDown,
   Sun,
   Moon
 } from 'lucide-react';
@@ -221,28 +222,40 @@ function App() {
           </div>
 
 
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 overflow-y-auto -mr-3 pr-3 space-y-1">
             <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
 
-            {user.role === 'admin' && (
-              <>
-                <NavItem icon={ClipboardList} label="Identité" active={activeTab === 'identite'} onClick={() => setActiveTab('identite')} />
-                <NavItem icon={BookText} label="Main courante" active={activeTab === 'maincourante'} onClick={() => setActiveTab('maincourante')} />
-                <NavItem icon={Receipt} label="Dépenses" active={activeTab === 'depenses'} onClick={() => setActiveTab('depenses')} />
-                <NavItem icon={TrendingUp} label="Recettes / Dons" active={activeTab === 'recettes'} onClick={() => setActiveTab('recettes')} />
-                <NavItem icon={FileText} label="Justificatifs" active={activeTab === 'justificatifs'} onClick={() => setActiveTab('justificatifs')} />
-                <NavItem icon={FileCheck} label="Attestations" active={activeTab === 'attestations'} onClick={() => setActiveTab('attestations')} />
-                <NavItem icon={BookOpen} label="Reçus-dons" active={activeTab === 'carnets'} onClick={() => setActiveTab('carnets')} />
-                <NavItem icon={ShieldCheck} label="Conformité" active={activeTab === 'conformite'} onClick={() => setActiveTab('conformite')} />
-                <NavItem icon={Archive} label="Dépôt" active={activeTab === 'depot'} onClick={() => setActiveTab('depot')} />
-                <NavItem icon={CalendarDays} label="Événements" active={activeTab === 'evenements'} onClick={() => setActiveTab('evenements')} />
-                <NavItem icon={GitCommitHorizontal} label="Frise" active={activeTab === 'frise'} onClick={() => setActiveTab('frise')} />
-                <NavItem icon={Flag} label="Échéancier" active={activeTab === 'echeancier'} onClick={() => setActiveTab('echeancier')} />
-                <NavItem icon={Users2} label="Mutualisation" active={activeTab === 'mutualisation'} onClick={() => setActiveTab('mutualisation')} />
-              </>
-            )}
+            {user.role === 'admin' && [
+              { label: 'Administratif', icon: ClipboardList, items: [
+                { key: 'identite', label: 'Identité', icon: ClipboardList },
+                { key: 'echeancier', label: 'Échéancier', icon: Flag },
+              ]},
+              { label: 'Comptabilité', icon: BookText, items: [
+                { key: 'maincourante', label: 'Main courante', icon: BookText },
+                { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
+                { key: 'depenses', label: 'Dépenses', icon: Receipt },
+                { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
+              ]},
+              { label: 'Dons & reçus', icon: BookOpen, items: [
+                { key: 'attestations', label: 'Attestations', icon: FileCheck },
+                { key: 'carnets', label: 'Reçus-dons', icon: BookOpen },
+              ]},
+              { label: 'Campagne', icon: CalendarDays, items: [
+                { key: 'evenements', label: 'Événements', icon: CalendarDays },
+                { key: 'frise', label: 'Frise', icon: GitCommitHorizontal },
+                { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
+              ]},
+              { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
+                { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
+                { key: 'depot', label: 'Dépôt', icon: Archive },
+              ]},
+            ].map(g => (
+              <NavGroup key={g.label} icon={g.icon} label={g.label} items={g.items}
+                activeTab={activeTab} setActiveTab={setActiveTab}
+                defaultOpen={g.items.some(i => i.key === activeTab)} />
+            ))}
 
-            <div className="pt-4 mt-4 border-t border-border">
+            <div className="pt-3 mt-3 border-t border-border">
               <NavItem icon={Settings} label="Paramètres" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
             </div>
           </nav>
@@ -433,6 +446,32 @@ function App() {
 
       </div>
     </div >
+  );
+}
+
+function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const hasActive = items.some(i => i.key === activeTab);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors",
+          hasActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        <span className="flex items-center gap-2"><Icon className="w-4 h-4" />{label}</span>
+        <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", open ? "" : "-rotate-90")} />
+      </button>
+      {open && (
+        <div className="mt-1 ml-2 pl-2 border-l border-border space-y-1">
+          {items.map(it => (
+            <NavItem key={it.key} icon={it.icon} label={it.label} active={activeTab === it.key} onClick={() => setActiveTab(it.key)} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
