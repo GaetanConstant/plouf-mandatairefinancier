@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 
+import annexes
 import comptes
 import depot
 
@@ -78,6 +79,27 @@ def generate_xlsx(campaign_id: str) -> bytes:
     wi.append(["N°", "Type", "Fichier", "Enveloppe"])
     for i, doc in enumerate(documents, 1):
         wi.append([i, doc["type_label"], doc["fichier"], doc["enveloppe"]])
+
+    # 6. Emprunts (annexes 3.2 / 3.3 / 3.4)
+    we = wb.create_sheet("Emprunts")
+    we.append(["Type", "Prêteur", "Pays", "Date contrat", "Durée (mois)", "Date fin", "Taux (%)", "Montant (€)"])
+    for e in annexes.list_emprunts(campaign_id):
+        preteur = " ".join(filter(None, [e["preteur_civilite"], e["preteur_prenom"], e["preteur_nom"]]))
+        we.append([e["type"], preteur, e["preteur_pays"], e["date_contrat"], e["duree_mois"],
+                   e["date_fin"], e["taux"], e["montant"]])
+
+    # 7. Colistiers
+    wc = wb.create_sheet("Colistiers")
+    wc.append(["Civilité", "Prénom", "Nom", "Mandat parlementaire", "1er tour", "2e tour"])
+    for col in annexes.list_colistiers(campaign_id):
+        wc.append([col["civilite"], col["prenom"], col["nom"], col["mandat_parlementaire"],
+                   "Oui" if col["present_tour1"] else "Non", "Oui" if col["present_tour2"] else "Non"])
+
+    # 8. Équipe de campagne (annexe 7)
+    wq = wb.create_sheet("Équipe")
+    wq.append(["Prénom", "Nom", "Fonction"])
+    for mb in annexes.list_equipe(campaign_id):
+        wq.append([mb["prenom"], mb["nom"], mb["fonction"]])
 
     for sheet in wb.worksheets:
         for cell in sheet[1]:

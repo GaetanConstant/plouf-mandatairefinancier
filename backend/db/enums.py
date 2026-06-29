@@ -26,6 +26,12 @@ class TypeMandataire(str, enum.Enum):
     afe = "afe"  # association de financement électorale
 
 
+class TypeEmprunt(str, enum.Enum):
+    banque = "banque"
+    parti = "parti"
+    personne_physique = "personne_physique"
+
+
 class CategorieRecette(str, enum.Enum):
     don = "don"
     apport_perso = "apport_perso"

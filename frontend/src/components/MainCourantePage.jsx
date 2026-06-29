@@ -44,7 +44,9 @@ export function MainCourantePage() {
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Tiers</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Mode</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">N° relevé</th>
+                            <th className="h-11 px-3 text-center font-medium text-muted-foreground">Rappr.</th>
                             <th className="h-11 px-3 text-right font-medium text-muted-foreground">Montant</th>
+                            <th className="h-11 px-3 text-right font-medium text-muted-foreground">Solde</th>
                         </tr>
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
@@ -67,14 +69,18 @@ export function MainCourantePage() {
                                 <td className="p-3">{l.tiers || '—'}</td>
                                 <td className="p-3 text-muted-foreground">{l.mode || '—'}</td>
                                 <td className="p-3 text-muted-foreground">{l.num_releve || '—'}</td>
+                                <td className="p-3 text-center">{l.rapprochement ? <span className="text-green-600">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                                 <td className={cn("p-3 text-right font-medium", l.sens === 'recette' ? "text-green-600" : "text-orange-600")}>
                                     {l.sens === 'recette' ? '+ ' : '- '}
                                     {l.montant?.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                                 </td>
+                                <td className={cn("p-3 text-right font-mono text-xs", l.solde < 0 ? "text-red-600" : "text-foreground")}>
+                                    {l.solde?.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                                </td>
                             </tr>
                         ))}
                         {!lignes?.length && (
-                            <tr><td colSpan={9} className="p-10 text-center text-muted-foreground italic">
+                            <tr><td colSpan={11} className="p-10 text-center text-muted-foreground italic">
                                 <BookText className="w-12 h-12 mx-auto mb-2 opacity-20" />
                                 Aucune écriture pour l'instant.
                             </td></tr>

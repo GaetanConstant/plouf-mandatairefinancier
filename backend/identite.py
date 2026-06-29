@@ -28,6 +28,8 @@ class ElectionIn(BaseModel):
     libelle: Optional[str] = None
     circonscription: Optional[str] = None
     population: Optional[int] = None
+    nom_liste: Optional[str] = None
+    nuance_politique: Optional[str] = None
     date_tour1: Optional[str] = None
     date_tour2: Optional[str] = None
     plafond_depenses: Optional[float] = None
@@ -40,6 +42,8 @@ class CandidatIn(BaseModel):
     nom_usage: Optional[str] = None
     prenom: Optional[str] = None
     date_naissance: Optional[str] = None
+    lieu_naissance: Optional[str] = None
+    mandat_parlementaire: Optional[str] = None
     tete_de_liste: Optional[bool] = None
     adresse_postale: Optional[str] = None
     code_postal: Optional[str] = None
@@ -150,6 +154,8 @@ def _election_dict(e: Optional[Election]) -> Optional[dict]:
         "libelle": e.libelle,
         "circonscription": e.circonscription,
         "population": e.population,
+        "nom_liste": e.nom_liste,
+        "nuance_politique": e.nuance_politique,
         "date_tour1": _fmt(e.date_tour1),
         "date_tour2": _fmt(e.date_tour2),
         "plafond_depenses": e.plafond_depenses,
@@ -164,6 +170,7 @@ def _candidat_dict(c: Optional[Candidat]) -> Optional[dict]:
         return None
     return {k: getattr(c, k) for k in (
         "civilite", "nom", "nom_usage", "prenom", "tete_de_liste",
+        "lieu_naissance", "mandat_parlementaire",
         "adresse_postale", "code_postal", "ville", "email", "tel",
         "adresse_post_campagne", "remplacant_identite")} | {"date_naissance": _fmt(c.date_naissance)}
 

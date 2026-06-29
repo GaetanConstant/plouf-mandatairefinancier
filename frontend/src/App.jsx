@@ -27,6 +27,8 @@ import {
   GitCommitHorizontal,
   Flag,
   Users2,
+  UsersRound,
+  Landmark,
   Droplets,
   ChevronRight,
   ChevronDown,
@@ -54,6 +56,8 @@ import { EvenementsPage } from './components/EvenementsPage';
 import { FrisePage } from './components/FrisePage';
 import { EcheancierPage } from './components/EcheancierPage';
 import { MutualisationPage } from './components/MutualisationPage';
+import { ListeEquipePage } from './components/ListeEquipePage';
+import { EmpruntsPage } from './components/EmpruntsPage';
 
 const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
@@ -228,12 +232,14 @@ function App() {
             {user.role === 'admin' && [
               { label: 'Administratif', icon: ClipboardList, items: [
                 { key: 'identite', label: 'Identité', icon: ClipboardList },
+                { key: 'listeequipe', label: 'Liste & équipe', icon: UsersRound },
                 { key: 'echeancier', label: 'Échéancier', icon: Flag },
               ]},
               { label: 'Comptabilité', icon: BookText, items: [
                 { key: 'maincourante', label: 'Main courante', icon: BookText },
                 { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
                 { key: 'depenses', label: 'Dépenses', icon: Receipt },
+                { key: 'emprunts', label: 'Emprunts', icon: Landmark },
                 { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
               ]},
               { label: 'Dons & reçus', icon: BookOpen, items: [
@@ -440,6 +446,8 @@ function App() {
           {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}
           {activeTab === 'echeancier' && user.role === 'admin' && <EcheancierPage />}
           {activeTab === 'mutualisation' && user.role === 'admin' && <MutualisationPage />}
+          {activeTab === 'listeequipe' && user.role === 'admin' && <ListeEquipePage />}
+          {activeTab === 'emprunts' && user.role === 'admin' && <EmpruntsPage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
         </main>

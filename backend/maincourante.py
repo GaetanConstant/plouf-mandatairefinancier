@@ -55,27 +55,37 @@ def journal(campaign_id: str) -> list[dict]:
                 "sens": "recette",
                 "date": _fmt(r.date_versement),
                 "num_piece": r.num_piece,
+                "num_cheque_remise": r.num_cheque_remise,
                 "rubrique": r.rubrique_imputation,
                 "nature": _CATEGORIE_LABEL.get(r.categorie, ""),
                 "tiers": donateurs.get(r.donateur_id),
                 "mode": _mode(r.mode),
                 "montant": r.montant,
                 "num_releve": r.num_releve_bancaire,
+                "rapprochement": r.rapprochement,
             })
         for d in s.scalars(select(Depense)).all():
             lignes.append({
                 "sens": "depense",
                 "date": _fmt(d.date_reglement),
                 "num_piece": d.num_piece,
+                "num_cheque_remise": d.num_cheque_remise,
                 "rubrique": d.rubrique_imputation,
                 "nature": d.nature,
                 "tiers": d.fournisseur,
                 "mode": _mode(d.mode),
                 "montant": d.montant_ttc,
                 "num_releve": d.num_releve_bancaire,
+                "rapprochement": d.rapprochement,
             })
     # Tri chronologique (les dates manquantes en fin).
     lignes.sort(key=lambda x: (x["date"] is None, x["date"] or ""))
+    # Solde courant (journal de banque) : cumul recettes - dépenses.
+    solde = 0.0
+    for ligne in lignes:
+        montant = ligne["montant"] or 0.0
+        solde += montant if ligne["sens"] == "recette" else -montant
+        ligne["solde"] = round(solde, 2)
     return lignes
 
 
@@ -100,10 +110,28 @@ def export_annexe8_xlsx(campaign_id: str) -> bytes:
         for cell in ws[1]:
             cell.font = Font(bold=True)
 
-    for ligne in journal(campaign_id):
+    lignes = journal(campaign_id)
+    for ligne in lignes:
         cols = [ligne["num_piece"], ligne["rubrique"], ligne["nature"], ligne["date"],
                 ligne["tiers"], ligne["mode"], ligne["montant"], ligne["num_releve"]]
         (ws_r if ligne["sens"] == "recette" else ws_d).append(cols)
+
+    # Onglet Journal de banque (chronologique, avec solde courant).
+    ws_j = wb.create_sheet("Journal de banque")
+    ws_j.append(["Date", "Réf. pièce", "N° chèque / remise", "Objet", "Imputation",
+                 "Dépenses (€)", "Recettes (€)", "Rappr.", "Solde (€)", "N° relevé"])
+    for cell in ws_j[1]:
+        cell.font = Font(bold=True)
+    for ligne in lignes:
+        montant = ligne["montant"] or 0.0
+        ws_j.append([
+            ligne["date"], ligne["num_piece"], ligne["num_cheque_remise"], ligne["nature"],
+            ligne["rubrique"],
+            montant if ligne["sens"] == "depense" else None,
+            montant if ligne["sens"] == "recette" else None,
+            "Oui" if ligne["rapprochement"] else "",
+            ligne["solde"], ligne["num_releve"],
+        ])
 
     buf = io.BytesIO()
     wb.save(buf)
