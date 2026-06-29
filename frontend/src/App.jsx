@@ -26,6 +26,7 @@ import {
   CalendarDays,
   GitCommitHorizontal,
   Flag,
+  Users2,
   Droplets,
   ChevronRight,
   Sun,
@@ -51,6 +52,7 @@ import { DepotPage } from './components/DepotPage';
 import { EvenementsPage } from './components/EvenementsPage';
 import { FrisePage } from './components/FrisePage';
 import { EcheancierPage } from './components/EcheancierPage';
+import { MutualisationPage } from './components/MutualisationPage';
 
 const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
@@ -236,6 +238,7 @@ function App() {
                 <NavItem icon={CalendarDays} label="Événements" active={activeTab === 'evenements'} onClick={() => setActiveTab('evenements')} />
                 <NavItem icon={GitCommitHorizontal} label="Frise" active={activeTab === 'frise'} onClick={() => setActiveTab('frise')} />
                 <NavItem icon={Flag} label="Échéancier" active={activeTab === 'echeancier'} onClick={() => setActiveTab('echeancier')} />
+                <NavItem icon={Users2} label="Mutualisation" active={activeTab === 'mutualisation'} onClick={() => setActiveTab('mutualisation')} />
               </>
             )}
 
@@ -423,6 +426,7 @@ function App() {
           {activeTab === 'evenements' && user.role === 'admin' && <EvenementsPage />}
           {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}
           {activeTab === 'echeancier' && user.role === 'admin' && <EcheancierPage />}
+          {activeTab === 'mutualisation' && user.role === 'admin' && <MutualisationPage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
         </main>

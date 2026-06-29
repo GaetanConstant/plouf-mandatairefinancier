@@ -22,9 +22,14 @@ export function MainCourantePage() {
                     <h1 className="text-3xl font-bold tracking-tight">Main courante</h1>
                     <p className="text-muted-foreground">Journal chronologique des recettes et dépenses (annexe 8).</p>
                 </div>
-                <a href={`${API_URL}/main-courante/export`} target="_blank" rel="noopener noreferrer">
-                    <Button className="gap-2"><Download className="w-4 h-4" /> Export annexe 8 (Excel)</Button>
-                </a>
+                <div className="flex gap-2">
+                    <a href={`${API_URL}/livre-comptes/export`} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Livre de comptes (Excel)</Button>
+                    </a>
+                    <a href={`${API_URL}/main-courante/export`} target="_blank" rel="noopener noreferrer">
+                        <Button className="gap-2"><Download className="w-4 h-4" /> Export annexe 8 (Excel)</Button>
+                    </a>
+                </div>
             </header>
 
             <div className="rounded-md border border-border bg-card overflow-auto">
