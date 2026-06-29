@@ -56,7 +56,9 @@ class Election(Base):
     circonscription: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     population: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    date_tour1: Mapped[date] = mapped_column(Date)
+    # Nullable : une Election peut être créée incomplète (stub de migration /
+    # saisie en cours) ; la date est requise au niveau service avant dépôt.
+    date_tour1: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     date_tour2: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # Plafond calculé par population, mais stocké (surchargeable).
@@ -216,7 +218,9 @@ class Recette(Base):
     categorie: Mapped[enums.CategorieRecette] = mapped_column(_enum(enums.CategorieRecette))
     montant: Mapped[float] = mapped_column(Float)
     date_versement: Mapped[date] = mapped_column(Date)
-    mode: Mapped[enums.ModePaiement] = mapped_column(_enum(enums.ModePaiement))
+    # Nullable : mode inconnu pour les données importées (legacy) ; requis au
+    # niveau service pour toute nouvelle saisie.
+    mode: Mapped[Optional[enums.ModePaiement]] = mapped_column(_enum(enums.ModePaiement), nullable=True)
     num_releve_bancaire: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     num_piece: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     rubrique_imputation: Mapped[str] = mapped_column(String(32))  # 7xxx (validée au service)

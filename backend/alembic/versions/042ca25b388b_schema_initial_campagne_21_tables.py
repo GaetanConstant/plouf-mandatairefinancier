@@ -1,8 +1,8 @@
 """schema initial campagne (21 tables)
 
-Revision ID: aef2fe119cba
+Revision ID: 042ca25b388b
 Revises: 
-Create Date: 2026-06-29 21:55:03.115959
+Create Date: 2026-06-29 22:00:53.526084
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'aef2fe119cba'
+revision: str = '042ca25b388b'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -36,7 +36,7 @@ def upgrade() -> None:
     sa.Column('libelle', sa.String(length=255), nullable=False),
     sa.Column('circonscription', sa.String(length=255), nullable=True),
     sa.Column('population', sa.Integer(), nullable=True),
-    sa.Column('date_tour1', sa.Date(), nullable=False),
+    sa.Column('date_tour1', sa.Date(), nullable=True),
     sa.Column('date_tour2', sa.Date(), nullable=True),
     sa.Column('plafond_depenses', sa.Float(), nullable=True),
     sa.Column('date_limite_depot', sa.Date(), nullable=True),
@@ -252,7 +252,7 @@ def upgrade() -> None:
     sa.Column('categorie', sa.Enum('don', 'apport_perso', 'pret', 'contribution_parti', 'produit_divers', 'collecte', name='categorierecette', native_enum=False, length=32), nullable=False),
     sa.Column('montant', sa.Float(), nullable=False),
     sa.Column('date_versement', sa.Date(), nullable=False),
-    sa.Column('mode', sa.Enum('cheque', 'virement', 'cb', 'prelevement', 'especes', 'plateforme', name='modepaiement', native_enum=False, length=32), nullable=False),
+    sa.Column('mode', sa.Enum('cheque', 'virement', 'cb', 'prelevement', 'especes', 'plateforme', name='modepaiement', native_enum=False, length=32), nullable=True),
     sa.Column('num_releve_bancaire', sa.String(length=64), nullable=True),
     sa.Column('num_piece', sa.String(length=64), nullable=True),
     sa.Column('rubrique_imputation', sa.String(length=32), nullable=False),
