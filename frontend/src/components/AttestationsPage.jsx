@@ -51,6 +51,24 @@ export function AttestationsPage({ campaignId }) {
         }
     });
 
+    const { data: recus } = useQuery({
+        queryKey: ['recus', campaignId],
+        queryFn: async () => (await axios.get(`${API_URL}/recus`, { withCredentials: true })).data,
+    });
+
+    // recette_id -> n° de formule (reçus délivrés uniquement)
+    const recuByRecette = {};
+    (recus || []).forEach(r => { if (r.statut === 'delivre') recuByRecette[r.recette_id] = r.numero_formule; });
+
+    const issueMutation = useMutation({
+        mutationFn: async (id) => axios.post(`${API_URL}/recettes/${id}/recu`, {}, { withCredentials: true }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['recus', campaignId]);
+            queryClient.invalidateQueries(['carnets']);
+        },
+        onError: (err) => alert(err.response?.data?.detail || "Impossible de délivrer le reçu"),
+    });
+
     const handleDownload = (id) => {
         // Use window.location.href to ensure cookies are sent if opening in same tab, 
         // or _blank relies on browser cookie policy. 
@@ -198,6 +216,23 @@ export function AttestationsPage({ campaignId }) {
                                     </span>
                                 </label>
                             </div>
+
+                            {recuByRecette[item.id] ? (
+                                <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-3 py-2 rounded-xl font-bold font-mono border border-primary/20" title="Reçu numéroté délivré">
+                                    N° {recuByRecette[item.id]}
+                                </span>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => issueMutation.mutate(item.id)}
+                                    isLoading={issueMutation.isPending && issueMutation.variables === item.id}
+                                    className="h-12 px-3 rounded-xl text-xs font-semibold hover:bg-primary/10 hover:text-primary"
+                                    title="Attribuer un numéro de reçu depuis un carnet"
+                                >
+                                    Délivrer reçu
+                                </Button>
+                            )}
 
                             <Button
                                 onClick={() => handleDownload(item.id)}
