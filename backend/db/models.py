@@ -202,6 +202,7 @@ class Donateur(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nom: Mapped[str] = mapped_column(String(120))
     prenom: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    adresse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # requise pour le reçu fiscal
     nationalite: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     pays_residence: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     est_personne_physique: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -226,6 +227,11 @@ class Recette(Base):
     rubrique_imputation: Mapped[str] = mapped_column(String(32))  # 7xxx (validée au service)
     justificatif_doc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document.id"), nullable=True)
     evenement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("evenement.id"), nullable=True)
+
+    # Suivi de l'envoi de l'attestation au donateur (distinct du statut de la
+    # formule dans le carnet, géré par RecuDon en phase 1b).
+    recu_genere: Mapped[bool] = mapped_column(Boolean, default=False)
+    date_envoi: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     donateur: Mapped[Optional["Donateur"]] = relationship(back_populates="recettes")
     recu: Mapped[Optional["RecuDon"]] = relationship(back_populates="recette", uselist=False)

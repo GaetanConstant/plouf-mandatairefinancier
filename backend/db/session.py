@@ -54,6 +54,29 @@ def init_campaign_schema(campaign_id: str) -> None:
     Base.metadata.create_all(engine)
 
 
+def provision_campaign_db(campaign_id: str) -> None:
+    """Crée la base SQLite d'une campagne et l'amène à head via Alembic.
+
+    Idempotent. Config sans fichier .ini pour ne pas perturber le logging.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = campaign_db_path(campaign_id)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    cfg = Config()
+    cfg.set_main_option("script_location", os.path.join(backend_dir, "alembic"))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{path}")
+    command.upgrade(cfg, "head")
+
+
+def ensure_campaign_db(campaign_id: str) -> None:
+    """Provisionne la base de campagne si son fichier SQLite n'existe pas encore."""
+    if not os.path.exists(campaign_db_path(campaign_id)):
+        provision_campaign_db(campaign_id)
+
+
 def get_session(campaign_id: str) -> Session:
     """Ouvre une nouvelle session (à fermer par l'appelant)."""
     get_engine(campaign_id)
