@@ -14,7 +14,7 @@ nombre quelconque de parties.
 from __future__ import annotations
 
 import io
-from datetime import datetime
+import os
 from typing import Optional
 
 from fastapi import HTTPException
@@ -168,55 +168,82 @@ def delete_mutualisee(campaign_id: str, mut_id: int) -> dict:
     return {"message": "Dépense mutualisée supprimée"}
 
 
-# ── Convention PDF ───────────────────────────────────────────────────────────
+# ── Convention PDF (reprend le template + le pipeline WeasyPrint de l'utilisateur) ─
 
-def _safe(text, limit: int = 110) -> str:
-    return str(text if text is not None else "")[:limit].encode("latin-1", "replace").decode("latin-1")
+def _pct(v) -> str:
+    if v is None:
+        return ""
+    if float(v).is_integer():
+        return f"{int(v)} %"
+    return f"{v:.2f}".replace(".", ",") + " %"
+
+
+def _montant(v) -> str:
+    return f"{(v or 0):,.2f}".replace(",", " ").replace(".", ",")
+
+
+_TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "templates", "convention_mutualisation.html")
 
 
 def convention_pdf(campaign_id: str, mut_id: int) -> bytes:
-    from fpdf import FPDF
+    # WeasyPrint a besoin de Pango/GLib (Homebrew) sur macOS.
+    os.environ.setdefault("DYLD_LIBRARY_PATH", "/opt/homebrew/lib")
+    from jinja2 import Template
+    from weasyprint import HTML
+
+    import identite
+    ident = identite.get_identite(campaign_id)
+    election = ident.get("election") or {}
+    candidat = ident.get("candidat") or {}
+    mandataire_d = ident.get("mandataire") or {}
 
     with campaign_session(campaign_id) as s:
         m = s.get(DepenseMutualisee, mut_id)
         if not m:
             raise HTTPException(status_code=404, detail="Dépense mutualisée introuvable")
         data = _mutualisee_dict(s, m)
+        parties_ext = {p.id: p for p in s.scalars(select(PartieExterne)).all()}
 
-    pdf = FPDF()
-    pdf.add_page()
-    printable = pdf.w - pdf.l_margin - pdf.r_margin
+    election_label = election.get("libelle") or "l'élection"
+    mand_nom = " ".join(filter(None, [mandataire_d.get("civilite"), mandataire_d.get("prenom"),
+                                      mandataire_d.get("nom")])).strip() or None
+    cand_nom = " ".join(filter(None, [candidat.get("prenom"), candidat.get("nom")])).strip() or "Notre campagne"
 
-    pdf.set_font("helvetica", "B", 15)
-    pdf.cell(0, 12, _safe("CONVENTION DE DÉPENSE MUTUALISÉE"), ln=True, align="C")
-    pdf.ln(2)
-    pdf.set_font("helvetica", size=11)
-    pdf.multi_cell(printable, 7, _safe(f"Objet : {data['objet']}"))
-    pdf.cell(0, 7, _safe(f"Montant total TTC : {data['montant_total_ttc']:.2f} EUR"), ln=True)
-    pdf.ln(2)
-
-    if data["cle_justification"]:
-        pdf.set_font("helvetica", "B", 11)
-        pdf.cell(0, 7, _safe("Clé de répartition :"), ln=True)
-        pdf.set_font("helvetica", size=10)
-        pdf.multi_cell(printable, 6, _safe(data["cle_justification"], 600))
-        pdf.ln(2)
-
-    pdf.set_font("helvetica", "B", 11)
-    pdf.cell(0, 8, _safe("Répartition entre les parties :"), ln=True)
-    pdf.set_font("helvetica", size=10)
+    parties = []
     for r in data["repartitions"]:
-        pdf.multi_cell(printable, 6, _safe(
-            f"  - {r['nom']} : {r['pourcentage']:.2f} %  ->  {r['montant']:.2f} EUR  ({r['statut_reglement'] or 'sans objet'})"))
+        if r["partie"] == "notre_campagne":
+            nom = cand_nom
+            qualite = f"candidat aux {election_label}" if cand_nom != "Notre campagne" else ""
+        else:
+            pe = parties_ext.get(r["partie_id"])
+            nom = (" ".join(filter(None, [pe.prenom_ou_liste, pe.nom])).strip() if pe else r["nom"])
+            qualite = (f"candidat — {pe.scrutin}" if pe and pe.scrutin else "")
+        parties.append({
+            "nom": nom,
+            "qualite": qualite,
+            "pourcentage": _pct(r["pourcentage"]),
+            "montant": _montant(r["montant"]),
+        })
 
-    pdf.ln(8)
-    pdf.set_font("helvetica", size=10)
-    pdf.cell(0, 7, _safe(f"Fait le {datetime.now().strftime('%d/%m/%Y')}"), ln=True)
-    pdf.ln(10)
-    for r in data["repartitions"]:
-        pdf.cell(0, 12, _safe(f"Signature {r['nom']} : ______________________"), ln=True)
+    justification = [ln.strip() for ln in (data["cle_justification"] or "").replace(";", "\n").splitlines()
+                     if ln.strip()]
 
-    return bytes(pdf.output())
+    context = {
+        "conv_num": f"CONV-{mut_id:03d}",
+        "election_label": election_label,
+        "nature_depense": data["objet"],
+        "description_depense": [f"{data['objet']} — {_montant(data['montant_total_ttc'])} € TTC"],
+        "mandataire": mand_nom,
+        "parties": parties,
+        "justification": justification,
+        "lieu": candidat.get("ville") or election.get("circonscription") or "",
+        "date_signature": "__ ________ ____",
+    }
+
+    with open(_TEMPLATE_PATH, encoding="utf-8") as f:
+        html = Template(f.read()).render(**context)
+    return HTML(string=html).write_pdf()
 
 
 # ── État des dépenses mutualisées (Excel) ────────────────────────────────────
