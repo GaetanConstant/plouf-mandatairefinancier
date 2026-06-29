@@ -55,6 +55,8 @@ class Election(Base):
     libelle: Mapped[str] = mapped_column(String(255))
     circonscription: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     population: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    nom_liste: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    nuance_politique: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Nullable : une Election peut être créée incomplète (stub de migration /
     # saisie en cours) ; la date est requise au niveau service avant dépôt.
@@ -101,6 +103,8 @@ class Candidat(Base):
     nom_usage: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     prenom: Mapped[str] = mapped_column(String(120))
     date_naissance: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    lieu_naissance: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    mandat_parlementaire: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     tete_de_liste: Mapped[bool] = mapped_column(Boolean, default=False)
 
     adresse_postale: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -203,6 +207,8 @@ class Donateur(Base):
     nom: Mapped[str] = mapped_column(String(120))
     prenom: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     adresse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # requise pour le reçu fiscal
+    code_postal: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    ville: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     nationalite: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     pays_residence: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     est_personne_physique: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -223,10 +229,14 @@ class Recette(Base):
     # niveau service pour toute nouvelle saisie.
     mode: Mapped[Optional[enums.ModePaiement]] = mapped_column(_enum(enums.ModePaiement), nullable=True)
     num_releve_bancaire: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    num_cheque_remise: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    date_remise_banque: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    rapprochement: Mapped[bool] = mapped_column(Boolean, default=False)
     num_piece: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     rubrique_imputation: Mapped[str] = mapped_column(String(32))  # 7xxx (validée au service)
     justificatif_doc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document.id"), nullable=True)
     evenement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("evenement.id"), nullable=True)
+    emprunt_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # lien Emprunt (applicatif)
 
     # Suivi de l'envoi de l'attestation au donateur (distinct du statut de la
     # formule dans le carnet, géré par RecuDon en phase 1b).
@@ -272,6 +282,8 @@ class Depense(Base):
     date_reglement: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     mode: Mapped[Optional[enums.ModePaiement]] = mapped_column(_enum(enums.ModePaiement), nullable=True)
     num_releve_bancaire: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    num_cheque_remise: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    rapprochement: Mapped[bool] = mapped_column(Boolean, default=False)
     num_piece: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     rubrique_imputation: Mapped[str] = mapped_column(String(32))  # 6xxx (validée au service)
     facture_doc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document.id"), nullable=True)
@@ -403,6 +415,54 @@ class RepartitionMutualisee(Base):
     )
 
     depense_mutualisee: Mapped["DepenseMutualisee"] = relationship(back_populates="repartitions")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Annexes CNCCFP — colistiers, équipe, emprunts
+# ──────────────────────────────────────────────────────────────────────────
+
+class Colistier(Base):
+    __tablename__ = "colistier"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    election_id: Mapped[int] = mapped_column(ForeignKey("election.id"))
+    ordre: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    civilite: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    prenom: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    nom: Mapped[str] = mapped_column(String(120))
+    mandat_parlementaire: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    present_tour1: Mapped[bool] = mapped_column(Boolean, default=True)
+    present_tour2: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class MembreEquipe(Base):
+    __tablename__ = "membre_equipe"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    election_id: Mapped[int] = mapped_column(ForeignKey("election.id"))
+    prenom: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    nom: Mapped[str] = mapped_column(String(120))
+    fonction: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class Emprunt(Base):
+    __tablename__ = "emprunt"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    election_id: Mapped[int] = mapped_column(ForeignKey("election.id"))
+    type: Mapped[enums.TypeEmprunt] = mapped_column(_enum(enums.TypeEmprunt))
+    # Prêteur (établissement / parti / personne physique selon le type)
+    preteur_nom: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    preteur_civilite: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    preteur_prenom: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    preteur_pays: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Contrat
+    date_contrat: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    duree_mois: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    date_fin: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    taux: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    montant: Mapped[float] = mapped_column(Float)
+    contrat_doc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document.id"), nullable=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────

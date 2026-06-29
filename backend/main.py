@@ -21,6 +21,7 @@ import frise
 import rapport
 import mutualisation
 import livre_comptes
+import annexes
 from db import provision_campaign_db
 from typing import List
 import os
@@ -769,6 +770,53 @@ def export_livre_comptes(current_user: dict = Depends(get_current_user), campaig
     return StreamingResponse(io.BytesIO(xlsx),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=livre_comptes_{campaign_id}.xlsx"})
+
+
+# --- Annexes CNCCFP : colistiers, équipe, emprunts ---
+
+@app.get("/colistiers")
+def list_colistiers(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.list_colistiers(campaign_id)
+
+
+@app.post("/colistiers")
+def create_colistier(payload: annexes.ColistierIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.create_colistier(campaign_id, payload)
+
+
+@app.delete("/colistiers/{colistier_id}")
+def delete_colistier(colistier_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.delete_colistier(campaign_id, colistier_id)
+
+
+@app.get("/equipe")
+def list_equipe(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.list_equipe(campaign_id)
+
+
+@app.post("/equipe")
+def create_membre(payload: annexes.MembreEquipeIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.create_membre(campaign_id, payload)
+
+
+@app.delete("/equipe/{membre_id}")
+def delete_membre(membre_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.delete_membre(campaign_id, membre_id)
+
+
+@app.get("/emprunts")
+def list_emprunts(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.list_emprunts(campaign_id)
+
+
+@app.post("/emprunts")
+def create_emprunt(payload: annexes.EmpruntIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.create_emprunt(campaign_id, payload)
+
+
+@app.delete("/emprunts/{emprunt_id}")
+def delete_emprunt(emprunt_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return annexes.delete_emprunt(campaign_id, emprunt_id)
 
 
 if __name__ == "__main__":
