@@ -6,7 +6,14 @@ campagne, stocké dans `data/campaigns/<id>.db` (un fichier SQLite par campagne)
 """
 
 from db.base import Base
-from db.session import get_engine, get_session, campaign_session, init_campaign_schema
+from db.session import (
+    get_engine,
+    get_session,
+    campaign_session,
+    init_campaign_schema,
+    provision_campaign_db,
+    ensure_campaign_db,
+)
 
 __all__ = [
     "Base",
@@ -14,4 +21,6 @@ __all__ = [
     "get_session",
     "campaign_session",
     "init_campaign_schema",
+    "provision_campaign_db",
+    "ensure_campaign_db",
 ]

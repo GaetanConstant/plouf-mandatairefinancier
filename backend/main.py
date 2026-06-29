@@ -9,6 +9,8 @@ import pdf_utils
 from database import init_central_db, get_central_db_connection, get_db_connection, update_db_from_excel, push_db_to_excel_and_cloud, CAMPAIGNS_DIR
 from dl_owncloud import download_file_from_owncloud
 from models import Recette, Depense, SpendingStats
+import comptes
+from db import provision_campaign_db
 from typing import List
 import os
 import re
@@ -146,7 +148,10 @@ def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_c
                          [current_user["username"], campaign_id])
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Erreur lors de la création de la campagne: {str(e)}")
-            
+
+    # Provisionne la base SQLite ORM de la campagne (tables + version Alembic).
+    provision_campaign_db(campaign_id)
+
     return {"id": campaign_id, "name": campaign.name}
 
 @app.post("/select-campaign/{campaign_id}")
@@ -271,9 +276,9 @@ def change_password(update: UserPasswordUpdate, current_user: dict = Depends(get
         conn.execute("UPDATE users SET hashed_password = ? WHERE username = ?", [new_hash, current_user["username"]])
     return {"message": "Mot de passe modifié avec succès"}
 
-PLAFOND_LEGAL = 154781.0
-TAUX_REMBOURSEMENT = 0.475
-LIMITE_DON_INDIVIDUEL = 4600.0
+
+# Plafond, taux de remboursement et limite de don sont désormais centralisés
+# dans le service `comptes` (le plafond est propre à chaque Election).
 
 
 def get_campaign_conn(campaign_id: str = Depends(get_active_campaign)):
@@ -283,112 +288,36 @@ def get_campaign_conn(campaign_id: str = Depends(get_active_campaign)):
 
 @app.get("/stats", response_model=SpendingStats)
 def get_stats(campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        total_depenses = conn.execute("SELECT COALESCE(SUM(montant_ttc), 0) FROM depenses").fetchone()[0]
-        # On ne compte que les vrais 'Payé' (non nature) pour la trésorerie
-        total_depenses_payees = conn.execute("SELECT COALESCE(SUM(montant_ttc), 0) FROM depenses WHERE statut = 'Payé' AND is_nature = FALSE").fetchone()[0]
-        total_nature = conn.execute("SELECT COALESCE(SUM(montant_ttc), 0) FROM depenses WHERE is_nature = TRUE").fetchone()[0]
-        total_recettes = conn.execute("SELECT COALESCE(SUM(montant), 0) FROM recettes").fetchone()[0]
-        nombre_donateurs = conn.execute("SELECT COUNT(DISTINCT nom_donateur) FROM recettes WHERE type = 'Don'").fetchone()[0]
-        
-    consommation = (total_depenses / PLAFOND_LEGAL) * 100
-    estimation_remboursement = min((total_depenses - total_nature) * TAUX_REMBOURSEMENT, PLAFOND_LEGAL * TAUX_REMBOURSEMENT)
-    reste_a_depenser = PLAFOND_LEGAL - total_depenses
-    
-    # Trésorerie simplifiée
-    solde_tresorerie = total_recettes - total_depenses_payees
-    solde_previsionnel = total_recettes - (total_depenses - total_nature)
-    
-    if total_recettes > 0:
-        consommation_budget_actuel = (total_depenses_payees / total_recettes) * 100
-    else:
-        consommation_budget_actuel = 0.0 if total_depenses_payees == 0 else 100.0
-
-    return SpendingStats(
-        total_depenses=total_depenses,
-        total_depenses_payees=total_depenses_payees,
-        total_recettes=total_recettes,
-        plafond=PLAFOND_LEGAL,
-        consommation_plafond=consommation,
-        estimation_remboursement=estimation_remboursement,
-        reste_a_depenser=reste_a_depenser,
-        nombre_donateurs=nombre_donateurs,
-        solde_tresorerie=solde_tresorerie,
-        solde_previsionnel=solde_previsionnel,
-        consommation_budget_actuel=consommation_budget_actuel,
-        total_nature_hors_tresorerie=total_nature
-    )
+    return SpendingStats(**comptes.compute_stats(campaign_id))
 
 @app.post("/recettes")
 def create_recette(recette: Recette, campaign_id: str = Depends(get_campaign_conn)):
-    # Check limit per donor
-    with get_db_connection(campaign_id) as conn:
-        current_total = conn.execute("SELECT COALESCE(SUM(montant), 0) FROM recettes WHERE nom_donateur = ? AND type = 'Don'", [recette.nom_donateur]).fetchone()[0]
-        if recette.type == 'Don' and (current_total + recette.montant > LIMITE_DON_INDIVIDUEL):
-            raise HTTPException(status_code=400, detail=f"Le donateur {recette.nom_donateur} dépasse le plafond de {LIMITE_DON_INDIVIDUEL}€ (Déjà donné: {current_total}€)")
+    return comptes.create_recette(campaign_id, recette)
 
-        conn.execute("""
-            INSERT INTO recettes (date, nom_donateur, adresse, montant, type, recu_genere, date_envoi)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, [recette.date, recette.nom_donateur, recette.adresse, recette.montant, recette.type, recette.recu_genere, recette.date_envoi])
-    return {"message": "Recette ajoutée"}
-
-
-import pandas as pd
-
-# ... (rest of imports)
 
 @app.put("/recettes/{recette_id}")
 def update_recette(recette_id: int, update: Recette, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        conn.execute("""
-            UPDATE recettes 
-            SET nom_donateur = ?, adresse = ?, date = ?, montant = ?, type = ?
-            WHERE id = ?
-        """, [update.nom_donateur, update.adresse, update.date, update.montant, update.type, recette_id])
-    return {"message": "Recette mise à jour"}
+    return comptes.update_recette(campaign_id, recette_id, update)
+
 
 @app.get("/recettes")
 def list_recettes(campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        df = conn.execute("SELECT * FROM recettes ORDER BY date DESC").fetchdf()
-        # Ensure date is string for JSON
-        if not df.empty and 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-        # Replace NaN with None for JSON serialization
-        df = df.astype(object).where(pd.notnull(df), None)
-        return df.to_dict(orient="records")
+    return comptes.list_recettes(campaign_id)
+
 
 @app.post("/depenses")
 def create_depense(depense: Depense, campaign_id: str = Depends(get_campaign_conn)):
-    # Force status for nature items if they were set to Payé by mistake in the form
-    actual_status = "Réalisé (Nature)" if depense.is_nature else depense.statut
-    
-    with get_db_connection(campaign_id) as conn:
-        conn.execute("""
-            INSERT INTO depenses (date, libelle, fournisseur, montant_ttc, tva, categorie_cnccfp, statut, justificatif_path, is_nature)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, [depense.date, depense.libelle, depense.fournisseur, depense.montant_ttc, depense.tva, depense.categorie_cnccfp, actual_status, depense.justificatif_path, depense.is_nature])
-    return {"message": "Dépense ajoutée"}
+    return comptes.create_depense(campaign_id, depense)
 
 
 @app.get("/depenses")
 def list_depenses(campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        df = conn.execute("SELECT * FROM depenses ORDER BY date DESC").fetchdf()
-        # Ensure date is string for JSON
-        if not df.empty and 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-        # Replace NaN with None for JSON serialization
-        df = df.astype(object).where(pd.notnull(df), None)
-        return df.to_dict(orient="records")
+    return comptes.list_depenses(campaign_id)
+
 
 @app.get("/fournisseurs")
 def list_fournisseurs(campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        # Get unique suppliers, excluding empty ones
-        rows = conn.execute("SELECT DISTINCT fournisseur FROM depenses WHERE fournisseur IS NOT NULL AND fournisseur != '' ORDER BY fournisseur ASC").fetchall()
-        return [row[0] for row in rows]
+    return comptes.list_fournisseurs(campaign_id)
 
 def safe_upload_name(original_name: str) -> str:
     """Assainit un nom de fichier et le rend unique (anti path-traversal / collision)."""
@@ -450,9 +379,14 @@ def export_data(campaign_id: str = Depends(get_campaign_conn)):
     recettes_csv_path = os.path.join(tmpdirname, "recettes.csv")
     zip_path = os.path.join(tmpdirname, zip_filename)
 
-    with get_db_connection(campaign_id) as conn:
-        conn.execute(f"COPY (SELECT * FROM depenses) TO '{depenses_csv_path}' (HEADER, DELIMITER ',')")
-        conn.execute(f"COPY (SELECT * FROM recettes) TO '{recettes_csv_path}' (HEADER, DELIMITER ',')")
+    import csv
+    depenses, recettes = comptes.export_csv_rows(campaign_id)
+    for path, rows in ((depenses_csv_path, depenses), (recettes_csv_path, recettes)):
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            if rows:
+                writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(rows)
 
     with zipfile.ZipFile(zip_path, 'w') as zipf:
         zipf.write(depenses_csv_path, "depenses.csv")
@@ -488,6 +422,14 @@ async def sync_budget(current_user: dict = Depends(get_current_user), campaign_i
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Seul un administrateur peut synchroniser le budget")
 
+    # Désactivé temporairement : cette synchro écrit dans l'ancienne base DuckDB.
+    # Depuis le passage à l'ORM SQLite, elle créerait une divergence de données.
+    # À reporter sur le nouveau modèle (import Excel → ORM) dans une phase ultérieure.
+    raise HTTPException(
+        status_code=503,
+        detail="Synchronisation Budget en cours de portage vers le nouveau modèle de données (indisponible temporairement).",
+    )
+
     # Configuration du téléchargement (lien de partage public, depuis .env)
     downloaded_url = OWNCLOUD_SHARE_URL
     password = OWNCLOUD_SHARE_PASSWORD
@@ -521,7 +463,14 @@ async def push_budget(current_user: dict = Depends(get_current_user), campaign_i
     """
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Seul un administrateur peut exporter le budget")
-    
+
+    # Désactivé temporairement : lit l'ancienne base DuckDB (divergente depuis le
+    # passage à l'ORM SQLite). À reporter sur le nouveau modèle ultérieurement.
+    raise HTTPException(
+        status_code=503,
+        detail="Export Budget vers OwnCloud en cours de portage vers le nouveau modèle de données (indisponible temporairement).",
+    )
+
     # Configuration OwnCloud issue du fichier .env
     hostname = OWNCLOUD_HOSTNAME
     username = OWNCLOUD_USERNAME
@@ -534,32 +483,19 @@ async def push_budget(current_user: dict = Depends(get_current_user), campaign_i
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _ascii_filename(value: str) -> str:
+    """Nom de fichier ASCII sûr pour l'en-tête Content-Disposition (évite les
+    erreurs d'encodage d'en-tête HTTP avec les accents)."""
+    import unicodedata
+    norm = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^A-Za-z0-9._-]", "_", norm) or "fichier"
+
+
 @app.get("/attestations/recette/{recette_id}")
 def get_recette_pdf(recette_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        row = conn.execute("SELECT * FROM recettes WHERE id = ?", [recette_id]).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Recette introuvable")
-        
-        # Mapping row to dict
-        # row: 0:id, 1:date, 2:nom_donateur, 3:adresse, 4:montant, 5:type
-        date_val = row[1]
-        if hasattr(date_val, 'strftime'):
-            date_str = date_val.strftime('%d/%m/%Y')
-        else:
-            date_str = str(date_val) if date_val else 'N/A'
-
-        data = {
-            "id": row[0],
-            "date": date_str,
-            "nom_donateur": row[2],
-            "adresse": row[3],
-            "montant": row[4],
-            "type": row[5]
-        }
-        
+    data = comptes.get_recette_pdf_data(campaign_id, recette_id)
     pdf_bytes = pdf_utils.generate_donation_receipt(data, SIGNATURE_PATH)
-    filename = f"attestation_{data['nom_donateur'].replace(' ', '_')}.pdf"
+    filename = _ascii_filename(f"attestation_{data['nom_donateur'] or 'donateur'}") + ".pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -568,47 +504,18 @@ def get_recette_pdf(recette_id: int, current_user: dict = Depends(get_current_us
 
 @app.get("/attestations/depense/{depense_id}")
 def get_depense_pdf(depense_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        row = conn.execute("SELECT * FROM depenses WHERE id = ?", [depense_id]).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Dépense introuvable")
-        
-        # Mapping row to dict
-        # row: 0:id, 1:date, 2:libelle, 3:fournisseur, 4:montant_ttc, 5:tva, 6:categorie_cnccfp
-        date_val = row[1]
-        if hasattr(date_val, 'strftime'):
-            date_str = date_val.strftime('%d/%m/%Y')
-        else:
-            date_str = str(date_val) if date_val else 'N/A'
-
-        data = {
-            "id": row[0],
-            "date": date_str,
-            "libelle": row[2],
-            "fournisseur": row[3],
-            "montant_ttc": row[4],
-            "tva": row[5],
-            "categorie_cnccfp": row[6]
-        }
-        
+    data = comptes.get_depense_pdf_data(campaign_id, depense_id)
     pdf_bytes = pdf_utils.generate_expense_certification(data, SIGNATURE_PATH)
-    filename = f"justificatif_{data['libelle'].replace(' ', '_')}.pdf"
+    filename = _ascii_filename(f"justificatif_{data['libelle'] or 'depense'}") + ".pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
 @app.post("/attestations/recette/{recette_id}/sent")
 def mark_recette_sent(recette_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    with get_db_connection(campaign_id) as conn:
-        current = conn.execute("SELECT date_envoi FROM recettes WHERE id = ?", [recette_id]).fetchone()
-        if current and current[0]:
-            conn.execute("UPDATE recettes SET date_envoi = NULL, recu_genere = FALSE WHERE id = ?", [recette_id])
-            return {"message": "Marquage annulé", "date_envoi": None}
-        else:
-            today = datetime.now().strftime('%d/%m/%Y %H:%M')
-            conn.execute("UPDATE recettes SET date_envoi = ?, recu_genere = TRUE WHERE id = ?", [today, recette_id])
-            return {"message": "Attestation marquée comme envoyée", "date_envoi": today}
+    return comptes.toggle_recette_sent(campaign_id, recette_id)
 
 
 if __name__ == "__main__":

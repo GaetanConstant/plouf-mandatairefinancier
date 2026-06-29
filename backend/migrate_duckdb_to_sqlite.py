@@ -163,17 +163,19 @@ def migrate_campaign(campaign_id: str, force: bool = False) -> None:
 
         # Recettes
         rows = src.execute(
-            "SELECT date, nom_donateur, montant, type, recu_genere FROM recettes"
+            "SELECT date, nom_donateur, adresse, montant, type, recu_genere, date_envoi FROM recettes"
         ).fetchall()
-        for d, nom_donateur, montant, type_, recu_genere in rows:
+        for d, nom_donateur, adresse, montant, type_, recu_genere, date_envoi in rows:
             categorie = _map_categorie_recette(type_)
             nom = _clean_donor_name(nom_donateur) or "Inconnu"
             don = donateurs.get(nom)
             if don is None:
-                don = Donateur(nom=nom, est_personne_physique=True)
+                don = Donateur(nom=nom, adresse=adresse, est_personne_physique=True)
                 session.add(don)
                 donateurs[nom] = don
                 stats["donateurs"] += 1
+            elif not don.adresse and adresse:
+                don.adresse = adresse
             session.add(Recette(
                 donateur=don,
                 categorie=categorie,
@@ -181,11 +183,11 @@ def migrate_campaign(campaign_id: str, force: bool = False) -> None:
                 date_versement=d,
                 mode=None,  # inconnu dans le legacy
                 rubrique_imputation=_RUBRIQUE_RECETTE.get(categorie, _RUBRIQUE_RECETTE_DEFAUT),
+                recu_genere=bool(recu_genere),
+                date_envoi=date_envoi,
             ))
             stats["recettes"] += 1
             stats["mode_inconnu"] += 1
-            if recu_genere:
-                stats["recu_genere_ignore"] += 1
 
         # Depenses
         rows = src.execute(
@@ -233,10 +235,8 @@ def migrate_campaign(campaign_id: str, force: bool = False) -> None:
     log.info("  ✅ %s recettes, %s dépenses, %s donateurs, %s documents",
              stats["recettes"], stats["depenses"], stats["donateurs"], stats["documents"])
     log.info("  ⚠️ hypothèses : mode de versement NULL sur %s recettes ; "
-             "rubrique dépense = '%s' (à re-catégoriser) sur %s dépenses ; "
-             "%s reçus 'générés' anciens non repris (pas de carnet).",
-             stats["mode_inconnu"], _RUBRIQUE_DEPENSE_DEFAUT, stats["rubrique_defaut"],
-             stats["recu_genere_ignore"])
+             "rubrique dépense = '%s' (à re-catégoriser) sur %s dépenses.",
+             stats["mode_inconnu"], _RUBRIQUE_DEPENSE_DEFAUT, stats["rubrique_defaut"])
 
 
 def _all_campaign_ids() -> list[str]:
