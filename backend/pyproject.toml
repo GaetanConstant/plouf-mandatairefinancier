@@ -13,7 +13,9 @@ dependencies = [
     "pandas>=2.2.0",
     "pyocclient>=0.6.0",
     "openpyxl>=3.1.2",
-    "fpdf2>=2.7.0"
+    "fpdf2>=2.7.0",
+    "sqlalchemy>=2.0.51",
+    "alembic>=1.16.5",
 ]
 
 [build-system]
