@@ -11,6 +11,7 @@ from dl_owncloud import download_file_from_owncloud
 from models import Recette, Depense, SpendingStats
 import comptes
 import recus
+import conformite
 from db import provision_campaign_db
 from typing import List
 import os
@@ -559,6 +560,13 @@ def issue_recu(recette_id: int, payload: RecuIssue | None = None,
 @app.post("/recus/{recu_id}/annuler")
 def annuler_recu(recu_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return recus.annuler_recu(campaign_id, recu_id)
+
+
+# --- Contrôles de conformité (moteur de règles §5) ---
+
+@app.get("/conformite")
+def get_conformite(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return conformite.run_checks(campaign_id)
 
 
 if __name__ == "__main__":
