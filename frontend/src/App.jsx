@@ -17,6 +17,7 @@ import {
   LogOut,
   Settings,
   Shield,
+  ShieldCheck,
   FileCheck,
   BookOpen,
   Droplets,
@@ -37,6 +38,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { CampaignPage } from './pages/CampaignPage';
 import { AttestationsPage } from './components/AttestationsPage';
 import { CarnetsPage } from './components/CarnetsPage';
+import { ConformitePage } from './components/ConformitePage';
 
 const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
@@ -215,6 +217,7 @@ function App() {
                 <NavItem icon={FileText} label="Justificatifs" active={activeTab === 'justificatifs'} onClick={() => setActiveTab('justificatifs')} />
                 <NavItem icon={FileCheck} label="Attestations" active={activeTab === 'attestations'} onClick={() => setActiveTab('attestations')} />
                 <NavItem icon={BookOpen} label="Reçus-dons" active={activeTab === 'carnets'} onClick={() => setActiveTab('carnets')} />
+                <NavItem icon={ShieldCheck} label="Conformité" active={activeTab === 'conformite'} onClick={() => setActiveTab('conformite')} />
               </>
             )}
 
@@ -395,6 +398,7 @@ function App() {
           {activeTab === 'justificatifs' && user.role === 'admin' && <JustificatifsList />}
           {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage campaignId={campaign.id} />}
           {activeTab === 'carnets' && user.role === 'admin' && <CarnetsPage />}
+          {activeTab === 'conformite' && user.role === 'admin' && <ConformitePage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
         </main>
