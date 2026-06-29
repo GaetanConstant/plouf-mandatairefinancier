@@ -23,6 +23,9 @@ import {
   BookText,
   ClipboardList,
   Archive,
+  CalendarDays,
+  GitCommitHorizontal,
+  Flag,
   Droplets,
   ChevronRight,
   Sun,
@@ -45,6 +48,9 @@ import { ConformitePage } from './components/ConformitePage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
+import { EvenementsPage } from './components/EvenementsPage';
+import { FrisePage } from './components/FrisePage';
+import { EcheancierPage } from './components/EcheancierPage';
 
 const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
@@ -227,6 +233,9 @@ function App() {
                 <NavItem icon={BookOpen} label="Reçus-dons" active={activeTab === 'carnets'} onClick={() => setActiveTab('carnets')} />
                 <NavItem icon={ShieldCheck} label="Conformité" active={activeTab === 'conformite'} onClick={() => setActiveTab('conformite')} />
                 <NavItem icon={Archive} label="Dépôt" active={activeTab === 'depot'} onClick={() => setActiveTab('depot')} />
+                <NavItem icon={CalendarDays} label="Événements" active={activeTab === 'evenements'} onClick={() => setActiveTab('evenements')} />
+                <NavItem icon={GitCommitHorizontal} label="Frise" active={activeTab === 'frise'} onClick={() => setActiveTab('frise')} />
+                <NavItem icon={Flag} label="Échéancier" active={activeTab === 'echeancier'} onClick={() => setActiveTab('echeancier')} />
               </>
             )}
 
@@ -411,6 +420,9 @@ function App() {
           {activeTab === 'maincourante' && user.role === 'admin' && <MainCourantePage />}
           {activeTab === 'identite' && user.role === 'admin' && <IdentitePage />}
           {activeTab === 'depot' && user.role === 'admin' && <DepotPage />}
+          {activeTab === 'evenements' && user.role === 'admin' && <EvenementsPage />}
+          {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}
+          {activeTab === 'echeancier' && user.role === 'admin' && <EcheancierPage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
         </main>
