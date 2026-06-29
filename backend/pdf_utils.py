@@ -25,6 +25,12 @@ def generate_donation_receipt(data, signature_path):
     # Titre
     pdf.set_font("helvetica", 'B', 16)
     pdf.cell(0, 20, "REÇU DE DON POUR CAMPAGNE ÉLECTORALE", ln=True, align='C')
+
+    # Numéro de formule (si un reçu numéroté a été délivré)
+    if data.get("numero_recu"):
+        pdf.set_font("helvetica", 'B', 12)
+        pdf.cell(0, 8, f"Reçu n° {data['numero_recu']}", ln=True, align='C')
+
     pdf.ln(10)
 
     # Corps

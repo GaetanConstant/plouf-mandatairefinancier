@@ -10,6 +10,7 @@ from database import init_central_db, get_central_db_connection, get_db_connecti
 from dl_owncloud import download_file_from_owncloud
 from models import Recette, Depense, SpendingStats
 import comptes
+import recus
 from db import provision_campaign_db
 from typing import List
 import os
@@ -494,6 +495,7 @@ def _ascii_filename(value: str) -> str:
 @app.get("/attestations/recette/{recette_id}")
 def get_recette_pdf(recette_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     data = comptes.get_recette_pdf_data(campaign_id, recette_id)
+    data["numero_recu"] = recus.numero_recu_pour_recette(campaign_id, recette_id)
     pdf_bytes = pdf_utils.generate_donation_receipt(data, SIGNATURE_PATH)
     filename = _ascii_filename(f"attestation_{data['nom_donateur'] or 'donateur'}") + ".pdf"
     return StreamingResponse(
@@ -516,6 +518,47 @@ def get_depense_pdf(depense_id: int, current_user: dict = Depends(get_current_us
 @app.post("/attestations/recette/{recette_id}/sent")
 def mark_recette_sent(recette_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return comptes.toggle_recette_sent(campaign_id, recette_id)
+
+
+# --- Carnets de reçus-dons & reçus numérotés (Bloc C) ---
+
+class CarnetCreate(BaseModel):
+    numero_carnet: str
+    numero_formule_debut: int
+    numero_formule_fin: int
+    date_retrait_prefecture: str | None = None
+
+
+class RecuIssue(BaseModel):
+    carnet_id: int | None = None
+
+
+@app.get("/carnets")
+def list_carnets(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return recus.list_carnets(campaign_id)
+
+
+@app.post("/carnets")
+def create_carnet(carnet: CarnetCreate, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return recus.create_carnet(campaign_id, carnet.numero_carnet, carnet.numero_formule_debut,
+                               carnet.numero_formule_fin, carnet.date_retrait_prefecture)
+
+
+@app.get("/recus")
+def list_recus(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return recus.list_recus(campaign_id)
+
+
+@app.post("/recettes/{recette_id}/recu")
+def issue_recu(recette_id: int, payload: RecuIssue | None = None,
+               current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    carnet_id = payload.carnet_id if payload else None
+    return recus.issue_recu(campaign_id, recette_id, carnet_id)
+
+
+@app.post("/recus/{recu_id}/annuler")
+def annuler_recu(recu_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return recus.annuler_recu(campaign_id, recu_id)
 
 
 if __name__ == "__main__":
