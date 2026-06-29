@@ -12,6 +12,7 @@ from models import Recette, Depense, SpendingStats
 import comptes
 import recus
 import conformite
+import maincourante
 from db import provision_campaign_db
 from typing import List
 import os
@@ -567,6 +568,24 @@ def annuler_recu(recu_id: int, current_user: dict = Depends(get_current_user), c
 @app.get("/conformite")
 def get_conformite(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return conformite.run_checks(campaign_id)
+
+
+# --- Main courante (annexe 8) ---
+
+@app.get("/main-courante")
+def get_main_courante(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return maincourante.journal(campaign_id)
+
+
+@app.get("/main-courante/export")
+def export_main_courante(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    xlsx = maincourante.export_annexe8_xlsx(campaign_id)
+    filename = f"main_courante_annexe8_{campaign_id}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 if __name__ == "__main__":
