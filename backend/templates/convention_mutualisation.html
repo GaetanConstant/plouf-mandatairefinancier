@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 2.5cm; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; line-height: 1.5; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 30px; font-size: 10pt; }
+  .header-right { font-style: italic; text-align: right; }
+  h1 { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; margin: 40px 0 10px 0; }
+  .nature { text-align: center; font-size: 14pt; font-weight: bold; color: #cc0000; text-transform: uppercase; margin-bottom: 40px; }
+  p { text-align: justify; margin-bottom: 12px; }
+  .partie { font-weight: bold; }
+  .repartition { margin: 15px 0 15px 30px; }
+  .repartition li { margin-bottom: 4px; list-style: none; }
+  .repartition li::before { content: "- "; }
+  .footer-text { margin-top: 30px; }
+  .date-line { margin-top: 20px; }
+  .signatures { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 20px; }
+  .signature-block { width: 45%; margin-bottom: 20px; }
+  .signature-block p { text-align: left; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span>Convention : {{ conv_num }}</span>
+  <span class="header-right">{{ election_label }}</span>
+</div>
+
+<h1>Convention de mutualisation de dépenses relatives à :</h1>
+<div class="nature">{{ nature_depense }}</div>
+
+<p>Les soussignés,</p>
+
+{% for p in parties %}
+<p><span class="partie">{{ p.nom }}</span>{% if p.qualite %}, {{ p.qualite }}{% endif %}</p>
+{% if not loop.last %}<p>Et</p>{% endif %}
+{% endfor %}
+
+<p>déclarent convenir d'une convention de mutualisation et de répartition de dépenses relatives à :</p>
+
+<ul class="repartition">
+  {% for ligne in description_depense %}
+  <li>{{ ligne }}</li>
+  {% endfor %}
+</ul>
+
+<p>Le mandataire financier{% if mandataire %}, à savoir {{ mandataire }},{% endif %} réceptionnera et réglera la ou les factures correspondantes aux dépenses susvisées.</p>
+
+<p>{{ mandataire or "Le mandataire financier" }} procédera ensuite à la refacturation des sommes engagées selon la clé de répartition suivante :</p>
+
+<ul class="repartition">
+  {% for p in parties %}
+  <li>{{ p.pourcentage }}{% if p.montant %}, soit {{ p.montant }} €{% endif %} pour {{ p.nom }}</li>
+  {% endfor %}
+</ul>
+
+{% if justification %}
+<p><strong>Justification de la clé de répartition :</strong></p>
+<ul class="repartition">
+  {% for ligne in justification %}
+  <li>{{ ligne }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<p class="footer-text">Pour faire valoir ce que de droit</p>
+
+<p class="date-line">Fait à {{ lieu }} le {{ date_signature }}</p>
+
+<div class="signatures">
+  {% for p in parties %}
+  <div class="signature-block">
+    <p>{{ p.nom }}</p>
+    <p>Bon pour accord,</p>
+  </div>
+  {% endfor %}
+</div>
+
+</body>
+</html>
