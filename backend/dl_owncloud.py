@@ -1,5 +1,8 @@
 import owncloud
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def download_file_from_owncloud(url, password, remote_file, local_file):
     """
@@ -17,15 +20,19 @@ def download_file_from_owncloud(url, password, remote_file, local_file):
 
 
 if __name__ == "__main__":
-    # Configuration
-    hostname = 'nouveau.cloud117.fr'
-    downloaded_url = "https://nouveau.cloud117.fr/s/NLEHT4s8rBCZYpQ"
-    username = 'gaetanc@pm.me'
-    password = 't88M^v$@scFE' 
-    
+    # Configuration depuis les variables d'environnement (.env)
+    downloaded_url = os.getenv("OWNCLOUD_SHARE_URL", "")
+    password = os.getenv("OWNCLOUD_SHARE_PASSWORD", "")
+
+    if not downloaded_url or not password:
+        raise SystemExit(
+            "Configuration manquante : définir OWNCLOUD_SHARE_URL et "
+            "OWNCLOUD_SHARE_PASSWORD dans le fichier .env"
+        )
+
     # Chemins des fichiers
-    local_filename = 'Budget 2026.xlsx'
-    remote_filename = 'Budget 2026.xlsx'
+    local_filename = os.getenv("BUDGET_REMOTE_FILENAME", "Budget 2026.xlsx")
+    remote_filename = local_filename
     
     # Définir le chemin d'export (dossier parent du backend)
     backend_dir = os.path.dirname(os.path.abspath(__file__))
