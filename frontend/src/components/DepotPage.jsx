@@ -46,9 +46,14 @@ export function DepotPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Dépôt du dossier</h1>
                     <p className="text-muted-foreground">Classement des pièces par enveloppe (A / B) et bordereau de dépôt.</p>
                 </div>
-                <a href={`${API_URL}/depot/export`} target="_blank" rel="noopener noreferrer">
-                    <Button className="gap-2"><Download className="w-4 h-4" /> Bordereau de dépôt (PDF)</Button>
-                </a>
+                <div className="flex gap-2">
+                    <a href={`${API_URL}/depot/export-cnccfp`} target="_blank" rel="noopener noreferrer">
+                        <Button className="gap-2"><Download className="w-4 h-4" /> Compte au format CNCCFP (Excel)</Button>
+                    </a>
+                    <a href={`${API_URL}/depot/export`} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Bordereau (PDF)</Button>
+                    </a>
+                </div>
             </header>
 
             <div className={cn("rounded-2xl border p-6 flex items-center gap-4",
