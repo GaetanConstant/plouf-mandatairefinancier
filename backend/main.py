@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Response, Depends, status, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Response, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -8,22 +8,21 @@ import io
 import pdf_utils
 from database import init_central_db, get_central_db_connection, get_db_connection, update_db_from_excel, push_db_to_excel_and_cloud, CAMPAIGNS_DIR
 from dl_owncloud import download_file_from_owncloud
-from models import Recette, Depense, SpendingStats
 import comptes
 import recus
-import conformite
-import maincourante
-import identite
-import depot
-import evenements
-import echeancier
-import frise
-import rapport
-import mutualisation
-import livre_comptes
-import annexes
 from db import provision_campaign_db
-from typing import List
+from deps import get_campaign_conn
+from routers import (
+    comptes as comptes_routes,
+    recus as recus_routes,
+    conformite as conformite_routes,
+    maincourante as maincourante_routes,
+    identite as identite_routes,
+    depot as depot_routes,
+    pilotage as pilotage_routes,
+    mutualisation as mutualisation_routes,
+    annexes as annexes_routes,
+)
 import os
 import re
 import uuid
@@ -96,12 +95,6 @@ if not os.path.exists(UPLOADS_DIR):
 app.mount("/docs", StaticFiles(directory=UPLOADS_DIR), name="justificatifs")
 
 SIGNATURE_PATH = os.path.join(ROOT_DIR, "signature mandataire.png")
-
-def get_active_campaign(request: Request):
-    campaign_id = request.cookies.get("campaign_id")
-    if not campaign_id:
-        return None
-    return campaign_id
 
 @app.post("/login")
 def login(credentials: LoginRequest, response: Response):
@@ -288,48 +281,6 @@ def change_password(update: UserPasswordUpdate, current_user: dict = Depends(get
         conn.execute("UPDATE users SET hashed_password = ? WHERE username = ?", [new_hash, current_user["username"]])
     return {"message": "Mot de passe modifié avec succès"}
 
-
-# Plafond, taux de remboursement et limite de don sont désormais centralisés
-# dans le service `comptes` (le plafond est propre à chaque Election).
-
-
-def get_campaign_conn(campaign_id: str = Depends(get_active_campaign)):
-    if not campaign_id:
-        raise HTTPException(status_code=400, detail="Aucune campagne sélectionnée")
-    return campaign_id
-
-@app.get("/stats", response_model=SpendingStats)
-def get_stats(campaign_id: str = Depends(get_campaign_conn)):
-    return SpendingStats(**comptes.compute_stats(campaign_id))
-
-@app.post("/recettes")
-def create_recette(recette: Recette, campaign_id: str = Depends(get_campaign_conn)):
-    return comptes.create_recette(campaign_id, recette)
-
-
-@app.put("/recettes/{recette_id}")
-def update_recette(recette_id: int, update: Recette, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return comptes.update_recette(campaign_id, recette_id, update)
-
-
-@app.get("/recettes")
-def list_recettes(campaign_id: str = Depends(get_campaign_conn)):
-    return comptes.list_recettes(campaign_id)
-
-
-@app.post("/depenses")
-def create_depense(depense: Depense, campaign_id: str = Depends(get_campaign_conn)):
-    return comptes.create_depense(campaign_id, depense)
-
-
-@app.get("/depenses")
-def list_depenses(campaign_id: str = Depends(get_campaign_conn)):
-    return comptes.list_depenses(campaign_id)
-
-
-@app.get("/fournisseurs")
-def list_fournisseurs(campaign_id: str = Depends(get_campaign_conn)):
-    return comptes.list_fournisseurs(campaign_id)
 
 def safe_upload_name(original_name: str) -> str:
     """Assainit un nom de fichier et le rend unique (anti path-traversal / collision)."""
@@ -531,292 +482,16 @@ def mark_recette_sent(recette_id: int, current_user: dict = Depends(get_current_
     return comptes.toggle_recette_sent(campaign_id, recette_id)
 
 
-# --- Carnets de reçus-dons & reçus numérotés (Bloc C) ---
-
-class CarnetCreate(BaseModel):
-    numero_carnet: str
-    numero_formule_debut: int
-    numero_formule_fin: int
-    date_retrait_prefecture: str | None = None
-
-
-class RecuIssue(BaseModel):
-    carnet_id: int | None = None
-
-
-@app.get("/carnets")
-def list_carnets(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return recus.list_carnets(campaign_id)
-
-
-@app.post("/carnets")
-def create_carnet(carnet: CarnetCreate, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return recus.create_carnet(campaign_id, carnet.numero_carnet, carnet.numero_formule_debut,
-                               carnet.numero_formule_fin, carnet.date_retrait_prefecture)
-
-
-@app.get("/recus")
-def list_recus(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return recus.list_recus(campaign_id)
-
-
-@app.post("/recettes/{recette_id}/recu")
-def issue_recu(recette_id: int, payload: RecuIssue | None = None,
-               current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    carnet_id = payload.carnet_id if payload else None
-    return recus.issue_recu(campaign_id, recette_id, carnet_id)
-
-
-@app.post("/recus/{recu_id}/annuler")
-def annuler_recu(recu_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return recus.annuler_recu(campaign_id, recu_id)
-
-
-# --- Contrôles de conformité (moteur de règles §5) ---
-
-@app.get("/conformite")
-def get_conformite(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return conformite.run_checks(campaign_id)
-
-
-# --- Main courante (annexe 8) ---
-
-@app.get("/main-courante")
-def get_main_courante(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return maincourante.journal(campaign_id)
-
-
-@app.get("/main-courante/export")
-def export_main_courante(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    xlsx = maincourante.export_annexe8_xlsx(campaign_id)
-    filename = f"main_courante_annexe8_{campaign_id}.xlsx"
-    return StreamingResponse(
-        io.BytesIO(xlsx),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
-# --- Identité administrative (socle §6.1) ---
-
-@app.get("/identite")
-def get_identite(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return identite.get_identite(campaign_id)
-
-
-@app.put("/identite/election")
-def put_election(payload: identite.ElectionIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return identite.save_election(campaign_id, payload)
-
-
-@app.put("/identite/candidat")
-def put_candidat(payload: identite.CandidatIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return identite.save_candidat(campaign_id, payload)
-
-
-@app.put("/identite/mandataire")
-def put_mandataire(payload: identite.MandataireIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return identite.save_mandataire(campaign_id, payload)
-
-
-@app.put("/identite/expert-comptable")
-def put_expert(payload: identite.ExpertComptableIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return identite.save_expert(campaign_id, payload)
-
-
-@app.put("/identite/compte-bancaire")
-def put_compte(payload: identite.CompteBancaireIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return identite.save_compte(campaign_id, payload)
-
-
-# --- Constitution et dépôt du dossier (Bloc F) ---
-
-class DocumentUpdate(BaseModel):
-    enveloppe: str | None = None
-    type: str | None = None
-
-
-@app.get("/documents")
-def list_documents(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return depot.list_documents(campaign_id)
-
-
-@app.put("/documents/{doc_id}")
-def update_document(doc_id: int, payload: DocumentUpdate, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return depot.set_document(campaign_id, doc_id, payload.enveloppe, payload.type)
-
-
-@app.get("/depot")
-def get_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return depot.get_depot(campaign_id)
-
-
-@app.get("/depot/export")
-def export_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    pdf = depot.export_bordereau_pdf(campaign_id)
-    return StreamingResponse(
-        io.BytesIO(pdf),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=bordereau_depot_{campaign_id}.pdf"},
-    )
-
-
-# --- Événements + liaison n-n (Phase 3) ---
-
-@app.get("/evenements")
-def list_evenements(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.list_evenements(campaign_id)
-
-
-@app.post("/evenements")
-def create_evenement(payload: evenements.EvenementIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.create_evenement(campaign_id, payload)
-
-
-@app.get("/evenements/{evenement_id}")
-def detail_evenement(evenement_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.detail_evenement(campaign_id, evenement_id)
-
-
-@app.put("/evenements/{evenement_id}")
-def update_evenement(evenement_id: int, payload: evenements.EvenementIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.update_evenement(campaign_id, evenement_id, payload)
-
-
-@app.delete("/evenements/{evenement_id}")
-def delete_evenement(evenement_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.delete_evenement(campaign_id, evenement_id)
-
-
-@app.post("/evenements/{evenement_id}/depenses")
-def link_depense(evenement_id: int, payload: evenements.LiaisonIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.link_depense(campaign_id, evenement_id, payload)
-
-
-@app.delete("/evenements/{evenement_id}/depenses/{depense_id}")
-def unlink_depense(evenement_id: int, depense_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return evenements.unlink_depense(campaign_id, evenement_id, depense_id)
-
-
-# --- Échéancier / Frise / Rapport ---
-
-@app.get("/echeancier")
-def get_echeancier(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return echeancier.echeances(campaign_id)
-
-
-@app.get("/frise")
-def get_frise(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return frise.frise(campaign_id)
-
-
-@app.get("/rapport")
-def get_rapport(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    pdf = rapport.generate(campaign_id)
-    return StreamingResponse(
-        io.BytesIO(pdf),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=rapport_campagne_{campaign_id}.pdf"},
-    )
-
-
-# --- Mutualisation (conventions entre candidats) ---
-
-@app.get("/parties-externes")
-def list_parties(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return mutualisation.list_parties(campaign_id)
-
-
-@app.post("/parties-externes")
-def create_partie(payload: mutualisation.PartieExterneIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return mutualisation.create_partie(campaign_id, payload)
-
-
-@app.get("/mutualisations")
-def list_mutualisations(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return mutualisation.list_mutualisees(campaign_id)
-
-
-@app.post("/mutualisations")
-def create_mutualisation(payload: mutualisation.MutualiseeIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return mutualisation.create_mutualisee(campaign_id, payload)
-
-
-@app.delete("/mutualisations/{mut_id}")
-def delete_mutualisation(mut_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return mutualisation.delete_mutualisee(campaign_id, mut_id)
-
-
-@app.get("/mutualisations/{mut_id}/convention")
-def convention_pdf(mut_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    pdf = mutualisation.convention_pdf(campaign_id, mut_id)
-    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=convention_{mut_id}.pdf"})
-
-
-@app.get("/mutualisations/export")
-def export_mutualisations(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    xlsx = mutualisation.export_etat_xlsx(campaign_id)
-    return StreamingResponse(io.BytesIO(xlsx),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=etat_depenses_mutualisees_{campaign_id}.xlsx"})
-
-
-# --- Livre de comptes (export expert-comptable) ---
-
-@app.get("/livre-comptes/export")
-def export_livre_comptes(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    xlsx = livre_comptes.generate_xlsx(campaign_id)
-    return StreamingResponse(io.BytesIO(xlsx),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=livre_comptes_{campaign_id}.xlsx"})
-
-
-# --- Annexes CNCCFP : colistiers, équipe, emprunts ---
-
-@app.get("/colistiers")
-def list_colistiers(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.list_colistiers(campaign_id)
-
-
-@app.post("/colistiers")
-def create_colistier(payload: annexes.ColistierIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.create_colistier(campaign_id, payload)
-
-
-@app.delete("/colistiers/{colistier_id}")
-def delete_colistier(colistier_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.delete_colistier(campaign_id, colistier_id)
-
-
-@app.get("/equipe")
-def list_equipe(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.list_equipe(campaign_id)
-
-
-@app.post("/equipe")
-def create_membre(payload: annexes.MembreEquipeIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.create_membre(campaign_id, payload)
-
-
-@app.delete("/equipe/{membre_id}")
-def delete_membre(membre_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.delete_membre(campaign_id, membre_id)
-
-
-@app.get("/emprunts")
-def list_emprunts(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.list_emprunts(campaign_id)
-
-
-@app.post("/emprunts")
-def create_emprunt(payload: annexes.EmpruntIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.create_emprunt(campaign_id, payload)
-
-
-@app.delete("/emprunts/{emprunt_id}")
-def delete_emprunt(emprunt_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    return annexes.delete_emprunt(campaign_id, emprunt_id)
+# --- Montage des routers par domaine ---
+app.include_router(comptes_routes.router)
+app.include_router(recus_routes.router)
+app.include_router(conformite_routes.router)
+app.include_router(maincourante_routes.router)
+app.include_router(identite_routes.router)
+app.include_router(depot_routes.router)
+app.include_router(pilotage_routes.router)
+app.include_router(mutualisation_routes.router)
+app.include_router(annexes_routes.router)
 
 
 if __name__ == "__main__":
