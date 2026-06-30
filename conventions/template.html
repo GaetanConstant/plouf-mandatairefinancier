@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4;
+    margin: 2.5cm 2.5cm 2.5cm 2.5cm;
+  }
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    color: #000;
+    line-height: 1.5;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    font-size: 10pt;
+  }
+  .header-right {
+    font-style: italic;
+    text-align: right;
+  }
+  h1 {
+    text-align: center;
+    font-size: 14pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin: 40px 0 10px 0;
+  }
+  .nature {
+    text-align: center;
+    font-size: 14pt;
+    font-weight: bold;
+    color: #cc0000;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+  p {
+    text-align: justify;
+    margin-bottom: 12px;
+  }
+  .partie {
+    font-weight: bold;
+  }
+  .repartition {
+    margin: 15px 0 15px 30px;
+  }
+  .repartition li {
+    margin-bottom: 4px;
+    list-style: none;
+  }
+  .repartition li::before {
+    content: "- ";
+  }
+  .footer-text {
+    margin-top: 30px;
+  }
+  .date-line {
+    margin-top: 20px;
+  }
+  .signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+  }
+  .signature-block {
+    width: 45%;
+  }
+  .signature-block p {
+    text-align: left;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span>Convention : {{ conv_num }}</span>
+  <span class="header-right">Élections municipales et métropolitaines des 15 et 22 mars 2026</span>
+</div>
+
+<h1>Convention de mutualisation de dépenses relatives à :</h1>
+<div class="nature">{{ nature_depense }}</div>
+
+<p>Les soussignés,</p>
+
+<p><span class="partie">Mathieu GARABEDIAN</span>, candidat tête de liste aux élections municipales de Villeurbanne des 15 et 22 mars 2026</p>
+
+<p>Et</p>
+
+<p><span class="partie">Gabriel AMARD</span>, candidat tête de liste aux élections métropolitaines de la circonscription de Villeurbanne des 15 et 22 mars 2026</p>
+
+<p>déclarent convenir d'une convention de mutualisation et de répartition de dépenses relatives à :</p>
+
+<ul class="repartition">
+  {% for ligne in description_depense %}
+  <li>{{ ligne }}</li>
+  {% endfor %}
+</ul>
+
+{% if nb_factures == 1 %}
+<p>Le mandataire financier de M. Mathieu GARABEDIAN et de M. Gabriel AMARD, à savoir M. Gaetan CONSTANT, réceptionnera et réglera la facture correspondante aux dépenses susvisées.</p>
+{% else %}
+<p>Le mandataire financier de M. Mathieu GARABEDIAN et de M. Gabriel AMARD, à savoir M. Gaetan CONSTANT, réceptionnera et réglera les {{ nb_factures }} factures correspondantes aux dépenses susvisées.</p>
+{% endif %}
+
+<p>M. Gaetan CONSTANT procédera ensuite à la refacturation des sommes engagées selon la clé de répartition suivante :</p>
+
+<ul class="repartition">
+  <li>{{ part_garabedian }}{% if montant_garabedian %}, soit {{ montant_garabedian }} €{% endif %} pour la candidature de M. Mathieu GARABEDIAN</li>
+  <li>{{ part_amard }}{% if montant_amard %}, soit {{ montant_amard }} €{% endif %} pour la candidature de M. Gabriel AMARD</li>
+</ul>
+
+{% if justification %}
+<p><strong>Justification de la clé de répartition :</strong></p>
+<ul class="repartition">
+  {% for ligne in justification %}
+  <li>{{ ligne }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<p class="footer-text">Pour faire valoir ce que de droit</p>
+
+<p class="date-line">Fait à Villeurbanne le {{ date_signature }}</p>
+
+<div class="signatures">
+  <div class="signature-block">
+    <p>Mathieu GARABEDIAN</p>
+    <p>Bon pour accord,</p>
+  </div>
+  <div class="signature-block">
+    <p>Gabriel AMARD</p>
+    <p>Bon pour accord,</p>
+  </div>
+</div>
+
+</body>
+</html>

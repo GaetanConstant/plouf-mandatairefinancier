@@ -1,0 +1,13 @@
+﻿N° Convention;Objet;N° Facture;Prestataire;Montant Facture TTC (€);% Municipal;% Métropolitain;Montant Garabedian (€);Montant Amard (€)
+CONV-006;Stockage du matériel de campagne — local « Local Pop' »;cf. CONV-LOCAL-001;Local Pop';9 800,00;93 %;7 %;9 114,00;686,00
+CONV-002;Tracts porte-à-porte Garabedian + Amard;202512.0312;PublicImprim;693,60;75 %;25 %;520,20;173,40
+;;202603.0037;PublicImprim;508,51;;;381,38;127,13
+;Sous-total CONV-002;;;1 202,11;;;901,58;300,53
+CONV-003;Programme municipal et métropolitain;DC26010284;PubAdresse;31 721,80;83 %;17 %;26 329,09;5 392,71
+;;202601.395;Imprimerie GRENIER;23 784,00;;;19 740,72;4 043,28
+;;20260123-00069;VARSO;3 669,00;;;3 045,27;623,73
+;Sous-total CONV-003;;;59 174,80;;;49 115,08;10 059,72
+CONV-004;Bandeaux programmatiques (4 bandeaux);202602.0114;PublicImprim;723,60;75 %;25 %;542,70;180,90
+CONV-005;Barnum de campagne;OD126 705;VITABRI;2 874,00;67 %;33 %;1 925,58;948,42
+;;;;;;;;
+TOTAL;;;;73 774,51;;;61 598,94;12 175,57
