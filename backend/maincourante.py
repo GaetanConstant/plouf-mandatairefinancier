@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from db.models import Depense, Donateur, Recette
 from db.session import campaign_session, ensure_campaign_db
+from db.helpers import fmt_date as _fmt
 from db import enums
 
 _MODE_LABEL = {
@@ -38,10 +39,6 @@ def _mode(m) -> str:
     return _MODE_LABEL.get(m, "")
 
 
-def _fmt(d) -> str | None:
-    if d is None:
-        return None
-    return d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
 
 
 def journal(campaign_id: str) -> list[dict]:

@@ -23,6 +23,7 @@ from sqlalchemy import select
 
 from db.models import DepenseMutualisee, Election, PartieExterne, RepartitionMutualisee
 from db.session import campaign_session, ensure_campaign_db
+from db.helpers import election_id as _election_id
 from db import enums
 
 
@@ -54,9 +55,6 @@ class MutualiseeIn(BaseModel):
     repartitions: list[RepartitionIn] = []
 
 
-def _election_id(s) -> Optional[int]:
-    e = s.scalars(select(Election)).first()
-    return e.id if e else None
 
 
 # ── Parties externes ─────────────────────────────────────────────────────────

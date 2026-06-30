@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 
 from db.models import Depense, Document, Donateur, Election, Recette
 from db.session import campaign_session, ensure_campaign_db
+from db.helpers import fmt_date as _fmt_date
 from db import enums
 
 PLAFOND_LEGAL_DEFAUT = 154781.0
@@ -83,10 +84,6 @@ def _media_type(filename: str | None) -> str:
     return "autre"
 
 
-def _fmt_date(d) -> str | None:
-    if d is None:
-        return None
-    return d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
 
 
 # ── Recettes ─────────────────────────────────────────────────────────────────

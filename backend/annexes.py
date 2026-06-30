@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from db.models import Colistier, Election, Emprunt, MembreEquipe
 from db.session import campaign_session, ensure_campaign_db
+from db.helpers import election_id as _election_id, fmt_date as _fmt
 from db import enums
 
 
@@ -20,13 +21,8 @@ def _d(s: Optional[str]) -> Optional[date]:
     return date.fromisoformat(s) if s else None
 
 
-def _fmt(d) -> Optional[str]:
-    return d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else (str(d) if d else None)
 
 
-def _election_id(s) -> Optional[int]:
-    e = s.scalars(select(Election)).first()
-    return e.id if e else None
 
 
 # ── Colistiers ───────────────────────────────────────────────────────────────

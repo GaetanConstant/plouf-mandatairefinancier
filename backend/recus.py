@@ -14,18 +14,12 @@ from sqlalchemy import func, select
 
 from db.models import CarnetRecus, Donateur, Election, Recette, RecuDon
 from db.session import campaign_session, ensure_campaign_db
+from db.helpers import election_id as _election_id, fmt_date as _fmt
 from db import enums
 
 
-def _election_id(s) -> int | None:
-    el = s.scalars(select(Election)).first()
-    return el.id if el else None
 
 
-def _fmt(d) -> str | None:
-    if d is None:
-        return None
-    return d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
 
 
 # ── Carnets ──────────────────────────────────────────────────────────────────
