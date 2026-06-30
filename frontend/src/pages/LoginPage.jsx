@@ -1,18 +1,16 @@
 
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Button } from '../components/ui/Components';
-import { Lock, User } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import parrot from '../assets/parrot.webp';
+import scopaLogo from '../assets/scopa-logo.png';
 
 const API_URL = 'http://localhost:8000';
-
-// Palette SCOPA
-const SCOPA = { primary: '#6186ea', dark: '#3547af', cream: '#edecea' };
 
 export function LoginPage({ onLogin }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPw, setShowPw] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -30,80 +28,111 @@ export function LoginPage({ onLogin }) {
         }
     };
 
+    const inputStyle = {
+        width: '100%', padding: '11px 16px', borderRadius: '10px',
+        border: '1px solid #ccc8c4', background: '#fafaf9', fontSize: '14px',
+        fontFamily: 'inherit', outline: 'none',
+    };
+
     return (
-        <div className="min-h-screen flex" style={{ backgroundColor: SCOPA.cream }}>
-            {/* Colonne formulaire (encadré + typo conservés) */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6">
-                <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-8 animate-in fade-in zoom-in-95 duration-300">
-                    <div className="flex flex-col items-center mb-8">
-                        {/* Vignette perroquet sur mobile (où la colonne de droite est masquée) */}
-                        <img src={parrot} alt="Plouf" className="md:hidden w-full h-32 object-cover rounded-xl mb-4" />
-                        <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: SCOPA.dark }}>Plouf</h1>
-                        <p className="text-muted-foreground text-center mt-2">
-                            Connectez-vous pour accéder au compte mandataire.
-                        </p>
+        <div
+            style={{
+                fontFamily: "'Work Sans', 'Helvetica Neue', Arial, sans-serif",
+                minHeight: '100vh', position: 'relative', overflow: 'hidden',
+                backgroundImage: `url(${parrot})`, backgroundSize: '115%',
+                backgroundPosition: 'right 40%', backgroundRepeat: 'no-repeat',
+            }}
+        >
+            {/* Panneau verre dépoli à gauche */}
+            <aside
+                className="login-panel"
+                style={{
+                    position: 'absolute', top: 0, bottom: 0, left: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem',
+                    WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)',
+                    background: 'rgba(237, 236, 234, 0.4)', borderRight: '1px solid rgba(255,255,255,0.1)',
+                }}
+            >
+                <div
+                    style={{
+                        width: '100%', maxWidth: '420px', background: 'rgba(255,255,255,0.88)',
+                        borderRadius: '20px', boxShadow: '0 20px 40px -8px rgba(0,0,0,0.18)',
+                        padding: '2.5rem', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)',
+                    }}
+                >
+                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                        <h1 style={{ margin: 0, fontSize: '34px', fontWeight: 700, color: '#3547af', letterSpacing: '-0.5px' }}>Plouf</h1>
+                        <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6b7280' }}>Compte mandataire financier</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Identifiant</label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                                <input
-                                    type="text"
-                                    className="pl-10 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                    placeholder="gconstant"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    required
-                                />
+                    {error && (
+                        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '1rem' }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={labelStyle}>Identifiant</label>
+                            <input type="text" placeholder="gconstant" required autoComplete="username"
+                                value={username} onChange={(e) => setUsername(e.target.value)}
+                                style={inputStyle} onFocus={focusOn} onBlur={focusOff} />
+                        </div>
+
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={labelStyle}>Mot de passe</label>
+                            <div style={{ position: 'relative' }}>
+                                <input type={showPw ? 'text' : 'password'} placeholder="••••••••" required autoComplete="current-password"
+                                    value={password} onChange={(e) => setPassword(e.target.value)}
+                                    style={{ ...inputStyle, paddingRight: '3rem' }} onFocus={focusOn} onBlur={focusOff} />
+                                <button type="button" onClick={() => setShowPw(!showPw)}
+                                    aria-label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#9ca3af', display: 'flex', alignItems: 'center' }}>
+                                    {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Mot de passe</label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                                <input
-                                    type="password"
-                                    className="pl-10 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive font-medium flex items-center justify-center">
-                                {error}
-                            </div>
-                        )}
-
-                        <Button type="submit" className="w-full rounded-full" isLoading={loading}
-                            style={{ backgroundColor: SCOPA.primary }}>
-                            Se connecter
-                        </Button>
+                        <button type="submit" disabled={loading}
+                            style={{
+                                width: '100%', padding: '13px', background: '#3547af', color: '#fff',
+                                fontSize: '14px', fontWeight: 600, fontFamily: 'inherit', border: 'none',
+                                borderRadius: '50px', cursor: loading ? 'not-allowed' : 'pointer',
+                                marginTop: '0.5rem', opacity: loading ? 0.6 : 1, transition: 'opacity .2s, transform .1s',
+                            }}>
+                            {loading ? 'Connexion…' : 'Se connecter'}
+                        </button>
                     </form>
                 </div>
+            </aside>
 
-                <p className="mt-8 text-sm" style={{ color: SCOPA.dark, opacity: 0.6 }}>
-                    © 2026 Plouf — Accès sécurisé.
-                </p>
-            </div>
+            {/* Logo SCOPA en bas à gauche */}
+            <footer style={{ position: 'fixed', bottom: '16px', left: '20px', zIndex: 10 }}>
+                <a href="https://scopa.co" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }}>
+                    <img src={scopaLogo} alt="SCOPA" style={{ height: '56px', width: 'auto', opacity: 0.65 }} />
+                </a>
+            </footer>
 
-            {/* Colonne perroquet (image enership) */}
-            <div className="hidden md:block flex-1 relative overflow-hidden">
-                <img src={parrot} alt="Perroquet Plouf" className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, rgba(53,71,175,0.25) 0%, rgba(53,71,175,0.65) 100%)` }} />
-                <div className="absolute bottom-12 left-12 right-12 text-white">
-                    <h2 className="text-5xl font-extrabold uppercase tracking-wide drop-shadow-lg">Plouf</h2>
-                    <p className="mt-3 text-white/90 text-lg max-w-md drop-shadow">
-                        La gestion du mandataire financier, simple et conforme.
-                    </p>
-                </div>
-            </div>
+            <style>{`
+                .login-panel { width: 33.333%; }
+                @media (max-width: 640px) { .login-panel { width: 100% !important; border-right: none !important; } }
+            `}</style>
         </div>
     );
+}
+
+const labelStyle = {
+    display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280',
+    textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px',
+};
+
+function focusOn(e) {
+    e.target.style.borderColor = '#3547af';
+    e.target.style.boxShadow = '0 0 0 3px rgba(53,71,175,0.15)';
+    e.target.style.background = '#fff';
+}
+function focusOff(e) {
+    e.target.style.borderColor = '#ccc8c4';
+    e.target.style.boxShadow = 'none';
+    e.target.style.background = '#fafaf9';
 }
