@@ -26,3 +26,6 @@ frontend/dist/
 
 # Sensitive
 .env
+
+# Données personnelles électeurs (liste électorale + croisement sénatorial)
+electeurssenatoriales/*.csv
