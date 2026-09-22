@@ -6,6 +6,7 @@ les données sont désormais lues/écrites dans la base SQLite ORM d'une campagn
 
 from __future__ import annotations
 
+import logging
 import os
 import unicodedata
 
@@ -16,6 +17,9 @@ from db.models import Depense, Document, Donateur, Election, Recette
 from db.session import campaign_session, ensure_campaign_db
 from db.helpers import fmt_date as _fmt_date
 from db import enums
+from database import UPLOADS_DIR
+
+logger = logging.getLogger(__name__)
 
 PLAFOND_LEGAL_DEFAUT = 154781.0
 TAUX_REMBOURSEMENT = 0.475
@@ -204,7 +208,44 @@ def get_recette_pdf_data(campaign_id: str, recette_id: int) -> dict:
 
 # ── Dépenses ─────────────────────────────────────────────────────────────────
 
-def _depense_to_legacy(d: Depense, doc_fichier: str | None) -> dict:
+def _supprimer_fichier_remplace(session, ancien: str | None, nouveau: str) -> None:
+    """Efface du disque le fichier qu'une pièce vient de remplacer.
+
+    Ne supprime que si plus aucun document de la campagne ne le référence : un
+    même fichier peut avoir été rattaché à deux dépenses. Un échec d'effacement
+    n'interrompt pas la mise à jour — on perd un fichier orphelin, pas la
+    comptabilité ; l'écran Justificatifs le signalera.
+    """
+    if not ancien or ancien == nouveau:
+        return
+    encore_reference = session.scalar(
+        select(func.count()).select_from(Document).where(Document.fichier == ancien)
+    )
+    if encore_reference:
+        return
+    chemin = os.path.join(UPLOADS_DIR, ancien)
+    try:
+        os.remove(chemin)
+        logger.info("Pièce remplacée supprimée du disque : %s", ancien)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        logger.warning("Suppression de %s impossible : %s", chemin, e)
+
+
+def _type_piece(valeur: str | None) -> enums.TypeDocument:
+    """Nature de la pièce jointe à une dépense (devis, facture…).
+
+    Une valeur inconnue vaut `facture` : la saisie ne doit pas échouer sur un
+    libellé, le classement du dépôt reste corrigeable depuis l'écran Dépôt.
+    """
+    try:
+        return enums.TypeDocument(valeur) if valeur else enums.TypeDocument.facture
+    except ValueError:
+        return enums.TypeDocument.facture
+
+
+def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None = None) -> dict:
     return {
         "id": d.id,
         "date": _fmt_date(d.date_reglement),
@@ -215,6 +256,7 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None) -> dict:
         "categorie_cnccfp": d.rubrique_imputation,
         "statut": _STATUT_TO_LEGACY.get(d.statut, "Engagé"),
         "justificatif_path": doc_fichier,
+        "type_piece": doc_type or enums.TypeDocument.facture.value,
         "is_nature": d.statut == enums.StatutDepense.realise_nature,
     }
 
@@ -228,8 +270,12 @@ def list_depenses(campaign_id: str) -> list[dict]:
         docs = {}
         if doc_ids:
             for doc in s.scalars(select(Document).where(Document.id.in_(doc_ids))).all():
-                docs[doc.id] = doc.fichier
-        return [_depense_to_legacy(d, docs.get(d.facture_doc_id)) for d in depenses]
+                docs[doc.id] = (doc.fichier, doc.type.value)
+        resultat = []
+        for d in depenses:
+            fichier, type_doc = docs.get(d.facture_doc_id, (None, None))
+            resultat.append(_depense_to_legacy(d, fichier, type_doc))
+        return resultat
 
 
 def create_depense(campaign_id: str, dto) -> dict:
@@ -240,7 +286,7 @@ def create_depense(campaign_id: str, dto) -> dict:
         if dto.justificatif_path:
             fichier = os.path.basename(dto.justificatif_path)
             doc = Document(
-                type=enums.TypeDocument.facture,
+                type=_type_piece(dto.type_piece),
                 media_type=_media_type(fichier),
                 fichier=fichier,
                 enveloppe=enums.Enveloppe.A,
@@ -264,23 +310,27 @@ def create_depense(campaign_id: str, dto) -> dict:
 
 
 def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
-    """Met à jour une dépense existante (date, fournisseur, montant, imputation…).
+    """Met à jour une dépense existante (date, fournisseur, montant, pièce…).
 
-    Le justificatif n'est remplacé que si un nouveau fichier est fourni : une
-    modification de libellé ne doit pas détacher la facture déjà rattachée.
+    La pièce jointe est remplacée **en place** : un devis qui devient facture
+    garde la même ligne de document, sinon le devis resterait listé dans le
+    dépôt comme une pièce orpheline. Sans nouveau fichier, seule sa nature est
+    mise à jour — le justificatif déjà rattaché n'est jamais détaché.
     """
     ensure_campaign_db(campaign_id)
     statut, reglee = _statut_legacy_to_orm(dto.statut, dto.is_nature)
+    type_piece = _type_piece(dto.type_piece)
     with campaign_session(campaign_id) as s:
         d = s.get(Depense, depense_id)
         if not d:
             raise HTTPException(status_code=404, detail="Dépense introuvable")
+
+        doc = s.get(Document, d.facture_doc_id) if d.facture_doc_id else None
         if dto.justificatif_path:
             fichier = os.path.basename(dto.justificatif_path)
-            actuel = s.get(Document, d.facture_doc_id) if d.facture_doc_id else None
-            if actuel is None or actuel.fichier != fichier:
+            if doc is None:
                 doc = Document(
-                    type=enums.TypeDocument.facture,
+                    type=type_piece,
                     media_type=_media_type(fichier),
                     fichier=fichier,
                     enveloppe=enums.Enveloppe.A,
@@ -288,6 +338,16 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
                 s.add(doc)
                 s.flush()
                 d.facture_doc_id = doc.id
+            else:
+                ancien = doc.fichier
+                doc.fichier = fichier
+                doc.media_type = _media_type(fichier)
+                doc.type = type_piece
+                s.flush()
+                _supprimer_fichier_remplace(s, ancien, fichier)
+        elif doc is not None:
+            doc.type = type_piece
+
         d.fournisseur = dto.fournisseur
         d.nature = dto.libelle
         d.montant_ttc = dto.montant_ttc

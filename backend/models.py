@@ -21,6 +21,8 @@ class Depense(BaseModel):
     statut: str # 'Engagé', 'Facturé', 'Payé'
     justificatif_path: Optional[str] = None
     is_nature: bool = False
+    # Nature de la pièce jointe : un devis devient une facture en cours de route.
+    type_piece: str = "facture"
 
 class SpendingStats(BaseModel):
     total_depenses: float

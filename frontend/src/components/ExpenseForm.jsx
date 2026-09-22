@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CATEGORIES_CNCCFP, STATUTS_DEPENSE } from '../lib/constants';
+import { CATEGORIES_CNCCFP, STATUTS_DEPENSE, TYPES_PIECE } from '../lib/constants';
 import { Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -22,6 +22,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
         categorie_cnccfp: expense?.categorie_cnccfp || CATEGORIES_CNCCFP[0].code,
         statut: expense?.statut || STATUTS_DEPENSE[0].value,
         justificatif_path: expense?.justificatif_path || null,
+        type_piece: expense?.type_piece || TYPES_PIECE[1].value,
         is_nature: expense?.is_nature || false
     });
     // Le fournisseur se choisit dans la liste des fournisseurs déjà saisis ;
@@ -222,14 +223,44 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                 </label>
             </div>
 
-            <div className="space-y-2">
-                <label className="text-sm font-medium">Justificatif (Facture/Devis)</label>
-                <input
-                    type="file"
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium hover:file:cursor-pointer"
-                    onChange={e => setFile(e.target.files[0])}
+            <div className="space-y-2 rounded-lg border border-border/50 bg-muted/40 p-3">
+                <Select
+                    label="Nature de la pièce"
+                    options={TYPES_PIECE}
+                    value={formData.type_piece}
+                    onChange={e => setFormData({ ...formData, type_piece: e.target.value })}
                 />
-                {errors.file && <p className="text-sm text-destructive">{errors.file}</p>}
+
+                {formData.justificatif_path && (
+                    <p className="text-xs text-muted-foreground">
+                        Pièce actuelle :{' '}
+                        <a
+                            href={`${API_URL}/docs/${formData.justificatif_path.split('/').pop()}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                        >
+                            {formData.justificatif_path.split('/').pop()}
+                        </a>
+                    </p>
+                )}
+
+                <div className="space-y-1">
+                    <label className="text-sm font-medium">
+                        {formData.justificatif_path ? 'Remplacer la pièce' : 'Justificatif (devis ou facture)'}
+                    </label>
+                    <input
+                        type="file"
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium hover:file:cursor-pointer"
+                        onChange={e => setFile(e.target.files[0])}
+                    />
+                    {formData.justificatif_path && (
+                        <p className="text-[11px] text-muted-foreground">
+                            Sans nouveau fichier, seule la nature de la pièce est mise à jour.
+                        </p>
+                    )}
+                    {errors.file && <p className="text-sm text-destructive">{errors.file}</p>}
+                </div>
             </div>
 
             <div className="pt-4 flex justify-end gap-2">

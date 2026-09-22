@@ -14,9 +14,11 @@ from typing import Iterator
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 CAMPAIGNS_DIR = os.path.join(DATA_DIR, "campaigns")
+UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 CENTRAL_DB_PATH = os.path.join(DATA_DIR, "central.sqlite")
 
 os.makedirs(CAMPAIGNS_DIR, exist_ok=True)
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # Mot de passe initial des comptes semés au premier démarrage. Doit être changé
 # à la première connexion (écran « Mon compte »).

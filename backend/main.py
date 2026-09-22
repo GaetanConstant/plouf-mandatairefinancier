@@ -7,8 +7,9 @@ from contextlib import asynccontextmanager
 import io
 import logging
 import pdf_utils
-from database import init_central_db, get_central_db_connection
+from database import init_central_db, get_central_db_connection, UPLOADS_DIR
 import comptes
+import depot
 import recus
 from db import provision_campaign_db
 from db.session import campaign_db_path
@@ -94,9 +95,6 @@ app.add_middleware(
 
 # Configuration du dossier des justificatifs
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UPLOADS_DIR = os.path.join(ROOT_DIR, "data", "uploads")
-if not os.path.exists(UPLOADS_DIR):
-    os.makedirs(UPLOADS_DIR)
 
 # Monter le dossier static pour l'accès direct aux fichiers
 app.mount("/docs", StaticFiles(directory=UPLOADS_DIR), name="justificatifs")
@@ -318,9 +316,17 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
 
 @app.get("/justificatifs")
 def list_justificatifs(current_user: dict = Depends(get_current_user)):
+    """Fichiers présents dans `uploads`, en signalant ceux rattachés à rien.
+
+    Un fichier orphelin — devis remplacé, pièce chargée puis jamais associée —
+    n'apparaît dans aucun dossier de dépôt mais encombre le dossier au moment
+    de l'envoi à la CNCCFP. Le rattachement se juge sur **toutes** les
+    campagnes : `uploads` leur est commun.
     """
-    Liste tous les fichiers justificatifs présents sur le serveur.
-    """
+    with get_central_db_connection() as conn:
+        campaign_ids = [row[0] for row in conn.execute("SELECT id FROM campaigns").fetchall()]
+    rattaches = depot.fichiers_rattaches(campaign_ids)
+
     files = []
     if os.path.exists(UPLOADS_DIR):
         for filename in os.listdir(UPLOADS_DIR):
@@ -331,7 +337,8 @@ def list_justificatifs(current_user: dict = Depends(get_current_user)):
                     "name": filename,
                     "size": stats.st_size,
                     "mtime": datetime.fromtimestamp(stats.st_mtime).isoformat(),
-                    "url": f"/docs/{filename}"
+                    "url": f"/docs/{filename}",
+                    "rattache": filename in rattaches,
                 })
     return sorted(files, key=lambda x: x["mtime"], reverse=True)
 

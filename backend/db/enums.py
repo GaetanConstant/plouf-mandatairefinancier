@@ -92,6 +92,7 @@ class TypeEvenement(str, enum.Enum):
 
 
 class TypeDocument(str, enum.Enum):
+    devis = "devis"
     facture = "facture"
     recu = "recu"
     releve_bancaire = "releve_bancaire"

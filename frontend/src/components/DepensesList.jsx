@@ -55,14 +55,20 @@ export function DepensesList() {
                                     <td className="p-4 align-middle text-right">{depense.montant_ttc.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</td>
                                     <td className="p-4 align-middle text-center">
                                         {depense.justificatif_path ? (
-                                            <a
-                                                href={`${API_URL}/docs/${depense.justificatif_path.split('/').pop()}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:text-primary/80 flex justify-center transition-colors"
-                                            >
-                                                <FileText className="w-5 h-5" />
-                                            </a>
+                                            <>
+                                                <a
+                                                    href={`${API_URL}/docs/${depense.justificatif_path.split('/').pop()}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:text-primary/80 flex justify-center transition-colors"
+                                                >
+                                                    <FileText className="w-5 h-5" />
+                                                </a>
+                                                {/* Un devis reste à remplacer par la facture définitive. */}
+                                                {depense.type_piece === 'devis' && (
+                                                    <span className="mt-1 block text-[10px] font-bold text-amber-600">DEVIS</span>
+                                                )}
+                                            </>
                                         ) : (
                                             <span className="text-muted-foreground text-xs">-</span>
                                         )}

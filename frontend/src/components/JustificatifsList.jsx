@@ -65,6 +65,9 @@ export function JustificatifsList() {
         file.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Compté sur l'ensemble des fichiers, pas sur la recherche en cours.
+    const orphelins = files?.filter(file => !file.rattache).length ?? 0;
+
     if (isLoading) return (
         <div className="flex flex-col items-center justify-center h-64 gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -84,6 +87,12 @@ export function JustificatifsList() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Explorateur de Justificatifs</h2>
                     <p className="text-muted-foreground">Gérez et visualisez vos pièces justificatives téléchargées.</p>
+                    {orphelins > 0 && (
+                        <p className="mt-1 text-sm font-medium text-amber-600">
+                            {orphelins} fichier{orphelins > 1 ? 's' : ''} rattaché{orphelins > 1 ? 's' : ''} à aucune dépense —
+                            à supprimer avant l'envoi du dossier.
+                        </p>
+                    )}
                 </div>
 
                 <div className="relative w-full md:w-72">
@@ -109,7 +118,11 @@ export function JustificatifsList() {
                     {filteredFiles?.map((file) => (
                         <div
                             key={file.name}
-                            className="bg-card group border border-border rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all duration-300 relative flex flex-col"
+                            className={`bg-card group border rounded-xl p-4 hover:shadow-md transition-all duration-300 relative flex flex-col ${
+                                file.rattache
+                                    ? 'border-border hover:border-primary/20'
+                                    : 'border-amber-300 bg-amber-50/40 hover:border-amber-400'
+                            }`}
                         >
                             <div className="flex items-start justify-between mb-3">
                                 <div className="p-3 bg-muted rounded-lg group-hover:bg-primary/5 transition-colors">
@@ -140,6 +153,11 @@ export function JustificatifsList() {
                                 <h3 className="font-semibold text-sm truncate mb-1" title={file.name}>
                                     {file.name}
                                 </h3>
+                                <p className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${
+                                    file.rattache ? 'text-muted-foreground/60' : 'text-amber-600'
+                                }`}>
+                                    {file.rattache ? 'Rattaché' : 'Orphelin'}
+                                </p>
                                 <div className="flex items-center justify-between text-[11px] text-muted-foreground/70">
                                     <span>{formatSize(file.size)}</span>
                                     <span>{new Date(file.mtime).toLocaleDateString('fr-FR')}</span>

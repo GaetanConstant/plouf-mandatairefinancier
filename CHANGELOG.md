@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.10.0 — 2026-09-22 — Devis, factures et pièces orphelines
+
+- Une pièce jointe à une dépense se déclare comme devis ou comme facture, et se remplace quand le devis devient facture.
+- Le fichier remplacé est effacé du disque, sauf s'il sert encore à une autre dépense.
+- L'écran Justificatifs signale les fichiers rattachés à aucune dépense, à nettoyer avant l'envoi du dossier.
+
 ## v0.9.0 — 2026-09-22 — Versionnage et corrections de saisie
 
 - Une dépense déjà enregistrée peut être corrigée : date, fournisseur, montant, imputation et statut.
