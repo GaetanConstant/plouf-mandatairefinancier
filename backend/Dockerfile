@@ -10,7 +10,8 @@ RUN uv sync --locked --no-dev
 FROM python:3.12-slim-bookworm AS production
 WORKDIR /app/backend
 
-# WeasyPrint (génération des PDF) a besoin de pango/cairo/harfbuzz et de polices.
+# WeasyPrint (PDF) veut pango/cairo/harfbuzz ; l'OCR des justificatifs veut
+# tesseract (français) et poppler pour convertir les PDF en images.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
@@ -19,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgdk-pixbuf-2.0-0 \
         libffi8 \
         fonts-dejavu-core \
+        tesseract-ocr \
+        tesseract-ocr-fra \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/backend /app/backend
