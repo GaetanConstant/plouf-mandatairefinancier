@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText } from 'lucide-react';
+import { FileText, Pencil } from 'lucide-react';
 import { API_URL } from '../lib/api';
+import { Modal } from './ui/Components';
+import { ExpenseForm } from './ExpenseForm';
 
 
 export function DepensesList() {
+    const [editing, setEditing] = useState(null);
     const { data: depenses, isLoading } = useQuery({
         queryKey: ['depenses'],
         queryFn: async () => {
@@ -31,6 +34,7 @@ export function DepensesList() {
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Statut</th>
                                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Montant TTC</th>
                                 <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Justificatif</th>
+                                <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Modifier</th>
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
@@ -63,12 +67,32 @@ export function DepensesList() {
                                             <span className="text-muted-foreground text-xs">-</span>
                                         )}
                                     </td>
+                                    <td className="p-4 align-middle text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditing(depense)}
+                                            title="Modifier cette dépense"
+                                            className="text-muted-foreground hover:text-primary transition-colors"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            <Modal
+                isOpen={Boolean(editing)}
+                onClose={() => setEditing(null)}
+                title="Modifier la dépense"
+            >
+                {editing && (
+                    <ExpenseForm expense={editing} onClose={() => setEditing(null)} />
+                )}
+            </Modal>
         </div>
     );
 }

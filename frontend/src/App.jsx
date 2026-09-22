@@ -190,9 +190,6 @@ function App() {
     return <div className="flex items-center justify-center h-screen bg-background text-foreground">Chargement des données...</div>;
   }
 
-  const PLAFOND = 154781;
-  const REMBOURSEMENT_MAX = PLAFOND * 0.475;
-
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Modal
@@ -374,7 +371,7 @@ function App() {
                       style={{ width: `${Math.min(stats.consommation_plafond, 100)}%` }}
                     />
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Limite légale absolue (154k€). Ne jamais dépasser 100%.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Limite légale absolue ({stats.plafond.toLocaleString('fr-FR')} €, propre à cette élection). Ne jamais dépasser 100%.</p>
                 </div>
 
                 {/* Budget Réel/Trésorerie */}

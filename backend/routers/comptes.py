@@ -33,6 +33,11 @@ def create_depense(depense: Depense, campaign_id: str = Depends(get_campaign_con
     return comptes.create_depense(campaign_id, depense)
 
 
+@router.put("/depenses/{depense_id}")
+def update_depense(depense_id: int, update: Depense, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    return comptes.update_depense(campaign_id, depense_id, update)
+
+
 @router.get("/depenses")
 def list_depenses(campaign_id: str = Depends(get_campaign_conn)):
     return comptes.list_depenses(campaign_id)

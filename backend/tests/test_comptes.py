@@ -69,6 +69,39 @@ def test_plafond_par_donateur_independant():
         teardown(cid)
 
 
+def test_update_depense_modifie_les_champs_saisis():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(montant=100.0, cat="A1", d="2026-01-10"))
+        dep = comptes.list_depenses(cid)[0]
+        comptes.update_depense(cid, dep["id"], _depense(
+            montant=250.0, cat="B1", d="2026-02-15", statut="Engagé"))
+        modifiee = comptes.list_depenses(cid)[0]
+        assert modifiee["montant_ttc"] == 250.0
+        assert modifiee["categorie_cnccfp"] == "B1"
+        assert modifiee["date"] == "2026-02-15"
+        assert modifiee["statut"] == "Engagé"
+    finally:
+        teardown(cid)
+
+
+def test_update_depense_conserve_le_justificatif_sans_nouveau_fichier():
+    """Modifier un libellé ne doit pas détacher la facture déjà rattachée."""
+    cid = fresh_campaign()
+    try:
+        d = _depense()
+        d.justificatif_path = "/data/uploads/facture.pdf"
+        comptes.create_depense(cid, d)
+        dep = comptes.list_depenses(cid)[0]
+        assert dep["justificatif_path"] == "facture.pdf"
+
+        sans_fichier = _depense(montant=300.0)
+        comptes.update_depense(cid, dep["id"], sans_fichier)
+        assert comptes.list_depenses(cid)[0]["justificatif_path"] == "facture.pdf"
+    finally:
+        teardown(cid)
+
+
 def test_stats_plafond_et_nature():
     cid = fresh_campaign(plafond=154781.0)
     try:

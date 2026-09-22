@@ -263,6 +263,42 @@ def create_depense(campaign_id: str, dto) -> dict:
     return {"message": "Dépense ajoutée"}
 
 
+def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
+    """Met à jour une dépense existante (date, fournisseur, montant, imputation…).
+
+    Le justificatif n'est remplacé que si un nouveau fichier est fourni : une
+    modification de libellé ne doit pas détacher la facture déjà rattachée.
+    """
+    ensure_campaign_db(campaign_id)
+    statut, reglee = _statut_legacy_to_orm(dto.statut, dto.is_nature)
+    with campaign_session(campaign_id) as s:
+        d = s.get(Depense, depense_id)
+        if not d:
+            raise HTTPException(status_code=404, detail="Dépense introuvable")
+        if dto.justificatif_path:
+            fichier = os.path.basename(dto.justificatif_path)
+            actuel = s.get(Document, d.facture_doc_id) if d.facture_doc_id else None
+            if actuel is None or actuel.fichier != fichier:
+                doc = Document(
+                    type=enums.TypeDocument.facture,
+                    media_type=_media_type(fichier),
+                    fichier=fichier,
+                    enveloppe=enums.Enveloppe.A,
+                )
+                s.add(doc)
+                s.flush()
+                d.facture_doc_id = doc.id
+        d.fournisseur = dto.fournisseur
+        d.nature = dto.libelle
+        d.montant_ttc = dto.montant_ttc
+        d.tva = dto.tva
+        d.date_reglement = dto.date
+        d.rubrique_imputation = dto.categorie_cnccfp
+        d.statut = statut
+        d.reglee = reglee
+    return {"message": "Dépense mise à jour"}
+
+
 def list_fournisseurs(campaign_id: str) -> list[str]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
