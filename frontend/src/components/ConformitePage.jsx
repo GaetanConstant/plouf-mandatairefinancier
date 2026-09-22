@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { ShieldCheck, ShieldAlert, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const NIVEAUX = {
     bloquant: { label: 'Bloquant', icon: ShieldAlert, cls: 'text-red-600', badge: 'bg-red-500/10 text-red-600 border-red-500/20' },

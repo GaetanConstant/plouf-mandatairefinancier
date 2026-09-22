@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Users, UserPlus, Trash2, Plus } from 'lucide-react';
 import { Button, Input } from './ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function ListeEquipePage() {
     return (

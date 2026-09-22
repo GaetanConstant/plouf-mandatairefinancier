@@ -3,12 +3,15 @@
 import os
 import sys
 from datetime import date
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import HTTPException
 
 import comptes
+import depot
+from database import UPLOADS_DIR
 from models import Recette, Depense
 from _fixture import fresh_campaign, teardown, run_tests
 
@@ -66,6 +69,137 @@ def test_plafond_par_donateur_independant():
         comptes.create_recette(cid, _recette(montant=4600, nom="B B"))  # autre donateur
         assert len(comptes.list_recettes(cid)) == 2
     finally:
+        teardown(cid)
+
+
+def test_update_depense_modifie_les_champs_saisis():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(montant=100.0, cat="A1", d="2026-01-10"))
+        dep = comptes.list_depenses(cid)[0]
+        comptes.update_depense(cid, dep["id"], _depense(
+            montant=250.0, cat="B1", d="2026-02-15", statut="Engagé"))
+        modifiee = comptes.list_depenses(cid)[0]
+        assert modifiee["montant_ttc"] == 250.0
+        assert modifiee["categorie_cnccfp"] == "B1"
+        assert modifiee["date"] == "2026-02-15"
+        assert modifiee["statut"] == "Engagé"
+    finally:
+        teardown(cid)
+
+
+def test_update_depense_conserve_le_justificatif_sans_nouveau_fichier():
+    """Modifier un libellé ne doit pas détacher la facture déjà rattachée."""
+    cid = fresh_campaign()
+    try:
+        d = _depense()
+        d.justificatif_path = "/data/uploads/facture.pdf"
+        comptes.create_depense(cid, d)
+        dep = comptes.list_depenses(cid)[0]
+        assert dep["justificatif_path"] == "facture.pdf"
+
+        sans_fichier = _depense(montant=300.0)
+        comptes.update_depense(cid, dep["id"], sans_fichier)
+        assert comptes.list_depenses(cid)[0]["justificatif_path"] == "facture.pdf"
+    finally:
+        teardown(cid)
+
+
+def test_remplacer_le_devis_par_la_facture_ne_laisse_pas_de_piece_orpheline():
+    """Un devis qui devient facture garde la même ligne de document.
+
+    Créer une seconde pièce ferait apparaître le devis abandonné dans le dépôt
+    CNCCFP, à côté de la facture qui le remplace.
+    """
+    cid = fresh_campaign()
+    try:
+        d = _depense()
+        d.justificatif_path = "/data/uploads/devis.pdf"
+        d.type_piece = "devis"
+        comptes.create_depense(cid, d)
+        dep = comptes.list_depenses(cid)[0]
+        assert dep["type_piece"] == "devis"
+
+        remplacement = _depense()
+        remplacement.justificatif_path = "/data/uploads/facture.pdf"
+        remplacement.type_piece = "facture"
+        comptes.update_depense(cid, dep["id"], remplacement)
+
+        apres = comptes.list_depenses(cid)[0]
+        assert apres["justificatif_path"] == "facture.pdf"
+        assert apres["type_piece"] == "facture"
+        assert len(depot.list_documents(cid)) == 1
+    finally:
+        teardown(cid)
+
+
+def test_requalifier_la_piece_sans_changer_de_fichier():
+    cid = fresh_campaign()
+    try:
+        d = _depense()
+        d.justificatif_path = "/data/uploads/devis.pdf"
+        d.type_piece = "devis"
+        comptes.create_depense(cid, d)
+        dep = comptes.list_depenses(cid)[0]
+
+        sans_fichier = _depense()
+        sans_fichier.type_piece = "facture"
+        comptes.update_depense(cid, dep["id"], sans_fichier)
+
+        apres = comptes.list_depenses(cid)[0]
+        assert apres["justificatif_path"] == "devis.pdf"
+        assert apres["type_piece"] == "facture"
+    finally:
+        teardown(cid)
+
+
+def test_le_fichier_remplace_est_efface_du_disque():
+    """Le devis remplacé ne doit pas traîner dans data/uploads à l'envoi du dossier."""
+    cid = fresh_campaign()
+    devis = Path(UPLOADS_DIR) / "devis_a_remplacer.pdf"
+    facture = Path(UPLOADS_DIR) / "facture_de_remplacement.pdf"
+    devis.write_bytes(b"%PDF-devis")
+    facture.write_bytes(b"%PDF-facture")
+    try:
+        d = _depense()
+        d.justificatif_path = str(devis)
+        comptes.create_depense(cid, d)
+        dep = comptes.list_depenses(cid)[0]
+
+        remplacement = _depense()
+        remplacement.justificatif_path = str(facture)
+        comptes.update_depense(cid, dep["id"], remplacement)
+
+        assert not devis.exists()
+        assert facture.exists()
+    finally:
+        devis.unlink(missing_ok=True)
+        facture.unlink(missing_ok=True)
+        teardown(cid)
+
+
+def test_le_fichier_encore_rattache_ailleurs_est_conserve():
+    """Deux dépenses peuvent pointer la même facture : on n'efface pas sous l'autre."""
+    cid = fresh_campaign()
+    partagee = Path(UPLOADS_DIR) / "facture_partagee.pdf"
+    autre = Path(UPLOADS_DIR) / "autre_facture.pdf"
+    partagee.write_bytes(b"%PDF-partagee")
+    autre.write_bytes(b"%PDF-autre")
+    try:
+        for _ in range(2):
+            d = _depense()
+            d.justificatif_path = str(partagee)
+            comptes.create_depense(cid, d)
+        premiere = comptes.list_depenses(cid)[0]
+
+        remplacement = _depense()
+        remplacement.justificatif_path = str(autre)
+        comptes.update_depense(cid, premiere["id"], remplacement)
+
+        assert partagee.exists(), "la seconde dépense la référence encore"
+    finally:
+        partagee.unlink(missing_ok=True)
+        autre.unlink(missing_ok=True)
         teardown(cid)
 
 

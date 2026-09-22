@@ -20,3 +20,16 @@ OWNCLOUD_PASSWORD = os.getenv("OWNCLOUD_PASSWORD", "")
 OWNCLOUD_SHARE_URL = os.getenv("OWNCLOUD_SHARE_URL", "")
 OWNCLOUD_SHARE_PASSWORD = os.getenv("OWNCLOUD_SHARE_PASSWORD", "")
 BUDGET_REMOTE_FILENAME = os.getenv("BUDGET_REMOTE_FILENAME", "Budget 2026.xlsx")
+
+# Cookies de session : `secure` exige HTTPS — activé en production.
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")
+
+# Origines autorisées par CORS (séparées par des virgules).
+# En production le front et l'API partagent le même domaine : la liste peut
+# rester vide, les requêtes n'étant alors plus cross-origin.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]

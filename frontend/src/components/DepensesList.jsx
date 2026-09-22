@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText } from 'lucide-react';
+import { FileText, Pencil } from 'lucide-react';
+import { API_URL } from '../lib/api';
+import { Modal } from './ui/Components';
+import { ExpenseForm } from './ExpenseForm';
 
-const API_URL = 'http://localhost:8000';
 
 export function DepensesList() {
+    const [editing, setEditing] = useState(null);
     const { data: depenses, isLoading } = useQuery({
         queryKey: ['depenses'],
         queryFn: async () => {
@@ -31,6 +34,7 @@ export function DepensesList() {
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Statut</th>
                                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Montant TTC</th>
                                 <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Justificatif</th>
+                                <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Modifier</th>
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
@@ -51,17 +55,33 @@ export function DepensesList() {
                                     <td className="p-4 align-middle text-right">{depense.montant_ttc.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</td>
                                     <td className="p-4 align-middle text-center">
                                         {depense.justificatif_path ? (
-                                            <a
-                                                href={`${API_URL}/docs/${depense.justificatif_path.split('/').pop()}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:text-primary/80 flex justify-center transition-colors"
-                                            >
-                                                <FileText className="w-5 h-5" />
-                                            </a>
+                                            <>
+                                                <a
+                                                    href={`${API_URL}/docs/${depense.justificatif_path.split('/').pop()}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:text-primary/80 flex justify-center transition-colors"
+                                                >
+                                                    <FileText className="w-5 h-5" />
+                                                </a>
+                                                {/* Un devis reste à remplacer par la facture définitive. */}
+                                                {depense.type_piece === 'devis' && (
+                                                    <span className="mt-1 block text-[10px] font-bold text-amber-600">DEVIS</span>
+                                                )}
+                                            </>
                                         ) : (
                                             <span className="text-muted-foreground text-xs">-</span>
                                         )}
+                                    </td>
+                                    <td className="p-4 align-middle text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditing(depense)}
+                                            title="Modifier cette dépense"
+                                            className="text-muted-foreground hover:text-primary transition-colors"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -69,6 +89,16 @@ export function DepensesList() {
                     </table>
                 </div>
             </div>
+
+            <Modal
+                isOpen={Boolean(editing)}
+                onClose={() => setEditing(null)}
+                title="Modifier la dépense"
+            >
+                {editing && (
+                    <ExpenseForm expense={editing} onClose={() => setEditing(null)} />
+                )}
+            </Modal>
         </div>
     );
 }

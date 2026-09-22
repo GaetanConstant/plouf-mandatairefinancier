@@ -4,8 +4,8 @@ import axios from 'axios';
 import { Flag, Download, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { Button } from './ui/Components';
 import { cn } from '../lib/utils';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const STATUT = {
     passe: { label: 'Passé', icon: CheckCircle2, cls: 'text-muted-foreground', badge: 'bg-muted text-muted-foreground' },

@@ -5,12 +5,14 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import io
+import logging
 import pdf_utils
-from database import init_central_db, get_central_db_connection, get_db_connection, update_db_from_excel, push_db_to_excel_and_cloud, CAMPAIGNS_DIR
-from dl_owncloud import download_file_from_owncloud
+from database import init_central_db, get_central_db_connection, UPLOADS_DIR
 import comptes
+import depot
 import recus
 from db import provision_campaign_db
+from db.session import campaign_db_path
 from deps import get_campaign_conn
 from routers import (
     comptes as comptes_routes,
@@ -33,28 +35,34 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 # Auth imports
-
-# Auth imports
 from auth import verify_password, create_access_token, get_current_user, get_password_hash
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
-    OWNCLOUD_HOSTNAME,
-    OWNCLOUD_USERNAME,
-    OWNCLOUD_PASSWORD,
-    OWNCLOUD_SHARE_URL,
-    OWNCLOUD_SHARE_PASSWORD,
-    BUDGET_REMOTE_FILENAME,
+    COOKIE_SECURE,
+    COOKIE_SAMESITE,
+    CORS_ORIGINS,
 )
+
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup : initialiser la base centrale
+    # Startup : base centrale, puis mise à niveau du schéma de chaque campagne.
     init_central_db()
+    with get_central_db_connection() as conn:
+        campaign_ids = [row[0] for row in conn.execute("SELECT id FROM campaigns").fetchall()]
+    for campaign_id in campaign_ids:
+        try:
+            provision_campaign_db(campaign_id)
+        except Exception:
+            logger.exception("Migration de la campagne %s impossible", campaign_id)
     yield
     # Shutdown : rien à nettoyer pour l'instant
 
 
 app = FastAPI(title="Gestion Budget Campagne", version="1.0.0", lifespan=lifespan)
+
 
 class LoginRequest(BaseModel):
     username: str
@@ -79,7 +87,7 @@ class CampaignCreate(BaseModel):
 # Note: credentials=True is required for cookies
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Must specify origin for credentials
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,14 +95,19 @@ app.add_middleware(
 
 # Configuration du dossier des justificatifs
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UPLOADS_DIR = os.path.join(ROOT_DIR, "data", "uploads")
-if not os.path.exists(UPLOADS_DIR):
-    os.makedirs(UPLOADS_DIR)
 
 # Monter le dossier static pour l'accès direct aux fichiers
 app.mount("/docs", StaticFiles(directory=UPLOADS_DIR), name="justificatifs")
 
-SIGNATURE_PATH = os.path.join(ROOT_DIR, "signature mandataire.png")
+# Signature scannée du mandataire : hors git (donnée personnelle), déposée à
+# côté des données en production. Surchargeable par SIGNATURE_PATH.
+SIGNATURE_PATH = os.getenv("SIGNATURE_PATH") or os.path.join(ROOT_DIR, "signature mandataire.png")
+
+@app.get("/health")
+def health():
+    """Sonde de disponibilité utilisée par le déploiement et la supervision."""
+    return {"status": "ok"}
+
 
 @app.post("/login")
 def login(credentials: LoginRequest, response: Response):
@@ -117,8 +130,8 @@ def login(credentials: LoginRequest, response: Response):
         key="session_token",
         value=access_token,
         httponly=True,
-        samesite="lax", # Important for localhost dev
-        secure=False,   # False for localhost, True in prod
+        samesite=COOKIE_SAMESITE,
+        secure=COOKIE_SECURE,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     
@@ -143,7 +156,7 @@ def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_c
     import re
     # Create a slug from the name
     campaign_id = re.sub(r'[^a-zA-Z0-9]', '', campaign.name.lower()) + "_" + datetime.now().strftime("%H%M%S")
-    db_name = f"{campaign_id}.db"
+    db_name = f"{campaign_id}.sqlite"
     
     with get_central_db_connection() as conn:
         try:
@@ -178,8 +191,8 @@ def select_campaign(campaign_id: str, response: Response, current_user: dict = D
         key="campaign_id",
         value=campaign_id,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite=COOKIE_SAMESITE,
+        secure=COOKIE_SECURE,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     return {"message": f"Campagne {campaign_id} sélectionnée"}
@@ -197,19 +210,18 @@ def delete_campaign(campaign_id: str, current_user: dict = Depends(get_current_u
         if not res:
             raise HTTPException(status_code=404, detail="Campagne introuvable")
         
-        db_path = os.path.join(CAMPAIGNS_DIR, res[0])
-        
+        db_path = campaign_db_path(campaign_id)
+
         # Delete from central db
         conn.execute("DELETE FROM user_campaigns WHERE campaign_id = ?", [campaign_id])
         conn.execute("DELETE FROM campaigns WHERE id = ?", [campaign_id])
         
-    # Delete the duckdb file if it exists
+    # Supprime le fichier SQLite de la campagne s'il existe encore.
     if os.path.exists(db_path):
         try:
             os.remove(db_path)
-        except Exception as e:
-            # log or ignore if file is locked
-            print(f"Could not delete db file {db_path}: {e}")
+        except OSError as e:
+            logger.warning("Suppression du fichier %s impossible : %s", db_path, e)
             
     return {"message": "Campagne supprimée"}
 
@@ -304,9 +316,17 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
 
 @app.get("/justificatifs")
 def list_justificatifs(current_user: dict = Depends(get_current_user)):
+    """Fichiers présents dans `uploads`, en signalant ceux rattachés à rien.
+
+    Un fichier orphelin — devis remplacé, pièce chargée puis jamais associée —
+    n'apparaît dans aucun dossier de dépôt mais encombre le dossier au moment
+    de l'envoi à la CNCCFP. Le rattachement se juge sur **toutes** les
+    campagnes : `uploads` leur est commun.
     """
-    Liste tous les fichiers justificatifs présents sur le serveur.
-    """
+    with get_central_db_connection() as conn:
+        campaign_ids = [row[0] for row in conn.execute("SELECT id FROM campaigns").fetchall()]
+    rattaches = depot.fichiers_rattaches(campaign_ids)
+
     files = []
     if os.path.exists(UPLOADS_DIR):
         for filename in os.listdir(UPLOADS_DIR):
@@ -317,7 +337,8 @@ def list_justificatifs(current_user: dict = Depends(get_current_user)):
                     "name": filename,
                     "size": stats.st_size,
                     "mtime": datetime.fromtimestamp(stats.st_mtime).isoformat(),
-                    "url": f"/docs/{filename}"
+                    "url": f"/docs/{filename}",
+                    "rattache": filename in rattaches,
                 })
     return sorted(files, key=lambda x: x["mtime"], reverse=True)
 
@@ -379,72 +400,31 @@ async def analyze_document(file: UploadFile = File(...), current_user: dict = De
 
 @app.post("/sync-budget")
 async def sync_budget(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    """
-    Télécharge Budget 2026.xlsx depuis OwnCloud puis synchronise la base de données.
+    """Import du budget OwnCloud — désactivé.
+
+    Cette synchro écrivait dans l'ancienne base DuckDB, abandonnée au profit de
+    l'ORM SQLite. À reporter sur le nouveau modèle (import Excel → ORM).
     """
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Seul un administrateur peut synchroniser le budget")
 
-    # Désactivé temporairement : cette synchro écrit dans l'ancienne base DuckDB.
-    # Depuis le passage à l'ORM SQLite, elle créerait une divergence de données.
-    # À reporter sur le nouveau modèle (import Excel → ORM) dans une phase ultérieure.
     raise HTTPException(
         status_code=503,
         detail="Synchronisation Budget en cours de portage vers le nouveau modèle de données (indisponible temporairement).",
     )
 
-    # Configuration du téléchargement (lien de partage public, depuis .env)
-    downloaded_url = OWNCLOUD_SHARE_URL
-    password = OWNCLOUD_SHARE_PASSWORD
-    remote_filename = BUDGET_REMOTE_FILENAME
-    local_filename = BUDGET_REMOTE_FILENAME
-
-    if not downloaded_url or not password:
-        raise HTTPException(
-            status_code=500,
-            detail="Configuration OwnCloud manquante : définir OWNCLOUD_SHARE_URL et OWNCLOUD_SHARE_PASSWORD dans le fichier .env",
-        )
-
-    # Chemin local racine du projet
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    local_file_path = os.path.join(root_dir, local_filename)
-
-    try:
-        # 1. Télécharger le fichier
-        download_file_from_owncloud(downloaded_url, password, remote_filename, local_file_path)
-        
-        # 2. Mettre à jour la base de données
-        result = update_db_from_excel(local_file_path, campaign_id=campaign_id)
-        return {"message": f"Cloud ok : {result}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur Sync Cloud : {str(e)}")
 
 @app.post("/push-budget")
 async def push_budget(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
-    """
-    Exporte la base de données vers test.xlsx et l'envoie sur OwnCloud via login.
-    """
+    """Export du budget vers OwnCloud — désactivé, même raison que `/sync-budget`."""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Seul un administrateur peut exporter le budget")
 
-    # Désactivé temporairement : lit l'ancienne base DuckDB (divergente depuis le
-    # passage à l'ORM SQLite). À reporter sur le nouveau modèle ultérieurement.
     raise HTTPException(
         status_code=503,
         detail="Export Budget vers OwnCloud en cours de portage vers le nouveau modèle de données (indisponible temporairement).",
     )
 
-    # Configuration OwnCloud issue du fichier .env
-    hostname = OWNCLOUD_HOSTNAME
-    username = OWNCLOUD_USERNAME
-    password = OWNCLOUD_PASSWORD
-    remote_filename = f'test_{campaign_id}.xlsx'
-    
-    try:
-        result = push_db_to_excel_and_cloud(hostname, username, password, remote_filename, campaign_id=campaign_id)
-        return {"message": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 def _ascii_filename(value: str) -> str:
     """Nom de fichier ASCII sûr pour l'en-tête Content-Disposition (évite les

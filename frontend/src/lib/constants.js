@@ -13,6 +13,11 @@ export const CATEGORIES_CNCCFP = [
     { code: "I1", label: "Divers" },
 ];
 
+export const TYPES_PIECE = [
+    { value: "devis", label: "Devis" },
+    { value: "facture", label: "Facture" },
+];
+
 export const TYPES_RECETTE = [
     { value: "Don", label: "Don (Personne Physique)" },
     { value: "Apport", label: "Apport Personnel" },

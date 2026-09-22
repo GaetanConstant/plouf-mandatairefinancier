@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Button, Input, Select, Modal } from '../components/ui/Components';
 import { User, Shield, Key, Plus, Trash2, KeyRound, RefreshCw, CloudUpload } from 'lucide-react';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function SettingsPage({ currentUser }) {
     return (

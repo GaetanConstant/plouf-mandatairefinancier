@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Landmark, Plus, Trash2 } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 const eur = (v) => (v || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const TYPES = [

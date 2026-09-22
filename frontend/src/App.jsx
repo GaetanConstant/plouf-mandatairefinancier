@@ -15,6 +15,7 @@ import {
   Users,
   Plus,
   LogOut,
+  Info,
   Settings,
   Shield,
   ShieldCheck,
@@ -45,6 +46,7 @@ import { RevenueList } from './components/RevenueList';
 import { JustificatifsList } from './components/JustificatifsList';
 import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AProposPage } from './pages/AProposPage';
 import { CampaignPage } from './pages/CampaignPage';
 import { AttestationsPage } from './components/AttestationsPage';
 import { CarnetsPage } from './components/CarnetsPage';
@@ -58,8 +60,8 @@ import { EcheancierPage } from './components/EcheancierPage';
 import { MutualisationPage } from './components/MutualisationPage';
 import { ListeEquipePage } from './components/ListeEquipePage';
 import { EmpruntsPage } from './components/EmpruntsPage';
+import { API_URL } from './lib/api';
 
-const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
 
 function App() {
@@ -190,9 +192,6 @@ function App() {
     return <div className="flex items-center justify-center h-screen bg-background text-foreground">Chargement des données...</div>;
   }
 
-  const PLAFOND = 154781;
-  const REMBOURSEMENT_MAX = PLAFOND * 0.475;
-
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Modal
@@ -263,6 +262,7 @@ function App() {
 
             <div className="pt-3 mt-3 border-t border-border">
               <NavItem icon={Settings} label="Paramètres" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+              <NavItem icon={Info} label="À propos" active={activeTab === 'apropos'} onClick={() => setActiveTab('apropos')} />
             </div>
           </nav>
 
@@ -374,7 +374,7 @@ function App() {
                       style={{ width: `${Math.min(stats.consommation_plafond, 100)}%` }}
                     />
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Limite légale absolue (154k€). Ne jamais dépasser 100%.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Limite légale absolue ({stats.plafond.toLocaleString('fr-FR')} €, propre à cette élection). Ne jamais dépasser 100%.</p>
                 </div>
 
                 {/* Budget Réel/Trésorerie */}
@@ -450,6 +450,7 @@ function App() {
           {activeTab === 'emprunts' && user.role === 'admin' && <EmpruntsPage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
+          {activeTab === 'apropos' && <AProposPage />}
         </main>
 
       </div>

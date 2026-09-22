@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.pyc
+tests
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+test_receipt.pdf

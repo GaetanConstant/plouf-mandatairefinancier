@@ -4,8 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Droplets, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react';
 import { Button, Modal, Input } from '../components/ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function CampaignPage({ onSelect, user }) {
     const queryClient = useQueryClient();

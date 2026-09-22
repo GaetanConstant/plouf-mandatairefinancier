@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { CalendarDays, Plus, Trash2, Link2, X } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const TYPES_EVT = ['reunion_publique', 'collecte', 'tractage', 'meeting', 'porte_a_porte', 'reception', 'autre']
     .map(v => ({ value: v, label: v.replace(/_/g, ' ') }));

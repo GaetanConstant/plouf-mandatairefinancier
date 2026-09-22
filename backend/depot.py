@@ -10,6 +10,7 @@ Ce module classe les pièces (Document) par enveloppe, produit l'état du dossie
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import HTTPException
@@ -20,7 +21,10 @@ from db.models import Document
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
 
+logger = logging.getLogger(__name__)
+
 _TYPE_LABEL = {
+    enums.TypeDocument.devis: "Devis",
     enums.TypeDocument.facture: "Facture",
     enums.TypeDocument.recu: "Reçu",
     enums.TypeDocument.releve_bancaire: "Relevé bancaire",
@@ -42,6 +46,23 @@ def _doc_dict(d: Document) -> dict:
         "enveloppe": d.enveloppe.value if d.enveloppe else None,
         "date_ajout": d.date_ajout.strftime("%Y-%m-%d") if d.date_ajout else None,
     }
+
+
+def fichiers_rattaches(campaign_ids: list[str]) -> set[str]:
+    """Noms de fichiers référencés par au moins un document, toutes campagnes.
+
+    Le dossier `uploads` est commun aux campagnes : un fichier n'est orphelin
+    que s'il n'est rattaché nulle part, pas seulement dans la campagne ouverte.
+    """
+    noms: set[str] = set()
+    for campaign_id in campaign_ids:
+        try:
+            ensure_campaign_db(campaign_id)
+            with campaign_session(campaign_id) as s:
+                noms |= set(s.scalars(select(Document.fichier)).all())
+        except Exception:
+            logger.exception("Lecture des documents de %s impossible", campaign_id)
+    return noms
 
 
 def list_documents(campaign_id: str) -> list[dict]:

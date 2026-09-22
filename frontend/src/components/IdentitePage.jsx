@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Save, User, Briefcase, Landmark, Calculator, Vote } from 'lucide-react';
 import { Button, Input, Select } from './ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const TYPES_ELECTION = ['municipale', 'metropole', 'secteur', 'legislative', 'departementale', 'regionale', 'europeenne', 'autre']
     .map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
