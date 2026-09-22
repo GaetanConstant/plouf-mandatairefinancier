@@ -28,7 +28,22 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     steps:
+      # Le déploiement est mis en sommeil tant que les secrets ne sont pas
+      # posés : sans ce garde-fou, chaque push laisse `main` en échec alors que
+      # la mise en production est volontairement suspendue. L'étape se
+      # réactive d'elle-même le jour où SERVER_HOST existe.
+      - name: Vérifie que le déploiement est configuré
+        id: gate
+        run: |
+          if [ -z "${{ secrets.SERVER_HOST }}" ]; then
+            echo "actif=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Secrets de déploiement absents — déploiement ignoré."
+          else
+            echo "actif=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Déploie sur la VM
+        if: steps.gate.outputs.actif == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
