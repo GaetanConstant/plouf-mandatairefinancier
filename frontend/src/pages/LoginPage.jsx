@@ -3,8 +3,16 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react';
 import parrot from '../assets/parrot.webp';
+import ploufLogo from '../assets/plouf_logo.png';
 import scopaLogo from '../assets/scopa-logo.png';
 import { API_URL } from '../lib/api';
+import VERSIONS from '../data/versions.json';
+
+// Même source que la page À propos : version et année de la dernière livraison
+// viennent du CHANGELOG, jamais d'une constante en dur.
+const DERNIERE = VERSIONS[0];
+const VERSION_COURANTE = DERNIERE?.version ?? '';
+const ANNEE_DERNIER_DEV = DERNIERE?.date?.slice(0, 4) ?? '';
 
 
 export function LoginPage({ onLogin }) {
@@ -61,8 +69,26 @@ export function LoginPage({ onLogin }) {
                     }}
                 >
                     <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                        <h1 style={{ margin: 0, fontSize: '34px', fontWeight: 700, color: '#3547af', letterSpacing: '-0.5px' }}>Plouf</h1>
-                        <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6b7280' }}>Compte mandataire financier</p>
+                        <img
+                            src={ploufLogo}
+                            alt="Plouf"
+                            style={{ margin: '0 auto 1rem', height: '56px', objectFit: 'contain', display: 'block' }}
+                        />
+                        <h1 style={{
+                            margin: 0, fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase',
+                            letterSpacing: '0.05em', color: '#3547af',
+                        }}>
+                            Mandataire financier
+                        </h1>
+                        <p style={{
+                            margin: '0.25rem 0 0.5rem', fontSize: '0.75rem', fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b7280',
+                        }}>
+                            Plongez dans vos données
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.62rem', color: '#6b7280' }}>
+                            © {ANNEE_DERNIER_DEV} SCOPA — {VERSION_COURANTE}
+                        </p>
                     </div>
 
                     {error && (

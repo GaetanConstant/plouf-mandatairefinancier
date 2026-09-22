@@ -15,6 +15,7 @@ import {
   Users,
   Plus,
   LogOut,
+  Info,
   Settings,
   Shield,
   ShieldCheck,
@@ -45,6 +46,7 @@ import { RevenueList } from './components/RevenueList';
 import { JustificatifsList } from './components/JustificatifsList';
 import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AProposPage } from './pages/AProposPage';
 import { CampaignPage } from './pages/CampaignPage';
 import { AttestationsPage } from './components/AttestationsPage';
 import { CarnetsPage } from './components/CarnetsPage';
@@ -260,6 +262,7 @@ function App() {
 
             <div className="pt-3 mt-3 border-t border-border">
               <NavItem icon={Settings} label="Paramètres" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+              <NavItem icon={Info} label="À propos" active={activeTab === 'apropos'} onClick={() => setActiveTab('apropos')} />
             </div>
           </nav>
 
@@ -447,6 +450,7 @@ function App() {
           {activeTab === 'emprunts' && user.role === 'admin' && <EmpruntsPage />}
 
           {activeTab === 'settings' && <SettingsPage currentUser={user} />}
+          {activeTab === 'apropos' && <AProposPage />}
         </main>
 
       </div>

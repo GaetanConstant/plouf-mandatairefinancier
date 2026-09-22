@@ -1,7 +1,9 @@
 # Logiciel de gestion Mandataire Financier
 
 # Data & Database (Strictly excluded)
-data/
+# Ancré à la racine : `data/` nu masquait aussi frontend/src/data/, qui porte
+# le versions.json généré depuis CHANGELOG.md.
+/data/
 *.db
 *.sqlite
 *.xlsx
