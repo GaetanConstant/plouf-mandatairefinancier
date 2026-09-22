@@ -3,8 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { TYPES_RECETTE } from '../lib/constants';
 import { Button, Input, Select } from './ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function RevenueForm({ onClose }) {
     const queryClient = useQueryClient();

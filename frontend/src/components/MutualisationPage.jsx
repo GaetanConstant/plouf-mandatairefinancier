@@ -4,8 +4,8 @@ import axios from 'axios';
 import { Users, Plus, Trash2, FileDown, FileSpreadsheet, X } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
 import { cn } from '../lib/utils';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 const eur = (v) => (v || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 export function MutualisationPage() {

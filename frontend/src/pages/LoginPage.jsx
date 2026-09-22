@@ -4,8 +4,8 @@ import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react';
 import parrot from '../assets/parrot.webp';
 import scopaLogo from '../assets/scopa-logo.png';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function LoginPage({ onLogin }) {
     const [username, setUsername] = useState('');

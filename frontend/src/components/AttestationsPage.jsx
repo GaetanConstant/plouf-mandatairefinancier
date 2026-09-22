@@ -14,8 +14,8 @@ import {
 import { Modal, Button, Input } from './ui/Components';
 import { cn } from '../lib/utils';
 import { Edit2 } from 'lucide-react';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function AttestationsPage({ campaignId }) {
     const queryClient = useQueryClient();

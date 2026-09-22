@@ -58,8 +58,8 @@ import { EcheancierPage } from './components/EcheancierPage';
 import { MutualisationPage } from './components/MutualisationPage';
 import { ListeEquipePage } from './components/ListeEquipePage';
 import { EmpruntsPage } from './components/EmpruntsPage';
+import { API_URL } from './lib/api';
 
-const API_URL = 'http://localhost:8000';
 axios.defaults.withCredentials = true;
 
 function App() {

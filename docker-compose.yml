@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: mandataire-backend
+    # SECRET_KEY et configuration OwnCloud : backend/.env, non versionné.
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Bases SQLite (centrale + campagnes), justificatifs et signature.
+      - ${MANDATAIRE_DATA_DIR:-./data}:/app/data
+    expose:
+      - "8000"
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    container_name: mandataire-frontend
+    ports:
+      - "127.0.0.1:3305:8080"
+    depends_on:
+      - backend
+    restart: always

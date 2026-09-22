@@ -14,8 +14,8 @@ import {
     Loader2
 } from 'lucide-react';
 import { Button } from './ui/Components';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function JustificatifsList() {
     const queryClient = useQueryClient();

@@ -4,8 +4,8 @@ import axios from 'axios';
 import { BookOpen, Plus, Ban } from 'lucide-react';
 import { Modal, Button, Input } from './ui/Components';
 import { cn } from '../lib/utils';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const STATUT_BADGE = {
     delivre: 'bg-green-500/10 text-green-600 border-green-500/20',

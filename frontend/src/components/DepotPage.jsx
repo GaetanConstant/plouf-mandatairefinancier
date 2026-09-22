@@ -4,8 +4,8 @@ import axios from 'axios';
 import { Download, ShieldCheck, ShieldAlert, FileText } from 'lucide-react';
 import { Button } from './ui/Components';
 import { cn } from '../lib/utils';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const ENVELOPPES = [
     { value: '', label: 'Non classé' },

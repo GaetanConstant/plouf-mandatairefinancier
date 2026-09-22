@@ -2,8 +2,8 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { FileText } from 'lucide-react';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 export function DepensesList() {
     const { data: depenses, isLoading } = useQuery({

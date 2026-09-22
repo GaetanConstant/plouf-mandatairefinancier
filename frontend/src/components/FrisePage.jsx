@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { CalendarDays, TrendingUp, Receipt, Flag } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { API_URL } from '../lib/api';
 
-const API_URL = 'http://localhost:8000';
 
 const TYPE_CONF = {
     evenement: { label: 'Événements', icon: CalendarDays, dot: 'bg-primary', text: 'text-primary' },
