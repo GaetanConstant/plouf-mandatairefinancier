@@ -148,6 +148,12 @@ function App() {
   };
 
 
+  const { data: completude } = useQuery({
+    queryKey: ['completude'],
+    queryFn: async () => (await axios.get(`${API_URL}/identite/completude`)).data,
+    enabled: Boolean(campaign),
+  });
+
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['stats', campaign?.id],
     queryFn: async () => {
@@ -346,6 +352,30 @@ function App() {
               </header>
 
 
+
+              {/* Complétude du dossier : ce qui bloque le dépôt, avant les chiffres. */}
+              {completude && !completude.complet && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('identite')}
+                  className="w-full rounded-xl border border-red-300 bg-red-50/60 p-4 text-left transition-colors hover:bg-red-50"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-semibold text-red-700">
+                      Dossier de dépôt incomplet — {completude.manquants.length} élément
+                      {completude.manquants.length > 1 ? 's' : ''} à renseigner
+                    </span>
+                    <span className="text-xl font-black text-red-600">{completude.pct}%</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
+                    <div className="h-full bg-red-500 transition-all duration-700" style={{ width: `${completude.pct}%` }} />
+                  </div>
+                  <p className="mt-2 text-xs text-red-700/80">
+                    {completude.manquants.slice(0, 3).join(' · ')}
+                    {completude.manquants.length > 3 && ` · +${completude.manquants.length - 3} autres`}
+                  </p>
+                </button>
+              )}
 
               {/* Stats Cards */}
               <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CalendarDays, Plus, Trash2, Link2, X } from 'lucide-react';
+import { CalendarDays, Plus, Trash2, Link2, X, FileText } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -100,10 +100,21 @@ export function EvenementsPage() {
     );
 }
 
+// Une photo part en annexes (enveloppe B), une facture avec les pièces de A :
+// le classement est décidé côté serveur à partir de ce type.
+const TYPES_PIECE_EVENEMENT = [
+    { value: 'photo', label: 'Photo' },
+    { value: 'facture', label: 'Facture' },
+    { value: 'contrat', label: 'Contrat' },
+    { value: 'autre', label: 'Autre pièce' },
+];
+
 function EvenementDetail({ id, onClose, onChange }) {
     const queryClient = useQueryClient();
     const [depId, setDepId] = useState('');
     const [quotePart, setQuotePart] = useState('');
+    const [fichier, setFichier] = useState(null);
+    const [typePiece, setTypePiece] = useState('photo');
 
     const { data: detail } = useQuery({
         queryKey: ['evenement', id],
@@ -126,6 +137,30 @@ function EvenementDetail({ id, onClose, onChange }) {
         onSuccess: refresh,
     });
 
+    // Deux temps : le fichier est téléversé, puis rattaché comme pièce.
+    const addPieceMutation = useMutation({
+        mutationFn: async () => {
+            const body = new FormData();
+            body.append('file', fichier);
+            const { data } = await axios.post(`${API_URL}/upload`, body, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            await axios.post(`${API_URL}/evenements/${id}/documents`, {
+                fichier: data.path, type: typePiece,
+            });
+        },
+        onSuccess: () => {
+            refresh();
+            queryClient.invalidateQueries(['completude']);
+            setFichier(null);
+        },
+        onError: (err) => alert(err.response?.data?.detail || "Erreur lors de l'ajout de la pièce"),
+    });
+    const removePieceMutation = useMutation({
+        mutationFn: async (docId) => axios.delete(`${API_URL}/evenements/${id}/documents/${docId}`),
+        onSuccess: () => { refresh(); queryClient.invalidateQueries(['completude']); },
+    });
+
     return (
         <Modal isOpen={true} onClose={onClose} title={detail?.titre || 'Événement'}>
             <div className="space-y-4">
@@ -143,6 +178,55 @@ function EvenementDetail({ id, onClose, onChange }) {
                             <button onClick={() => unlinkMutation.mutate(d.depense_id)} className="text-muted-foreground hover:text-red-600"><X className="w-4 h-4" /></button>
                         </div>
                     )) : <p className="text-sm text-muted-foreground italic">Aucune dépense rattachée.</p>}
+                </div>
+
+                <div className="border-t border-border pt-4 space-y-2">
+                    <h4 className="text-sm font-semibold">Pièces et photos</h4>
+                    {detail?.documents?.length ? (
+                        <div className="grid grid-cols-3 gap-2">
+                            {detail.documents.map(doc => (
+                                <div key={doc.id} className="group relative overflow-hidden rounded-md border border-border bg-muted/40">
+                                    {doc.media_type === 'image' ? (
+                                        <a href={`${API_URL}/docs/${doc.fichier}`} target="_blank" rel="noopener noreferrer">
+                                            <img src={`${API_URL}/docs/${doc.fichier}`} alt={doc.fichier}
+                                                className="h-24 w-full object-cover" />
+                                        </a>
+                                    ) : (
+                                        <a href={`${API_URL}/docs/${doc.fichier}`} target="_blank" rel="noopener noreferrer"
+                                            className="flex h-24 flex-col items-center justify-center gap-1 p-2 text-center">
+                                            <FileText className="h-6 w-6 text-primary" />
+                                            <span className="line-clamp-2 text-[10px] text-muted-foreground">{doc.fichier}</span>
+                                        </a>
+                                    )}
+                                    <span className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[9px] font-bold uppercase text-white">
+                                        {doc.type} · {doc.enveloppe || 'hors dépôt'}
+                                    </span>
+                                    <button
+                                        onClick={() => removePieceMutation.mutate(doc.id)}
+                                        title="Détacher de l'événement"
+                                        className="absolute right-1 top-1 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : <p className="text-sm text-muted-foreground italic">Aucune pièce rattachée.</p>}
+
+                    <div className="flex items-end gap-2">
+                        <div className="w-36">
+                            <Select label="Type" options={TYPES_PIECE_EVENEMENT} value={typePiece}
+                                onChange={e => setTypePiece(e.target.value)} />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <label className="text-sm font-medium">Fichier</label>
+                            <input type="file"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium hover:file:cursor-pointer"
+                                onChange={e => setFichier(e.target.files[0])} />
+                        </div>
+                        <Button onClick={() => fichier && addPieceMutation.mutate()}
+                            isLoading={addPieceMutation.isPending}>Ajouter</Button>
+                    </div>
                 </div>
 
                 <div className="border-t border-border pt-4 space-y-2">

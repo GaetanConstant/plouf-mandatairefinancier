@@ -10,6 +10,16 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.12.0 — 2026-09-23 — Complétude du dossier et export des enveloppes
+
+- Un score de complétude indique, section par section, ce qui manque avant de pouvoir déposer ; les zones incomplètes ressortent en rouge sur le tableau de bord, l'écran Identité et l'écran Dépôt.
+- L'export des pièces officielles est refusé tant que le dossier est incomplet, avec la liste des manques.
+- Le dossier s'exporte en entier : archive ZIP classée par enveloppe, ou PDF unique paginé avec les pièces à la suite du bordereau.
+- Photos, factures et contrats se rattachent à un événement ; les photos rejoignent les annexes (enveloppe B).
+- La chronologie affiche les photos de chaque événement.
+- Une pièce annoncée au bordereau dont le fichier a disparu empêche désormais le dépôt.
+- Un dossier sans aucun expert-comptable déclenche enfin une alerte : la règle ne se déclenchait que si une fiche existait déjà.
+
 ## v0.10.0 — 2026-09-22 — Devis, factures et pièces orphelines
 
 - Une pièce jointe à une dépense se déclare comme devis ou comme facture, et se remplace quand le devis devient facture.

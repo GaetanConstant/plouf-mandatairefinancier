@@ -16,6 +16,10 @@ def frise(campaign_id: str) -> list[dict]:
     items: list[dict] = []
 
     for e in evenements.list_evenements(campaign_id):
+        # Les pièces de l'événement remontent sur la frise : les photos servent
+        # de preuve visuelle en procédure contradictoire, les autres pièces
+        # indiquent d'un coup d'œil ce qui est déjà justifié.
+        docs = evenements.list_documents_evenement(campaign_id, e["id"])
         items.append({
             "date": e["date_debut"],
             "type": "evenement",
@@ -23,7 +27,13 @@ def frise(campaign_id: str) -> list[dict]:
             "sous_titre": e["lieu"],
             "montant": e["cout"],
             "ref_id": e["id"],
-            "meta": {"type_evenement": e["type"], "nb_depenses": e["nb_depenses"]},
+            "photos": [d["fichier"] for d in docs if d["media_type"] == "image"],
+            "meta": {
+                "type_evenement": e["type"],
+                "nb_depenses": e["nb_depenses"],
+                "nb_photos": sum(1 for d in docs if d["media_type"] == "image"),
+                "nb_pieces": len(docs),
+            },
         })
 
     for r in comptes.list_recettes(campaign_id):

@@ -199,7 +199,14 @@ def run_checks(campaign_id: str) -> dict:
                 alertes.append(_alerte("mandataire_declaration", AVERTISSEMENT,
                     "Date de déclaration du mandataire en préfecture manquante.", "mandataire", None))
 
-        if expert and not expert.dispense and not expert.nom:
+        # Le cas « aucune ligne expert-comptable » échappait au contrôle : la
+        # règle ne se déclenchait que si un expert existait déjà, donc un
+        # dossier totalement vide sur ce point ne levait aucune alerte.
+        if expert is None:
+            alertes.append(_alerte("expert_absent", AVERTISSEMENT,
+                "Aucun expert-comptable enregistré (obligatoire sauf dispense).",
+                "expert_comptable", None))
+        elif not expert.dispense and not expert.nom:
             alertes.append(_alerte("expert_incomplet", AVERTISSEMENT,
                 "Expert-comptable non renseigné (et compte non dispensé).", "expert_comptable", None))
 

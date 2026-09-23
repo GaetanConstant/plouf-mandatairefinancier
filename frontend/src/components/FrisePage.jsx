@@ -52,16 +52,35 @@ export function FrisePage() {
                     return (
                         <div key={i} className="relative">
                             <span className={cn("absolute -left-[1.95rem] top-1.5 w-3.5 h-3.5 rounded-full ring-4 ring-background", conf.dot)} />
-                            <div className="bg-card rounded-lg border border-border p-3 flex items-center gap-3">
-                                <Icon className={cn("w-4 h-4 shrink-0", conf.text)} />
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground font-mono">{it.date || '—'}</span>
-                                        <span className="font-medium truncate">{it.titre}</span>
+                            <div className="bg-card rounded-lg border border-border p-3">
+                                <div className="flex items-center gap-3">
+                                    <Icon className={cn("w-4 h-4 shrink-0", conf.text)} />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-muted-foreground font-mono">{it.date || '—'}</span>
+                                            <span className="font-medium truncate">{it.titre}</span>
+                                        </div>
+                                        {it.sous_titre && <p className="text-xs text-muted-foreground truncate">{it.sous_titre}</p>}
                                     </div>
-                                    {it.sous_titre && <p className="text-xs text-muted-foreground truncate">{it.sous_titre}</p>}
+                                    {it.montant != null && <span className={cn("font-semibold text-sm shrink-0", conf.text)}>{eur(it.montant)}</span>}
                                 </div>
-                                {it.montant != null && <span className={cn("font-semibold text-sm shrink-0", conf.text)}>{eur(it.montant)}</span>}
+
+                                {/* Preuve visuelle de l'événement : utile en procédure contradictoire. */}
+                                {it.photos?.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2 pl-7">
+                                        {it.photos.map(fichier => (
+                                            <a key={fichier} href={`${API_URL}/docs/${fichier}`} target="_blank" rel="noopener noreferrer" title={fichier}>
+                                                <img src={`${API_URL}/docs/${fichier}`} alt={fichier}
+                                                    className="h-16 w-16 rounded-md border border-border object-cover transition-transform hover:scale-105" />
+                                            </a>
+                                        ))}
+                                        {it.meta?.nb_pieces > it.photos.length && (
+                                            <span className="self-end text-[11px] text-muted-foreground">
+                                                +{it.meta.nb_pieces - it.photos.length} pièce(s) non visuelle(s)
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
