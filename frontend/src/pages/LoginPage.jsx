@@ -40,6 +40,9 @@ export function LoginPage({ onLogin }) {
         width: '100%', padding: '11px 16px', borderRadius: '10px',
         border: '1px solid #ccc8c4', background: '#fafaf9', fontSize: '14px',
         fontFamily: 'inherit', outline: 'none',
+        // Fixée explicitement : sans elle, le mode sombre rend un texte blanc
+        // sur le fond clair du panneau, donc illisible.
+        color: '#1a1a1a',
     };
 
     return (
@@ -76,7 +79,7 @@ export function LoginPage({ onLogin }) {
                         />
                         <h1 style={{
                             margin: 0, fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase',
-                            letterSpacing: '0.05em', color: '#3547af',
+                            letterSpacing: '0.05em', color: '#E40046',
                         }}>
                             Mandataire financier
                         </h1>
@@ -121,7 +124,7 @@ export function LoginPage({ onLogin }) {
 
                         <button type="submit" disabled={loading}
                             style={{
-                                width: '100%', padding: '13px', background: '#3547af', color: '#fff',
+                                width: '100%', padding: '13px', background: '#E40046', color: '#fff',
                                 fontSize: '14px', fontWeight: 600, fontFamily: 'inherit', border: 'none',
                                 borderRadius: '50px', cursor: loading ? 'not-allowed' : 'pointer',
                                 marginTop: '0.5rem', opacity: loading ? 0.6 : 1, transition: 'opacity .2s, transform .1s',
@@ -153,8 +156,8 @@ const labelStyle = {
 };
 
 function focusOn(e) {
-    e.target.style.borderColor = '#3547af';
-    e.target.style.boxShadow = '0 0 0 3px rgba(53,71,175,0.15)';
+    e.target.style.borderColor = '#E40046';
+    e.target.style.boxShadow = '0 0 0 3px rgba(228,0,70,0.18)';
     e.target.style.background = '#fff';
 }
 function focusOff(e) {
