@@ -95,7 +95,13 @@ const ACCES_ECRAN = {
   soumissions: ['mandataire', 'expert_comptable', 'equipe'],
   acces: ['mandataire'],
   dashboard: ['mandataire', 'expert_comptable'],
+  settings: ['mandataire', 'expert_comptable', 'equipe'],
+  apropos: ['mandataire', 'expert_comptable', 'equipe'],
 };
+
+// Écran d'arrivée selon le rôle : l'équipe n'a pas de tableau de bord, elle
+// atterrirait sur une page vide.
+const ongletParDefaut = (role) => (role === 'equipe' ? 'soumissions' : 'dashboard');
 
 const peutVoir = (tab, role) => (ACCES_ECRAN[tab] ?? ['mandataire']).includes(role);
 
@@ -164,6 +170,8 @@ function App() {
     enabled: Boolean(campaign) && estMandataire,
     refetchInterval: 30000,
   });
+
+  const onglet = peutVoir(activeTab, roleCampagne) ? activeTab : ongletParDefaut(roleCampagne);
 
   const [groupeOuvert, setGroupeOuvert] = useState(() => groupeDe(activeTab));
   const allerA = useCallback((tab) => {
@@ -284,7 +292,7 @@ function App() {
   }
 
   if (!user) {
-    return <LoginPage onLogin={setUser} />;
+    return <LoginPage onLogin={(u) => { setUser(u); setCampaign(null); setActiveTab('dashboard'); }} />;
   }
 
   if (!campaign) {
@@ -330,16 +338,16 @@ function App() {
 
           <nav className="flex-1 overflow-y-auto -mr-3 pr-3 space-y-1">
             {peutVoir('dashboard', roleCampagne) && (
-              <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => allerA('dashboard')} />
+              <NavItem icon={LayoutDashboard} label="Tableau de bord" active={onglet === 'dashboard'} onClick={() => allerA('dashboard')} />
             )}
 
             {estMandataire && (
-              <NavItem icon={BellRing} label="À valider" active={activeTab === 'validation'}
+              <NavItem icon={BellRing} label="À valider" active={onglet === 'validation'}
                 onClick={() => allerA('validation')} badge={fileValidation?.total || 0} />
             )}
 
             {(estExpert || estEquipe) && (
-              <NavItem icon={Inbox} label="Mes soumissions" active={activeTab === 'soumissions'}
+              <NavItem icon={Inbox} label="Mes soumissions" active={onglet === 'soumissions'}
                 onClick={() => allerA('soumissions')} />
             )}
 
@@ -347,7 +355,7 @@ function App() {
               .filter(g => g.items.length > 0)
               .map(g => (
                 <NavGroup key={g.label} icon={g.icon} label={g.label} items={g.items}
-                  activeTab={activeTab} setActiveTab={allerA}
+                  activeTab={onglet} setActiveTab={allerA}
                   open={groupeOuvert === g.label}
                   onToggle={() => setGroupeOuvert(groupeOuvert === g.label ? null : g.label)} />
               ))}
@@ -368,7 +376,7 @@ function App() {
                 <button
                   onClick={() => allerA('acces')}
                   className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
-                    activeTab === 'acces' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                    onglet === 'acces' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
                 >
                   <Users className="w-3 h-3" /> Accès à la campagne
                 </button>
@@ -376,14 +384,14 @@ function App() {
               <button
                 onClick={() => allerA('settings')}
                 className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
-                  activeTab === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                  onglet === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Settings className="w-3 h-3" /> Paramètres
               </button>
               <button
                 onClick={() => allerA('apropos')}
                 className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
-                  activeTab === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                  onglet === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Info className="w-3 h-3" /> À propos
               </button>
@@ -415,7 +423,7 @@ function App() {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-8">
-          {activeTab === 'dashboard' && (
+          {onglet === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               <header className="flex justify-between items-center mb-8">
@@ -589,39 +597,39 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'depenses' && peutVoir('depenses', roleCampagne) && (
+          {onglet === 'depenses' && peutVoir('depenses', roleCampagne) && (
             <DepensesList cible={cible?.entite === 'depense' ? cible.id : null}
               onCibleConsommee={consommerCible} />
           )}
-          {activeTab === 'recettes' && peutVoir('recettes', roleCampagne) && (
+          {onglet === 'recettes' && peutVoir('recettes', roleCampagne) && (
             <RevenueList cible={cible?.entite === 'recette' ? cible.id : null}
               onCibleConsommee={consommerCible} />
           )}
-          {activeTab === 'justificatifs' && peutVoir('justificatifs', roleCampagne) && <JustificatifsList />}
-          {activeTab === 'attestations' && peutVoir('attestations', roleCampagne) && <AttestationsPage campaignId={campaign.id} />}
-          {activeTab === 'carnets' && peutVoir('carnets', roleCampagne) && <CarnetsPage />}
-          {activeTab === 'conformite' && peutVoir('conformite', roleCampagne) && (
+          {onglet === 'justificatifs' && peutVoir('justificatifs', roleCampagne) && <JustificatifsList />}
+          {onglet === 'attestations' && peutVoir('attestations', roleCampagne) && <AttestationsPage campaignId={campaign.id} />}
+          {onglet === 'carnets' && peutVoir('carnets', roleCampagne) && <CarnetsPage />}
+          {onglet === 'conformite' && peutVoir('conformite', roleCampagne) && (
             <ConformitePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
           )}
-          {activeTab === 'maincourante' && peutVoir('maincourante', roleCampagne) && <MainCourantePage />}
-          {activeTab === 'identite' && peutVoir('identite', roleCampagne) && (
+          {onglet === 'maincourante' && peutVoir('maincourante', roleCampagne) && <MainCourantePage />}
+          {onglet === 'identite' && peutVoir('identite', roleCampagne) && (
             <IdentitePage cible={cible?.entite} onCibleConsommee={consommerCible} />
           )}
-          {activeTab === 'depot' && peutVoir('depot', roleCampagne) && <DepotPage />}
-          {activeTab === 'evenements' && peutVoir('evenements', roleCampagne) && <EvenementsPage />}
-          {activeTab === 'frise' && peutVoir('frise', roleCampagne) && <FrisePage />}
-          {activeTab === 'calendrier' && peutVoir('calendrier', roleCampagne) && <CalendrierPage />}
-          {activeTab === 'echeancier' && peutVoir('echeancier', roleCampagne) && <EcheancierPage />}
-          {activeTab === 'mutualisation' && peutVoir('mutualisation', roleCampagne) && <MutualisationPage />}
-          {activeTab === 'listeequipe' && peutVoir('listeequipe', roleCampagne) && <ListeEquipePage />}
-          {activeTab === 'emprunts' && peutVoir('emprunts', roleCampagne) && <EmpruntsPage />}
+          {onglet === 'depot' && peutVoir('depot', roleCampagne) && <DepotPage />}
+          {onglet === 'evenements' && peutVoir('evenements', roleCampagne) && <EvenementsPage />}
+          {onglet === 'frise' && peutVoir('frise', roleCampagne) && <FrisePage />}
+          {onglet === 'calendrier' && peutVoir('calendrier', roleCampagne) && <CalendrierPage />}
+          {onglet === 'echeancier' && peutVoir('echeancier', roleCampagne) && <EcheancierPage />}
+          {onglet === 'mutualisation' && peutVoir('mutualisation', roleCampagne) && <MutualisationPage />}
+          {onglet === 'listeequipe' && peutVoir('listeequipe', roleCampagne) && <ListeEquipePage />}
+          {onglet === 'emprunts' && peutVoir('emprunts', roleCampagne) && <EmpruntsPage />}
 
-          {activeTab === 'settings' && <SettingsPage currentUser={user} />}
-          {activeTab === 'apropos' && <AProposPage />}
-          {activeTab === 'validation' && peutVoir('validation', roleCampagne) && <ValidationPage />}
-          {activeTab === 'soumissions' && peutVoir('soumissions', roleCampagne) && <SoumissionsPage />}
-          {activeTab === 'demandes' && peutVoir('demandes', roleCampagne) && <DemandesPiecesPage />}
-          {activeTab === 'acces' && peutVoir('acces', roleCampagne) && (
+          {onglet === 'settings' && <SettingsPage currentUser={user} />}
+          {onglet === 'apropos' && <AProposPage />}
+          {onglet === 'validation' && peutVoir('validation', roleCampagne) && <ValidationPage />}
+          {onglet === 'soumissions' && peutVoir('soumissions', roleCampagne) && <SoumissionsPage />}
+          {onglet === 'demandes' && peutVoir('demandes', roleCampagne) && <DemandesPiecesPage />}
+          {onglet === 'acces' && peutVoir('acces', roleCampagne) && (
             <AccesPage campaignId={campaign?.id} moi={moi} />
           )}
         </main>

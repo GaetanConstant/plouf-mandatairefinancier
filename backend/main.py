@@ -144,6 +144,11 @@ def login(credentials: LoginRequest, response: Response):
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     
+    # Une nouvelle session repart d'une page blanche : sans cela, le cookie de
+    # campagne du précédent utilisateur du navigateur reste actif, et l'on entre
+    # dans une campagne qu'on n'a pas choisie — voire à laquelle on n'a pas accès.
+    response.delete_cookie("campaign_id")
+
     return {"message": "Login successful", "user": {"username": user[0], "full_name": user[1], "role": user[3]}}
 
 @app.get("/campaigns")
