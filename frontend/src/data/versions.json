@@ -7,7 +7,9 @@
     "details": [
       "L'application restait sur « Chargement des données » en boucle pour un rôle sans accès au tableau de bord : les chiffres du compte étaient réclamés puis refusés, indéfiniment.",
       "Un échec de chargement des chiffres affiche désormais sa raison au lieu d'un voile permanent.",
-      "Une session expirée ramène à la page de connexion, au lieu de faire échouer chaque écran séparément."
+      "Une session expirée ramène à la page de connexion, au lieu de faire échouer chaque écran séparément.",
+      "Page de connexion : les identifiants saisis étaient blancs sur fond blanc en mode sombre.",
+      "Page de connexion aux couleurs de la France Insoumise."
     ],
     "majeur": false
   },

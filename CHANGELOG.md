@@ -16,6 +16,10 @@ Historique reconstitué depuis l'historique Git du dépôt.
 - L'application restait sur « Chargement des données » en boucle pour un rôle sans accès au tableau de bord : les chiffres du compte étaient réclamés puis refusés, indéfiniment.
 - Un échec de chargement des chiffres affiche désormais sa raison au lieu d'un voile permanent.
 - Une session expirée ramène à la page de connexion, au lieu de faire échouer chaque écran séparément.
+- Page de connexion : les identifiants saisis étaient blancs sur fond blanc en mode sombre.
+
+### Modifié
+- Page de connexion aux couleurs de la France Insoumise.
 
 ## v0.14.0 — 2026-09-23 — Rôles et validation des contributions
 
