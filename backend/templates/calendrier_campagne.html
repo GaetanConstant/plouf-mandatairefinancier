@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4 landscape; margin: 12mm 10mm; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #1a1a1a; }
+  h1 { font-size: 14pt; margin: 0 0 2mm; }
+  .sous-titre { color: #666; margin: 0 0 5mm; font-size: 8pt; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  th, td { border: 0.4pt solid #d0d0d0; padding: 0; }
+  th.mois { background: #f2f2f2; font-size: 7pt; font-weight: 700; padding: 1mm 0; }
+  th.semaine { background: #fafafa; font-size: 5.5pt; color: #888; font-weight: 400; height: 5mm; }
+  /* Plage sans activité, repliée : elle reste visible comme une coupure. */
+  th.repli { background: repeating-linear-gradient(45deg, #f4f4f4, #f4f4f4 1mm, #e6e6e6 1mm, #e6e6e6 2mm); width: 7mm; }
+  th.libelle, td.libelle { text-align: left; padding: 0.8mm 1.5mm; width: 46mm; font-size: 7pt; }
+  tr.groupe td { background: #e8e8e8; font-weight: 700; font-size: 7.5pt; padding: 1mm 1.5mm; }
+  td.cellule { height: 4.6mm; }
+  .barre { height: 3.2mm; border-radius: 1.6mm; background: #3547af; }
+  .barre.jalon { background: #c0392b; border-radius: 0; height: 4.6mm; }
+  td.cout { width: 16mm; text-align: right; padding-right: 1.5mm; font-size: 6.5pt; color: #444; }
+  .detail { color: #999; font-size: 6pt; }
+  .notes { margin-top: 5mm; font-size: 7pt; color: #555; }
+  .notes h2 { font-size: 8pt; margin: 0 0 1mm; }
+  .total { margin-top: 3mm; font-size: 8pt; font-weight: 700; }
+</style>
+</head>
+<body>
+  <h1>Calendrier de campagne — {{ titre }}</h1>
+  <p class="sous-titre">
+    Du {{ debut }} au {{ fin }} ({{ nb_semaines }} semaines) · {{ nb_evenements }} événement(s) ·
+    édité le {{ edite_le }}<br>
+    Une case = une semaine. Les plages sans activité sont repliées.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="libelle" rowspan="2">Activité</th>
+        {% for m in mois %}<th class="mois {% if m.repli %}repli{% endif %}" colspan="{{ m.largeur }}">{{ m.libelle }}{% if m.detail %}<br><span class="detail">{{ m.detail }}</span>{% endif %}</th>{% endfor %}
+        <th class="cout" rowspan="2">Coût</th>
+      </tr>
+      <tr>
+        {% for c in colonnes %}<th class="semaine {% if c.type == 'repli' %}repli{% endif %}">{% if c.type == 'repli' %}&middot;&middot;&middot;{% else %}{{ c.numero }}{% endif %}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in groupes %}
+      <tr class="groupe"><td colspan="{{ colonnes|length + 2 }}">{{ g.titre }}</td></tr>
+        {% for l in g.lignes %}
+        <tr>
+          <td class="libelle">
+            {{ l.libelle }}{% if l.detail %}<br><span class="detail">{{ l.detail }}</span>{% endif %}
+          </td>
+          {% for i in range(colonnes|length) %}
+            {% if i == l.colonne %}
+              <td class="cellule" colspan="{{ l.largeur }}">
+                <div class="barre {% if g.jalon %}jalon{% endif %}"></div>
+              </td>
+            {% elif i > l.colonne and i < l.colonne + l.largeur %}
+            {% else %}
+              <td class="cellule"></td>
+            {% endif %}
+          {% endfor %}
+          <td class="cout">{% if l.cout %}{{ "%.0f"|format(l.cout) }} €{% endif %}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="total">Total des événements datés : {{ "%.2f"|format(total_cout) }} €</p>
+
+  {% if jalons_apres %}
+  <div class="notes">
+    <h2>Après le dépôt du compte</h2>
+    {% for j in jalons_apres %}
+      <div>{{ j.date }} — {{ j.libelle }}{% if j.regle %} <span class="detail">({{ j.regle }})</span>{% endif %}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</body>
+</html>

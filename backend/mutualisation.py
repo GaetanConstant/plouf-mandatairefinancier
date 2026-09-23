@@ -188,6 +188,9 @@ def convention_pdf(campaign_id: str, mut_id: int) -> bytes:
     # WeasyPrint a besoin de Pango/GLib (Homebrew) sur macOS.
     os.environ.setdefault("DYLD_LIBRARY_PATH", "/opt/homebrew/lib")
     from jinja2 import Template
+    # macOS : Pango/GLib viennent de Homebrew (voir calendrier.export_pdf).
+    os.environ.setdefault("DYLD_LIBRARY_PATH", "/opt/homebrew/lib")
+
     from weasyprint import HTML
 
     import identite

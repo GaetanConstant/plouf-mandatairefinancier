@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Archive,
   CalendarDays,
+  CalendarRange,
   GitCommitHorizontal,
   Flag,
   Users2,
@@ -51,6 +52,7 @@ import { CampaignPage } from './pages/CampaignPage';
 import { AttestationsPage } from './components/AttestationsPage';
 import { CarnetsPage } from './components/CarnetsPage';
 import { ConformitePage } from './components/ConformitePage';
+import { CalendrierPage } from './components/CalendrierPage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
@@ -63,6 +65,37 @@ import { EmpruntsPage } from './components/EmpruntsPage';
 import { API_URL } from './lib/api';
 
 axios.defaults.withCredentials = true;
+
+const GROUPES_NAV = [
+  { label: 'Administratif', icon: ClipboardList, items: [
+    { key: 'identite', label: 'Identité', icon: ClipboardList },
+    { key: 'listeequipe', label: 'Liste & équipe', icon: UsersRound },
+    { key: 'echeancier', label: 'Échéancier', icon: Flag },
+  ]},
+  { label: 'Comptabilité', icon: BookText, items: [
+    { key: 'maincourante', label: 'Main courante', icon: BookText },
+    { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
+    { key: 'depenses', label: 'Dépenses', icon: Receipt },
+    { key: 'emprunts', label: 'Emprunts', icon: Landmark },
+    { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
+  ]},
+  { label: 'Dons & reçus', icon: BookOpen, items: [
+    { key: 'attestations', label: 'Attestations', icon: FileCheck },
+    { key: 'carnets', label: 'Reçus-dons', icon: BookOpen },
+  ]},
+  { label: 'Campagne', icon: CalendarDays, items: [
+    { key: 'evenements', label: 'Événements', icon: CalendarDays },
+    { key: 'frise', label: 'Frise', icon: GitCommitHorizontal },
+    { key: 'calendrier', label: 'Calendrier', icon: CalendarRange },
+    { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
+  ]},
+  { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
+    { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
+    { key: 'depot', label: 'Dépôt', icon: Archive },
+  ]},
+];
+
+const groupeDe = (tab) => GROUPES_NAV.find(g => g.items.some(i => i.key === tab))?.label ?? null;
 
 function App() {
   const queryClient = useQueryClient();
@@ -77,6 +110,14 @@ function App() {
   // pour ouvrir ou surligner la ligne à corriger, puis la consomme.
   const [cible, setCible] = useState(null);
   const consommerCible = useCallback(() => setCible(null), []);
+
+  // Accordéon : un seul groupe ouvert à la fois. Navigation centralisée pour
+  // que le groupe suive l'onglet, même quand l'appel vient d'ailleurs.
+  const [groupeOuvert, setGroupeOuvert] = useState(() => groupeDe(activeTab));
+  const allerA = useCallback((tab) => {
+    setActiveTab(tab);
+    setGroupeOuvert(groupeDe(tab));
+  }, []);
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [prefilledData, setPrefilledData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -236,44 +277,15 @@ function App() {
 
 
           <nav className="flex-1 overflow-y-auto -mr-3 pr-3 space-y-1">
-            <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+            <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => allerA('dashboard')} />
 
-            {user.role === 'admin' && [
-              { label: 'Administratif', icon: ClipboardList, items: [
-                { key: 'identite', label: 'Identité', icon: ClipboardList },
-                { key: 'listeequipe', label: 'Liste & équipe', icon: UsersRound },
-                { key: 'echeancier', label: 'Échéancier', icon: Flag },
-              ]},
-              { label: 'Comptabilité', icon: BookText, items: [
-                { key: 'maincourante', label: 'Main courante', icon: BookText },
-                { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
-                { key: 'depenses', label: 'Dépenses', icon: Receipt },
-                { key: 'emprunts', label: 'Emprunts', icon: Landmark },
-                { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
-              ]},
-              { label: 'Dons & reçus', icon: BookOpen, items: [
-                { key: 'attestations', label: 'Attestations', icon: FileCheck },
-                { key: 'carnets', label: 'Reçus-dons', icon: BookOpen },
-              ]},
-              { label: 'Campagne', icon: CalendarDays, items: [
-                { key: 'evenements', label: 'Événements', icon: CalendarDays },
-                { key: 'frise', label: 'Frise', icon: GitCommitHorizontal },
-                { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
-              ]},
-              { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
-                { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
-                { key: 'depot', label: 'Dépôt', icon: Archive },
-              ]},
-            ].map(g => (
+            {user.role === 'admin' && GROUPES_NAV.map(g => (
               <NavGroup key={g.label} icon={g.icon} label={g.label} items={g.items}
-                activeTab={activeTab} setActiveTab={setActiveTab}
-                defaultOpen={g.items.some(i => i.key === activeTab)} />
+                activeTab={activeTab} setActiveTab={allerA}
+                open={groupeOuvert === g.label}
+                onToggle={() => setGroupeOuvert(groupeOuvert === g.label ? null : g.label)} />
             ))}
 
-            <div className="pt-3 mt-3 border-t border-border">
-              <NavItem icon={Settings} label="Paramètres" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
-              <NavItem icon={Info} label="À propos" active={activeTab === 'apropos'} onClick={() => setActiveTab('apropos')} />
-            </div>
           </nav>
 
           <div className="mt-auto p-4 bg-muted/50 rounded-lg space-y-4">
@@ -283,7 +295,23 @@ function App() {
                 <span>{user.full_name}</span>
               </div>
               <div className="text-xs text-muted-foreground/80">Villeurbanne</div>
+            </div>
 
+            <div className="space-y-1">
+              <button
+                onClick={() => allerA('settings')}
+                className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
+                  activeTab === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                <Settings className="w-3 h-3" /> Paramètres
+              </button>
+              <button
+                onClick={() => allerA('apropos')}
+                className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
+                  activeTab === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                <Info className="w-3 h-3" /> À propos
+              </button>
             </div>
             <button
               onClick={toggleTheme}
@@ -361,7 +389,7 @@ function App() {
               {completude && !completude.complet && (
                 <button
                   type="button"
-                  onClick={() => setActiveTab('identite')}
+                  onClick={() => allerA('identite')}
                   className="w-full rounded-xl border border-red-300 bg-red-50/60 p-4 text-left transition-colors hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -479,7 +507,7 @@ function App() {
           {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage campaignId={campaign.id} />}
           {activeTab === 'carnets' && user.role === 'admin' && <CarnetsPage />}
           {activeTab === 'conformite' && user.role === 'admin' && (
-            <ConformitePage onNavigate={(tab, c) => { setCible(c); setActiveTab(tab); }} />
+            <ConformitePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
           )}
           {activeTab === 'maincourante' && user.role === 'admin' && <MainCourantePage />}
           {activeTab === 'identite' && user.role === 'admin' && (
@@ -488,6 +516,7 @@ function App() {
           {activeTab === 'depot' && user.role === 'admin' && <DepotPage />}
           {activeTab === 'evenements' && user.role === 'admin' && <EvenementsPage />}
           {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}
+          {activeTab === 'calendrier' && user.role === 'admin' && <CalendrierPage />}
           {activeTab === 'echeancier' && user.role === 'admin' && <EcheancierPage />}
           {activeTab === 'mutualisation' && user.role === 'admin' && <MutualisationPage />}
           {activeTab === 'listeequipe' && user.role === 'admin' && <ListeEquipePage />}
@@ -502,20 +531,24 @@ function App() {
   );
 }
 
-function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, defaultOpen }) {
-  const [open, setOpen] = useState(defaultOpen);
+function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, open, onToggle }) {
   const hasActive = items.some(i => i.key === activeTab);
   return (
     <div>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className={cn(
-          "w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors",
+          // Typo resserrée : « Conformité & dépôt » doit tenir sur une ligne dans
+          // une barre de 256 px, sinon le libellé se coupe ou passe à la ligne.
+          "w-full flex items-center justify-between gap-1 px-3 py-2 rounded-md text-[11px] font-semibold uppercase tracking-wide transition-colors",
           hasActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
         )}
       >
-        <span className="flex items-center gap-2"><Icon className="w-4 h-4" />{label}</span>
-        <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", open ? "" : "-rotate-90")} />
+        <span className="flex min-w-0 items-center gap-2 text-left leading-tight">
+          <Icon className="w-4 h-4 shrink-0" />
+          <span className="truncate whitespace-nowrap">{label}</span>
+        </span>
+        <ChevronDown className={cn("w-4 h-4 shrink-0 transition-transform duration-200", open ? "" : "-rotate-90")} />
       </button>
       {open && (
         <div className="mt-1 ml-2 pl-2 border-l border-border space-y-1">
