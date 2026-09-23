@@ -276,6 +276,26 @@ def list_acces(campaign_id: str, current_user: dict = Depends(get_current_user),
     return [{"username": l[0], "full_name": l[1], "role": l[2]} for l in lignes]
 
 
+@app.get("/campaigns/{campaign_id}/acces/candidats")
+def list_candidats_acces(campaign_id: str, current_user: dict = Depends(get_current_user),
+                         _garde: str = Depends(mandataire_requis)):
+    """Comptes existants qui n'ont pas encore accès à cette campagne.
+
+    Route distincte de `/users`, réservée aux administrateurs de la plateforme :
+    un mandataire doit pouvoir ouvrir sa campagne sans pour autant obtenir la
+    liste des comptes avec leurs rôles plateforme.
+    """
+    with get_central_db_connection() as conn:
+        lignes = conn.execute(
+            "SELECT u.username, u.full_name FROM users u "
+            "WHERE u.username NOT IN ("
+            "    SELECT username FROM user_campaigns WHERE campaign_id = ?"
+            ") ORDER BY u.full_name, u.username",
+            [campaign_id],
+        ).fetchall()
+    return [{"username": l[0], "full_name": l[1]} for l in lignes]
+
+
 class AccesIn(BaseModel):
     username: str
     role: str

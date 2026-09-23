@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { UserPlus, Trash2, ShieldCheck } from 'lucide-react';
-import { Button, Input, Select } from './ui/Components';
+import { Button, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
 const ROLES = [
@@ -22,8 +22,17 @@ export function AccesPage({ campaignId, moi }) {
         queryKey: ['acces', campaignId],
         queryFn: async () => (await axios.get(`${API_URL}/campaigns/${campaignId}/acces`)).data,
     });
+    // Comptes existants qui n'ont pas encore accès : inutile de proposer
+    // quelqu'un qui figure déjà dans la liste du dessous.
+    const { data: candidats } = useQuery({
+        queryKey: ['acces-candidats', campaignId],
+        queryFn: async () => (await axios.get(`${API_URL}/campaigns/${campaignId}/acces/candidats`)).data,
+    });
 
-    const rafraichir = () => queryClient.invalidateQueries(['acces', campaignId]);
+    const rafraichir = () => {
+        queryClient.invalidateQueries(['acces', campaignId]);
+        queryClient.invalidateQueries(['acces-candidats', campaignId]);
+    };
 
     const donner = useMutation({
         mutationFn: async () => axios.post(`${API_URL}/campaigns/${campaignId}/acces`, { username, role }),
@@ -49,12 +58,24 @@ export function AccesPage({ campaignId, moi }) {
 
             <div className="space-y-3 rounded-md border border-border bg-card p-4">
                 <div className="grid gap-3 md:grid-cols-2">
-                    <Input label="Identifiant du compte" placeholder="ex : mgarabedian"
-                        value={username} onChange={e => setUsername(e.target.value)} />
+                    <Select
+                        label="Compte"
+                        value={username}
+                        onChange={e => setUsername(e.target.value)}
+                        options={[
+                            { value: '', label: '— choisir un compte —' },
+                            ...(candidats || []).map(c => ({
+                                value: c.username,
+                                label: c.full_name ? `${c.full_name} (${c.username})` : c.username,
+                            })),
+                        ]}
+                    />
                     <Select label="Rôle" options={ROLES} value={role} onChange={e => setRole(e.target.value)} />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    Le compte doit déjà exister. Sa création se fait dans Paramètres.
+                    {candidats && candidats.length === 0
+                        ? "Tous les comptes existants ont déjà accès. Créez-en un nouveau dans Paramètres."
+                        : "Seuls les comptes sans accès à cette campagne sont proposés. La création de compte se fait dans Paramètres."}
                 </p>
                 <div className="flex justify-end">
                     <Button className="gap-2" isLoading={donner.isPending}
