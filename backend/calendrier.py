@@ -62,21 +62,68 @@ def _semaines(debut: date, fin: date) -> list[dict]:
     return colonnes
 
 
-def _entetes_mois(semaines: list[dict]) -> list[dict]:
-    """Bandeau des mois : une cellule par mois, large de ses semaines.
+# Au-delà de cette longueur, une plage sans aucune activité est repliée en une
+# seule colonne. En deçà, la replier ferait perdre plus en lisibilité qu'elle ne
+# ferait gagner en place.
+SEUIL_REPLI = 3
 
-    Une semaine à cheval sur deux mois est comptée dans celui de son lundi,
-    sinon les largeurs ne totalisent plus le nombre de colonnes.
+# Semaines conservées de part et d'autre d'une activité : une barre collée au
+# bord d'un repli ne se situe plus dans le temps.
+MARGE_CONTEXTE = 2
+
+
+def _colonnes(semaines: list[dict], occupees: set[int]) -> list[dict]:
+    """Colonnes du calendrier, plages creuses repliées.
+
+    La période légale court sur six mois avant le scrutin, mais une campagne se
+    concentre souvent sur ses dernières semaines : afficher les mois vides à la
+    même échelle écrase la partie qui porte l'information.
     """
+    colonnes: list[dict] = []
+    i, n = 0, len(semaines)
+    while i < n:
+        if i in occupees:
+            colonnes.append({"type": "semaine", "semaines": [i], **semaines[i]})
+            i += 1
+            continue
+
+        j = i
+        while j < n and j not in occupees:
+            j += 1
+        creux = list(range(i, j))
+        if len(creux) > SEUIL_REPLI:
+            colonnes.append({
+                "type": "repli",
+                "semaines": creux,
+                "nb_semaines": len(creux),
+                "debut": semaines[i]["debut"],
+                "fin": semaines[j - 1]["fin"],
+            })
+        else:
+            colonnes.extend({"type": "semaine", "semaines": [k], **semaines[k]} for k in creux)
+        i = j
+    return colonnes
+
+
+def _entetes(colonnes: list[dict]) -> list[dict]:
+    """Bandeau supérieur : un mois par groupe de semaines, un repli à part."""
     entetes: list[dict] = []
-    for s in semaines:
-        if entetes and entetes[-1]["mois"] == s["mois"] and entetes[-1]["annee"] == s["annee"]:
+    for c in colonnes:
+        if c["type"] == "repli":
+            debut, fin = c["debut"], c["fin"]
+            libelle = MOIS_COURTS[debut.month - 1]
+            if fin.month != debut.month:
+                libelle += f" → {MOIS_COURTS[fin.month - 1]}"
+            entetes.append({"repli": True, "largeur": 1,
+                            "libelle": libelle, "detail": f"{c['nb_semaines']} sem."})
+            continue
+        if entetes and not entetes[-1]["repli"] and entetes[-1].get("mois") == c["mois"] \
+                and entetes[-1].get("annee") == c["annee"]:
             entetes[-1]["largeur"] += 1
         else:
-            entetes.append({
-                "mois": s["mois"], "annee": s["annee"], "largeur": 1,
-                "libelle": f"{MOIS_COURTS[s['mois'] - 1]} {s['annee']}",
-            })
+            entetes.append({"repli": False, "mois": c["mois"], "annee": c["annee"],
+                            "largeur": 1, "detail": None,
+                            "libelle": f"{MOIS_COURTS[c['mois'] - 1]} {c['annee']}"})
     return entetes
 
 
@@ -164,13 +211,39 @@ def donnees(campaign_id: str) -> dict:
             lignes.sort(key=lambda l: l["debut"])
             groupes.append({"titre": titre, "jalon": False, "lignes": lignes})
 
+    # Semaines réellement couvertes par une activité : le reste peut se replier.
+    occupees: set[int] = set()
+    for g in groupes:
+        for l in g["lignes"]:
+            debut_marge = max(0, l["colonne"] - MARGE_CONTEXTE)
+            fin_marge = min(len(semaines), l["colonne"] + l["largeur"] + MARGE_CONTEXTE)
+            occupees.update(range(debut_marge, fin_marge))
+    colonnes = _colonnes(semaines, occupees)
+
+    # Chaque semaine pointe vers la colonne qui la porte (plusieurs semaines
+    # repliées partagent la même).
+    colonne_de_semaine: dict[int, int] = {}
+    for index, c in enumerate(colonnes):
+        for i in c["semaines"]:
+            colonne_de_semaine[i] = index
+
+    for g in groupes:
+        for l in g["lignes"]:
+            premiere = colonne_de_semaine[l["colonne"]]
+            derniere = colonne_de_semaine[l["colonne"] + l["largeur"] - 1]
+            l["colonne"], l["largeur"] = premiere, derniere - premiere + 1
+
     total = sum(l["cout"] or 0.0 for g in groupes for l in g["lignes"])
     return {
         "vide": False,
         "debut": debut.isoformat(),
         "fin": fin.isoformat(),
-        "semaines": [{**s, "debut": s["debut"].isoformat(), "fin": s["fin"].isoformat()} for s in semaines],
-        "mois": _entetes_mois(semaines),
+        "nb_semaines": len(semaines),
+        "colonnes": [
+            {**c, "debut": c["debut"].isoformat(), "fin": c["fin"].isoformat()}
+            for c in colonnes
+        ],
+        "mois": _entetes(colonnes),
         "groupes": groupes,
         "jalons_apres": jalons_apres,
         "total_cout": total,
@@ -219,6 +292,7 @@ def export_pdf(campaign_id: str) -> bytes:
         fin=_jolie_date(donnees_calendrier["fin"]),
         edite_le=date.today().strftime("%d/%m/%Y"),
         **{k: donnees_calendrier[k] for k in
-           ("semaines", "mois", "groupes", "jalons_apres", "total_cout", "nb_evenements")},
+           ("colonnes", "mois", "groupes", "jalons_apres", "total_cout",
+            "nb_evenements", "nb_semaines")},
     )
     return HTML(string=html).write_pdf()

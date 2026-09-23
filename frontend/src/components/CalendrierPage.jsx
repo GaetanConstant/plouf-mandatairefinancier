@@ -27,9 +27,15 @@ export function CalendrierPage() {
         );
     }
 
-    const nbSemaines = data.semaines.length;
-    // Une colonne d'intitulé large et fixe, puis une colonne par semaine.
-    const grille = { gridTemplateColumns: `14rem repeat(${nbSemaines}, minmax(0, 1fr)) 5rem` };
+    const colonnes = data.colonnes;
+    const nbColonnes = colonnes.length;
+    // Une case = une semaine. Les plages sans activité sont repliées en une
+    // colonne étroite, pour que la campagne réelle occupe la largeur utile.
+    const grille = {
+        gridTemplateColumns: `14rem ${colonnes
+            .map(c => (c.type === 'repli' ? '2.25rem' : 'minmax(0, 1fr)'))
+            .join(' ')} 5rem`,
+    };
 
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
@@ -37,7 +43,7 @@ export function CalendrierPage() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Calendrier de campagne</h2>
                     <p className="text-sm text-muted-foreground">
-                        {nbSemaines} semaines, de l'ouverture de la période de financement au jour du scrutin.
+                        {data.nb_semaines} semaines, de l'ouverture de la période de financement au jour du scrutin.
                         {' '}{data.nb_evenements} événement(s) · {eur(data.total_cout)}
                     </p>
                 </div>
@@ -51,11 +57,24 @@ export function CalendrierPage() {
                     {/* Bandeau des mois */}
                     <div className="grid items-end gap-px" style={grille}>
                         <div />
-                        {data.mois.map(m => (
-                            <div key={`${m.annee}-${m.mois}`}
+                        {data.mois.map((m, i) => (
+                            <div key={i}
                                 style={{ gridColumn: `span ${m.largeur}` }}
-                                className="truncate border-b border-border pb-1 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                                className={cn('truncate border-b border-border pb-1 text-center text-[11px] font-bold uppercase tracking-wide',
+                                    m.repli ? 'text-muted-foreground/50' : 'text-muted-foreground')}>
                                 {m.libelle}
+                            </div>
+                        ))}
+                        <div />
+                    </div>
+
+                    {/* Numéro de semaine : rend explicite qu'une case = une semaine. */}
+                    <div className="grid gap-px pb-1" style={grille}>
+                        <div />
+                        {colonnes.map((c, i) => (
+                            <div key={i} className={cn('text-center text-[9px]',
+                                c.type === 'repli' ? 'text-muted-foreground/60' : 'text-muted-foreground/70')}>
+                                {c.type === 'repli' ? '⋯' : `S${c.numero}`}
                             </div>
                         ))}
                         <div />
@@ -78,8 +97,8 @@ export function CalendrierPage() {
                                         title={`${ligne.debut}${ligne.fin !== ligne.debut ? ` → ${ligne.fin}` : ''}`}
                                         className={cn('h-3 rounded-full', groupe.jalon ? 'bg-red-500' : 'bg-primary')}
                                     />
-                                    {ligne.colonne + ligne.largeur < nbSemaines && (
-                                        <div style={{ gridColumn: `span ${nbSemaines - ligne.colonne - ligne.largeur}` }} />
+                                    {ligne.colonne + ligne.largeur < nbColonnes && (
+                                        <div style={{ gridColumn: `span ${nbColonnes - ligne.colonne - ligne.largeur}` }} />
                                     )}
                                     <div className="pl-2 text-right text-[11px] text-muted-foreground">
                                         {ligne.cout ? eur(ligne.cout) : ''}

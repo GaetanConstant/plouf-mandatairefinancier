@@ -12,7 +12,8 @@ Historique reconstitué depuis l'historique Git du dépôt.
 
 ## v0.13.0 — 2026-09-23 — Calendrier de campagne
 
-- Un écran Calendrier reconstruit le rétro-planning de la campagne : une ligne par activité, une colonne par semaine, de l'ouverture de la période de financement au jour du scrutin.
+- Un écran Calendrier reconstruit le rétro-planning de la campagne : une ligne par activité, une case par semaine, de l'ouverture de la période de financement au jour du scrutin.
+- Les longues plages sans activité sont repliées : la campagne réelle occupe la largeur utile, au lieu d'être écrasée par les mois vides de la période légale.
 - Chaque activité porte son coût réel, repris du compte — il ne peut pas diverger.
 - Le calendrier s'exporte en PDF et part automatiquement en annexe du dossier (enveloppe B), régénéré à chaque export.
 - Photos et factures d'un événement remontent dans la chronologie et dans le dossier.

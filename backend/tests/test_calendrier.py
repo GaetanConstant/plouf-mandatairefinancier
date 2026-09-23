@@ -74,5 +74,55 @@ def test_evenement_hors_periode_ecarte():
         teardown(cid)
 
 
+def test_les_semaines_creuses_sont_repliees():
+    """Six mois de période légale pour une campagne de trois semaines : l'axe
+    doit donner sa largeur à la campagne, pas au vide qui la précède."""
+    cid = fresh_campaign()
+    try:
+        _datee(cid, "2026-09-27")
+        evenements.create_evenement(cid, evenements.EvenementIn(
+            titre="Meeting", type="meeting", date_debut="2026-09-20"))
+
+        d = calendrier.donnees(cid)
+        assert d["nb_semaines"] > 25, "la période légale reste longue"
+        assert len(d["colonnes"]) < 12, "mais l'affichage se resserre"
+        assert any(c["type"] == "repli" for c in d["colonnes"])
+    finally:
+        teardown(cid)
+
+
+def test_une_colonne_de_semaine_couvre_une_seule_semaine():
+    cid = fresh_campaign()
+    try:
+        _datee(cid, "2026-09-27")
+        evenements.create_evenement(cid, evenements.EvenementIn(
+            titre="Meeting", type="meeting", date_debut="2026-09-20"))
+
+        for c in calendrier.donnees(cid)["colonnes"]:
+            if c["type"] == "semaine":
+                assert len(c["semaines"]) == 1
+                debut = date.fromisoformat(c["debut"])
+                fin = date.fromisoformat(c["fin"])
+                assert (fin - debut).days == 6
+    finally:
+        teardown(cid)
+
+
+def test_une_activite_n_est_jamais_collee_au_repli():
+    """Sans marge, une barre en bordure de coupure ne se situe plus dans le temps."""
+    cid = fresh_campaign()
+    try:
+        _datee(cid, "2026-09-27")
+        evenements.create_evenement(cid, evenements.EvenementIn(
+            titre="Meeting", type="meeting", date_debut="2026-09-20"))
+
+        colonnes = calendrier.donnees(cid)["colonnes"]
+        ligne = [g for g in calendrier.donnees(cid)["groupes"] if g["titre"] == "Meetings"][0]["lignes"][0]
+        avant = colonnes[ligne["colonne"] - 1] if ligne["colonne"] > 0 else None
+        assert avant is None or avant["type"] == "semaine"
+    finally:
+        teardown(cid)
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
