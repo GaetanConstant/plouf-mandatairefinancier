@@ -17,6 +17,7 @@ Historique reconstitué depuis l'historique Git du dépôt.
 - Le dossier s'exporte en entier : archive ZIP classée par enveloppe, ou PDF unique paginé avec les pièces à la suite du bordereau.
 - Photos, factures et contrats se rattachent à un événement ; les photos rejoignent les annexes (enveloppe B).
 - La chronologie affiche les photos de chaque événement.
+- Les alertes de conformité deviennent cliquables : elles mènent directement à l'endroit où corriger — la dépense s'ouvre en modification, la recette est surlignée, la section d'identité amenée à l'écran.
 - Une pièce annoncée au bordereau dont le fichier a disparu empêche désormais le dépôt.
 - Un dossier sans aucun expert-comptable déclenche enfin une alerte : la règle ne se déclenchait que si une fiche existait déjà.
 

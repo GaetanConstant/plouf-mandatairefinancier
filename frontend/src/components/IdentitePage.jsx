@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Save, User, Briefcase, Landmark, Calculator, Vote, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -96,7 +96,7 @@ const SECTIONS = [
     },
 ];
 
-export function IdentitePage() {
+export function IdentitePage({ cible = null, onCibleConsommee }) {
     const { data, isLoading } = useQuery({
         queryKey: ['identite'],
         queryFn: async () => (await axios.get(`${API_URL}/identite`)).data,
@@ -123,7 +123,8 @@ export function IdentitePage() {
             {completude && <BandeauCompletude etat={completude} sectionListe={sectionListe} />}
             {SECTIONS.map(section => (
                 <IdentitySection key={section.key} section={section} initial={data?.[section.key] || {}}
-                    etat={parCle[section.key]} />
+                    etat={parCle[section.key]} cible={cible === section.key}
+                    onCibleConsommee={onCibleConsommee} />
             ))}
         </div>
     );
@@ -170,8 +171,17 @@ function BandeauCompletude({ etat, sectionListe }) {
     );
 }
 
-function IdentitySection({ section, initial, etat }) {
+function IdentitySection({ section, initial, etat, cible = false, onCibleConsommee }) {
     const queryClient = useQueryClient();
+    const carte = useRef(null);
+
+    // Arrivée depuis une alerte de conformité : amener la section à l'écran.
+    useEffect(() => {
+        if (!cible) return;
+        carte.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const t = setTimeout(() => onCibleConsommee?.(), 4000);
+        return () => clearTimeout(t);
+    }, [cible, onCibleConsommee]);
     const [form, setForm] = useState({});
     const [saved, setSaved] = useState(false);
 
@@ -202,7 +212,10 @@ function IdentitySection({ section, initial, etat }) {
     const incomplet = etat && !etat.complet;
 
     return (
-        <div className={`bg-card rounded-xl border p-6 shadow-sm ${incomplet ? 'border-red-300' : 'border-border'}`}>
+        <div ref={carte}
+            className={`bg-card rounded-xl border p-6 shadow-sm transition-shadow ${
+                cible ? 'border-amber-400 ring-2 ring-amber-300' : incomplet ? 'border-red-300' : 'border-border'
+            }`}>
             <div className="flex flex-wrap items-center gap-2 mb-4">
                 <Icon className={`w-5 h-5 ${incomplet ? 'text-red-600' : 'text-primary'}`} />
                 <h2 className="font-bold text-lg">{section.title}</h2>

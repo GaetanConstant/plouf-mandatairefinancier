@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { ShieldCheck, ShieldAlert, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, Info, CheckCircle2, ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
 
@@ -12,7 +12,18 @@ const NIVEAUX = {
     info: { label: 'À compléter', icon: Info, cls: 'text-blue-600', badge: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
 };
 
-export function ConformitePage() {
+// Où va-t-on corriger l'alerte ? L'entité portée par l'alerte désigne l'écran,
+// et son id la ligne à ouvrir. « global » n'a pas de destination.
+const DESTINATION = {
+    depense: { tab: 'depenses', libelle: 'Ouvrir la dépense' },
+    recette: { tab: 'recettes', libelle: 'Ouvrir la recette' },
+    candidat: { tab: 'identite', libelle: 'Compléter le candidat' },
+    mandataire: { tab: 'identite', libelle: 'Compléter le mandataire' },
+    expert_comptable: { tab: 'identite', libelle: "Compléter l'expert-comptable" },
+    compte_bancaire: { tab: 'identite', libelle: 'Compléter le compte bancaire' },
+};
+
+export function ConformitePage({ onNavigate }) {
     const { data, isLoading } = useQuery({
         queryKey: ['conformite'],
         queryFn: async () => (await axios.get(`${API_URL}/conformite`)).data,
@@ -76,15 +87,41 @@ export function ConformitePage() {
                 )}
                 {alertes.map((a, i) => {
                     const N = NIVEAUX[a.niveau] || NIVEAUX.info;
-                    return (
-                        <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">
+                    const dest = onNavigate && DESTINATION[a.entite];
+                    const contenu = (
+                        <>
                             <N.icon className={cn("w-4 h-4 shrink-0", N.cls)} />
                             <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase shrink-0", N.badge)}>
                                 {N.label}
                             </span>
                             <span className="text-sm flex-1">{a.message}</span>
+                            {dest && (
+                                <span className="hidden shrink-0 items-center gap-1 text-xs font-medium text-primary group-hover:inline-flex">
+                                    {dest.libelle} <ArrowRight className="h-3.5 w-3.5" />
+                                </span>
+                            )}
                             <span className="text-[10px] text-muted-foreground font-mono shrink-0">{a.code}</span>
-                        </div>
+                        </>
+                    );
+
+                    if (!dest) {
+                        return (
+                            <div key={i} className="flex items-center gap-3 px-5 py-3">
+                                {contenu}
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <button
+                            key={i}
+                            type="button"
+                            onClick={() => onNavigate(dest.tab, { entite: a.entite, id: a.entite_id })}
+                            title={dest.libelle}
+                            className="group flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
+                        >
+                            {contenu}
+                        </button>
                     );
                 })}
             </div>

@@ -1,10 +1,20 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
 
 
-export function RevenueList() {
+export function RevenueList({ cible = null, onCibleConsommee }) {
+    // Recette désignée par une alerte : on l'amène à l'écran et on la surligne.
+    const ligneCible = useRef(null);
+    useEffect(() => {
+        if (!cible) return;
+        ligneCible.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const t = setTimeout(() => onCibleConsommee?.(), 4000);
+        return () => clearTimeout(t);
+    }, [cible, onCibleConsommee]);
+
     const { data: recettes, isLoading } = useQuery({
         queryKey: ['recettes'],
         queryFn: async () => {
@@ -32,7 +42,10 @@ export function RevenueList() {
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
                             {recettes?.map((recette, i) => (
-                                <tr key={i} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <tr key={i}
+                                    ref={recette.id === cible ? ligneCible : null}
+                                    className={cn("border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+                                        recette.id === cible && "bg-amber-50 ring-2 ring-inset ring-amber-400")}>
                                     <td className="p-4 align-middle">{recette.date}</td>
                                     <td className="p-4 align-middle font-medium">{recette.nom_donateur}</td>
                                     <td className="p-4 align-middle">{recette.type}</td>
