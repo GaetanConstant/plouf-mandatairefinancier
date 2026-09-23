@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends
 import completude
 import identite
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_requis
 
-router = APIRouter(prefix="/identite", tags=["identite"])
+router = APIRouter(prefix="/identite", tags=["identite"], dependencies=[Depends(mandataire_requis)])
 
 
 @router.get("")

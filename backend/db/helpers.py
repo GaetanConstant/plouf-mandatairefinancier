@@ -31,3 +31,16 @@ def media_type(filename: Optional[str]) -> str:
     if ext == ".pdf":
         return "pdf"
     return "autre"
+
+
+def valides(requete, modele):
+    """Restreint une requête aux objets validés par le mandataire.
+
+    À appliquer sur **tout** calcul qui alimente le compte : plafond,
+    trésorerie, conformité, main courante, exports, dossier de dépôt. Ce qu'un
+    militant ou l'expert-comptable dépose reste en attente et ne doit pas
+    déplacer un chiffre légal avant arbitrage.
+    """
+    from db import enums
+
+    return requete.where(modele.statut_validation == enums.StatutValidation.valide)

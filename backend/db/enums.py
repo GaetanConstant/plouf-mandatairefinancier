@@ -91,6 +91,23 @@ class TypeEvenement(str, enum.Enum):
     autre = "autre"
 
 
+class StatutValidation(str, enum.Enum):
+    """Cycle de vie d'un objet soumis au mandataire.
+
+    Seul `valide` entre dans le compte : plafond, trésorerie, conformité,
+    exports et dossier de dépôt ignorent le reste.
+    """
+    valide = "valide"
+    propose = "propose"
+    refuse = "refuse"
+
+
+class StatutDemandePiece(str, enum.Enum):
+    ouverte = "ouverte"
+    repondue = "repondue"
+    close = "close"
+
+
 class TypeDocument(str, enum.Enum):
     devis = "devis"
     facture = "facture"

@@ -13,7 +13,15 @@ import depot
 import recus
 from db import provision_campaign_db
 from db.session import campaign_db_path
-from deps import get_campaign_conn
+from deps import (
+    get_active_campaign,
+    get_campaign_conn,
+    get_role,
+    mandataire_requis,
+    tout_role,
+    role_sur_campagne,
+)
+from database import ROLE_MANDATAIRE, ROLES
 from routers import (
     comptes as comptes_routes,
     recus as recus_routes,
@@ -24,6 +32,7 @@ from routers import (
     pilotage as pilotage_routes,
     mutualisation as mutualisation_routes,
     annexes as annexes_routes,
+    validation as validation_routes,
 )
 import os
 import re
@@ -162,8 +171,9 @@ def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_c
         try:
             conn.execute("INSERT INTO campaigns (id, name, db_path) VALUES (?, ?, ?)", 
                          [campaign_id, campaign.name, db_name])
-            conn.execute("INSERT INTO user_campaigns (username, campaign_id) VALUES (?, ?)", 
-                         [current_user["username"], campaign_id])
+            conn.execute(
+                "INSERT INTO user_campaigns (username, campaign_id, role) VALUES (?, ?, ?)",
+                [current_user["username"], campaign_id, ROLE_MANDATAIRE])
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Erreur lors de la création de la campagne: {str(e)}")
 
@@ -232,9 +242,74 @@ def logout(response: Response):
     return {"message": "Logged out"}
 
 @app.get("/me")
-def read_users_me(current_user: dict = Depends(get_current_user)):
-    # Return role as well
-    return {"username": current_user["username"], "full_name": current_user["full_name"], "role": current_user["role"]}
+def read_users_me(current_user: dict = Depends(get_current_user),
+                  campaign_id: str = Depends(get_active_campaign)):
+    """Identité de l'appelant, et son rôle sur la campagne ouverte.
+
+    `role` reste le rôle plateforme (admin / user) ; `role_campagne` est celui
+    qui décide de ce que l'interface propose. L'administrateur est mandataire
+    de fait, pour pouvoir reprendre la main sur une campagne.
+    """
+    role_campagne = None
+    if campaign_id:
+        role_campagne = (ROLE_MANDATAIRE if current_user["role"] == "admin"
+                         else role_sur_campagne(current_user["username"], campaign_id))
+    return {
+        "username": current_user["username"],
+        "full_name": current_user["full_name"],
+        "role": current_user["role"],
+        "role_campagne": role_campagne,
+    }
+
+
+@app.get("/campaigns/{campaign_id}/acces")
+def list_acces(campaign_id: str, current_user: dict = Depends(get_current_user),
+               _garde: str = Depends(mandataire_requis)):
+    """Qui a accès à cette campagne, et à quel titre."""
+    with get_central_db_connection() as conn:
+        lignes = conn.execute(
+            "SELECT uc.username, u.full_name, uc.role FROM user_campaigns uc "
+            "LEFT JOIN users u ON u.username = uc.username WHERE uc.campaign_id = ? "
+            "ORDER BY uc.role, uc.username",
+            [campaign_id],
+        ).fetchall()
+    return [{"username": l[0], "full_name": l[1], "role": l[2]} for l in lignes]
+
+
+class AccesIn(BaseModel):
+    username: str
+    role: str
+
+
+@app.post("/campaigns/{campaign_id}/acces")
+def donner_acces(campaign_id: str, payload: AccesIn,
+                 current_user: dict = Depends(get_current_user),
+                 _garde: str = Depends(mandataire_requis)):
+    """Ouvre la campagne à un compte existant, avec son rôle."""
+    if payload.role not in ROLES:
+        raise HTTPException(status_code=400, detail=f"Rôle inconnu : {payload.role}")
+    with get_central_db_connection() as conn:
+        if not conn.execute("SELECT 1 FROM users WHERE username = ?", [payload.username]).fetchone():
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        conn.execute(
+            "INSERT INTO user_campaigns (username, campaign_id, role) VALUES (?, ?, ?) "
+            "ON CONFLICT(username, campaign_id) DO UPDATE SET role = excluded.role",
+            [payload.username, campaign_id, payload.role],
+        )
+    return {"message": f"Accès accordé à {payload.username} ({payload.role})."}
+
+
+@app.delete("/campaigns/{campaign_id}/acces/{username}")
+def retirer_acces(campaign_id: str, username: str,
+                  current_user: dict = Depends(get_current_user),
+                  _garde: str = Depends(mandataire_requis)):
+    """Un mandataire ne peut pas se retirer lui-même : la campagne resterait sans pilote."""
+    if username == current_user["username"]:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas retirer votre propre accès.")
+    with get_central_db_connection() as conn:
+        conn.execute("DELETE FROM user_campaigns WHERE username = ? AND campaign_id = ?",
+                     [username, campaign_id])
+    return {"message": f"Accès de {username} retiré."}
 
 
 # --- User Management Endpoints ---
@@ -305,7 +380,8 @@ def safe_upload_name(original_name: str) -> str:
 
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user),
+                      _garde: str = Depends(tout_role)):
     if not os.path.exists(UPLOADS_DIR):
         os.makedirs(UPLOADS_DIR)
     filename = safe_upload_name(file.filename)
@@ -315,7 +391,8 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     return {"filename": filename, "path": file_location}
 
 @app.get("/justificatifs")
-def list_justificatifs(current_user: dict = Depends(get_current_user)):
+def list_justificatifs(current_user: dict = Depends(get_current_user),
+                       _garde: str = Depends(tout_role)):
     """Fichiers présents dans `uploads`, en signalant ceux rattachés à rien.
 
     Un fichier orphelin — devis remplacé, pièce chargée puis jamais associée —
@@ -343,7 +420,8 @@ def list_justificatifs(current_user: dict = Depends(get_current_user)):
     return sorted(files, key=lambda x: x["mtime"], reverse=True)
 
 @app.delete("/justificatifs/{filename}")
-def delete_justificatif(filename: str, current_user: dict = Depends(get_current_user)):
+def delete_justificatif(filename: str, current_user: dict = Depends(get_current_user),
+                        _garde: str = Depends(mandataire_requis)):
     """
     Supprime un fichier justificatif.
     """
@@ -383,7 +461,8 @@ def export_data(campaign_id: str = Depends(get_campaign_conn)):
 from ocr_utils import extract_text_from_file, analyze_receipt_text
 
 @app.post("/analyze-document")
-async def analyze_document(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+async def analyze_document(file: UploadFile = File(...), current_user: dict = Depends(get_current_user),
+                           _garde: str = Depends(tout_role)):
     """
     Analyze uploded file (PDF primarily) to extract expense data.
     """
@@ -458,7 +537,9 @@ def get_depense_pdf(depense_id: int, current_user: dict = Depends(get_current_us
     )
 
 @app.post("/attestations/recette/{recette_id}/sent")
-def mark_recette_sent(recette_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+def mark_recette_sent(recette_id: int, current_user: dict = Depends(get_current_user),
+                      campaign_id: str = Depends(get_campaign_conn),
+                      _garde: str = Depends(mandataire_requis)):
     return comptes.toggle_recette_sent(campaign_id, recette_id)
 
 
@@ -472,6 +553,7 @@ app.include_router(depot_routes.router)
 app.include_router(pilotage_routes.router)
 app.include_router(mutualisation_routes.router)
 app.include_router(annexes_routes.router)
+app.include_router(validation_routes.router)
 
 
 if __name__ == "__main__":

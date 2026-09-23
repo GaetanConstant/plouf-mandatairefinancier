@@ -8,9 +8,9 @@ import completude
 import depot
 import export_cnccfp
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_ou_expert, mandataire_requis
 
-router = APIRouter(tags=["depot"])
+router = APIRouter(tags=["depot"], dependencies=[Depends(mandataire_ou_expert)])
 
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -26,7 +26,7 @@ def list_documents(current_user: dict = Depends(get_current_user), campaign_id: 
 
 
 @router.put("/documents/{doc_id}")
-def update_document(doc_id: int, payload: DocumentUpdate, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+def update_document(doc_id: int, payload: DocumentUpdate, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
     return depot.set_document(campaign_id, doc_id, payload.enveloppe, payload.type)
 
 
@@ -55,7 +55,7 @@ def get_depot(current_user: dict = Depends(get_current_user), campaign_id: str =
 
 
 @router.get("/depot/export")
-def export_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+def export_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
     _exiger_dossier_complet(campaign_id)
     pdf = depot.export_bordereau_pdf(campaign_id)
     return StreamingResponse(
@@ -66,7 +66,7 @@ def export_depot(current_user: dict = Depends(get_current_user), campaign_id: st
 
 
 @router.get("/depot/dossier-zip")
-def export_dossier_zip(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+def export_dossier_zip(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
     """Dossier complet : bordereau + contenu des enveloppes, fichiers d'origine."""
     _exiger_dossier_complet(campaign_id)
     archive = depot.export_dossier_zip(campaign_id)
@@ -78,7 +78,7 @@ def export_dossier_zip(current_user: dict = Depends(get_current_user), campaign_
 
 
 @router.get("/depot/dossier-pdf")
-def export_dossier_pdf(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+def export_dossier_pdf(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
     """Dossier complet en un seul PDF paginé, pour l'impression ou l'envoi d'un bloc."""
     _exiger_dossier_complet(campaign_id)
     pdf = depot.export_dossier_pdf(campaign_id)
@@ -90,7 +90,7 @@ def export_dossier_pdf(current_user: dict = Depends(get_current_user), campaign_
 
 
 @router.get("/depot/export-cnccfp")
-def export_cnccfp_xlsx(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+def export_cnccfp_xlsx(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
     _exiger_dossier_complet(campaign_id)
     xlsx = export_cnccfp.generate_xlsx(campaign_id)
     return StreamingResponse(

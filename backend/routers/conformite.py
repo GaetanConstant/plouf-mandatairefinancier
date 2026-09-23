@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 
 import conformite
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_ou_expert
 
-router = APIRouter(tags=["conformite"])
+router = APIRouter(tags=["conformite"], dependencies=[Depends(mandataire_ou_expert)])
 
 
 @router.get("/conformite")

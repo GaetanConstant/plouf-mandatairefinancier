@@ -5,9 +5,9 @@ from fastapi.responses import StreamingResponse
 
 import maincourante
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_ou_expert
 
-router = APIRouter(tags=["main-courante"])
+router = APIRouter(tags=["main-courante"], dependencies=[Depends(mandataire_ou_expert)])
 
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

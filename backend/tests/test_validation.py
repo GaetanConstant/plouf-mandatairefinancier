@@ -1,0 +1,136 @@
+"""Cycle de validation : ce qui entre dans le compte, et ce qui n'y entre pas."""
+
+import os
+import sys
+from datetime import date
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fastapi import HTTPException
+
+import comptes
+import conformite
+import evenements
+import maincourante
+import validation
+from database import ROLE_EQUIPE, ROLE_EXPERT, ROLE_MANDATAIRE
+from models import Depense
+from _fixture import fresh_campaign, teardown, run_tests
+
+
+def _depense(montant=100.0):
+    return Depense(date=date(2026, 1, 10), libelle="Tract", fournisseur="Imprimerie",
+                   montant_ttc=montant, tva=0.0, categorie_cnccfp="A1", statut="Payé")
+
+
+def test_depense_de_l_equipe_hors_du_compte_avant_validation():
+    """L'invariant central : un militant ne déplace pas un chiffre légal."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(500.0), "militant", ROLE_EQUIPE)
+        assert comptes.compute_stats(cid)["total_depenses"] == 0.0
+        assert comptes.list_depenses(cid) == []
+    finally:
+        teardown(cid)
+
+
+def test_la_validation_fait_entrer_la_depense_dans_le_compte():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(500.0), "militant", ROLE_EQUIPE)
+        file = validation.file_attente(cid)
+        assert file["nb_elements"] == 1
+        element = file["elements"][0]
+        assert element["cree_par"] == "militant"
+
+        validation.valider(cid, element["entite"], element["id"], "gconstant")
+        assert comptes.compute_stats(cid)["total_depenses"] == 500.0
+        assert validation.file_attente(cid)["nb_elements"] == 0
+    finally:
+        teardown(cid)
+
+
+def test_depense_du_mandataire_directement_au_compte():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(300.0), "gconstant", ROLE_MANDATAIRE)
+        assert comptes.compute_stats(cid)["total_depenses"] == 300.0
+        assert validation.file_attente(cid)["nb_elements"] == 0
+    finally:
+        teardown(cid)
+
+
+def test_refus_ne_supprime_pas_et_laisse_resoumettre():
+    """Une erreur d'arbitrage ne doit pas détruire une pièce comptable."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(200.0), "militant", ROLE_EQUIPE)
+        element = validation.file_attente(cid)["elements"][0]
+
+        validation.refuser(cid, element["entite"], element["id"], "gconstant", "Facture illisible")
+        mien = validation.mes_soumissions(cid, "militant")
+        assert len(mien) == 1
+        assert mien[0]["statut"] == "refuse"
+        assert mien[0]["motif_refus"] == "Facture illisible"
+        assert comptes.compute_stats(cid)["total_depenses"] == 0.0
+
+        validation.resoumettre(cid, element["entite"], element["id"], "militant")
+        assert validation.file_attente(cid)["nb_elements"] == 1
+    finally:
+        teardown(cid)
+
+
+def test_resoumettre_le_depot_d_un_autre_est_refuse():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(), "militant", ROLE_EQUIPE)
+        element = validation.file_attente(cid)["elements"][0]
+        validation.refuser(cid, element["entite"], element["id"], "gconstant", "non")
+        try:
+            validation.resoumettre(cid, element["entite"], element["id"], "autre")
+        except HTTPException as e:
+            assert e.status_code == 403
+        else:
+            raise AssertionError("un contributeur ne resoumet que ses propres dépôts")
+    finally:
+        teardown(cid)
+
+
+def test_une_soumission_en_attente_reste_hors_des_controles_et_du_journal():
+    """Conformité et main courante ne jugent que le compte réel."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(9_999_999.0), "militant", ROLE_EQUIPE)
+        assert conformite.run_checks(cid)["compteurs"]["bloquant"] == 0
+        assert maincourante.journal(cid) == [] or all(
+            l.get("libelle") != "Tract" for l in maincourante.journal(cid))
+    finally:
+        teardown(cid)
+
+
+def test_evenement_de_l_equipe_absent_de_la_liste_avant_validation():
+    cid = fresh_campaign()
+    try:
+        evenements.create_evenement(cid, evenements.EvenementIn(
+            titre="Porte à porte", type="porte_a_porte", date_debut="2026-05-02"),
+            "militant", ROLE_EQUIPE)
+        assert evenements.list_evenements(cid) == []
+        assert validation.file_attente(cid)["nb_elements"] == 1
+    finally:
+        teardown(cid)
+
+
+def test_demande_de_piece_de_l_expert_compte_dans_la_file():
+    cid = fresh_campaign()
+    try:
+        validation.create_demande(cid, validation.DemandePieceIn(
+            message="Merci de fournir le relevé bancaire de septembre."), "esserot")
+        file = validation.file_attente(cid)
+        assert file["nb_demandes_pieces"] == 1
+        assert file["total"] == 1
+    finally:
+        teardown(cid)
+
+
+if __name__ == "__main__":
+    sys.exit(run_tests(globals()))

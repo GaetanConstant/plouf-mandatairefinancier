@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from db.models import Depense, Donateur, Recette
 from db.session import campaign_session, ensure_campaign_db
-from db.helpers import fmt_date as _fmt
+from db.helpers import fmt_date as _fmt, valides as _valides
 from db import enums
 
 _MODE_LABEL = {
@@ -47,7 +47,7 @@ def journal(campaign_id: str) -> list[dict]:
     lignes: list[dict] = []
     with campaign_session(campaign_id) as s:
         donateurs = {d.id: d.nom for d in s.scalars(select(Donateur)).all()}
-        for r in s.scalars(select(Recette)).all():
+        for r in s.scalars(_valides(select(Recette), Recette)).all():
             lignes.append({
                 "sens": "recette",
                 "date": _fmt(r.date_versement),
@@ -61,7 +61,7 @@ def journal(campaign_id: str) -> list[dict]:
                 "num_releve": r.num_releve_bancaire,
                 "rapprochement": r.rapprochement,
             })
-        for d in s.scalars(select(Depense)).all():
+        for d in s.scalars(_valides(select(Depense), Depense)).all():
             lignes.append({
                 "sens": "depense",
                 "date": _fmt(d.date_reglement),
