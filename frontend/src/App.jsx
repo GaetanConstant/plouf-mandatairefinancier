@@ -66,6 +66,37 @@ import { API_URL } from './lib/api';
 
 axios.defaults.withCredentials = true;
 
+const GROUPES_NAV = [
+  { label: 'Administratif', icon: ClipboardList, items: [
+    { key: 'identite', label: 'Identité', icon: ClipboardList },
+    { key: 'listeequipe', label: 'Liste & équipe', icon: UsersRound },
+    { key: 'echeancier', label: 'Échéancier', icon: Flag },
+  ]},
+  { label: 'Comptabilité', icon: BookText, items: [
+    { key: 'maincourante', label: 'Main courante', icon: BookText },
+    { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
+    { key: 'depenses', label: 'Dépenses', icon: Receipt },
+    { key: 'emprunts', label: 'Emprunts', icon: Landmark },
+    { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
+  ]},
+  { label: 'Dons & reçus', icon: BookOpen, items: [
+    { key: 'attestations', label: 'Attestations', icon: FileCheck },
+    { key: 'carnets', label: 'Reçus-dons', icon: BookOpen },
+  ]},
+  { label: 'Campagne', icon: CalendarDays, items: [
+    { key: 'evenements', label: 'Événements', icon: CalendarDays },
+    { key: 'frise', label: 'Frise', icon: GitCommitHorizontal },
+    { key: 'calendrier', label: 'Calendrier', icon: CalendarRange },
+    { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
+  ]},
+  { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
+    { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
+    { key: 'depot', label: 'Dépôt', icon: Archive },
+  ]},
+];
+
+const groupeDe = (tab) => GROUPES_NAV.find(g => g.items.some(i => i.key === tab))?.label ?? null;
+
 function App() {
   const queryClient = useQueryClient();
 
@@ -79,6 +110,14 @@ function App() {
   // pour ouvrir ou surligner la ligne à corriger, puis la consomme.
   const [cible, setCible] = useState(null);
   const consommerCible = useCallback(() => setCible(null), []);
+
+  // Accordéon : un seul groupe ouvert à la fois. Navigation centralisée pour
+  // que le groupe suive l'onglet, même quand l'appel vient d'ailleurs.
+  const [groupeOuvert, setGroupeOuvert] = useState(() => groupeDe(activeTab));
+  const allerA = useCallback((tab) => {
+    setActiveTab(tab);
+    setGroupeOuvert(groupeDe(tab));
+  }, []);
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [prefilledData, setPrefilledData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -238,39 +277,13 @@ function App() {
 
 
           <nav className="flex-1 overflow-y-auto -mr-3 pr-3 space-y-1">
-            <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+            <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => allerA('dashboard')} />
 
-            {user.role === 'admin' && [
-              { label: 'Administratif', icon: ClipboardList, items: [
-                { key: 'identite', label: 'Identité', icon: ClipboardList },
-                { key: 'listeequipe', label: 'Liste & équipe', icon: UsersRound },
-                { key: 'echeancier', label: 'Échéancier', icon: Flag },
-              ]},
-              { label: 'Comptabilité', icon: BookText, items: [
-                { key: 'maincourante', label: 'Main courante', icon: BookText },
-                { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
-                { key: 'depenses', label: 'Dépenses', icon: Receipt },
-                { key: 'emprunts', label: 'Emprunts', icon: Landmark },
-                { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
-              ]},
-              { label: 'Dons & reçus', icon: BookOpen, items: [
-                { key: 'attestations', label: 'Attestations', icon: FileCheck },
-                { key: 'carnets', label: 'Reçus-dons', icon: BookOpen },
-              ]},
-              { label: 'Campagne', icon: CalendarDays, items: [
-                { key: 'evenements', label: 'Événements', icon: CalendarDays },
-                { key: 'frise', label: 'Frise', icon: GitCommitHorizontal },
-                { key: 'calendrier', label: 'Calendrier', icon: CalendarRange },
-                { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
-              ]},
-              { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
-                { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
-                { key: 'depot', label: 'Dépôt', icon: Archive },
-              ]},
-            ].map(g => (
+            {user.role === 'admin' && GROUPES_NAV.map(g => (
               <NavGroup key={g.label} icon={g.icon} label={g.label} items={g.items}
-                activeTab={activeTab} setActiveTab={setActiveTab}
-                defaultOpen={g.items.some(i => i.key === activeTab)} />
+                activeTab={activeTab} setActiveTab={allerA}
+                open={groupeOuvert === g.label}
+                onToggle={() => setGroupeOuvert(groupeOuvert === g.label ? null : g.label)} />
             ))}
 
           </nav>
@@ -286,14 +299,14 @@ function App() {
 
             <div className="space-y-1">
               <button
-                onClick={() => setActiveTab('settings')}
+                onClick={() => allerA('settings')}
                 className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
                   activeTab === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Settings className="w-3 h-3" /> Paramètres
               </button>
               <button
-                onClick={() => setActiveTab('apropos')}
+                onClick={() => allerA('apropos')}
                 className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
                   activeTab === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
@@ -376,7 +389,7 @@ function App() {
               {completude && !completude.complet && (
                 <button
                   type="button"
-                  onClick={() => setActiveTab('identite')}
+                  onClick={() => allerA('identite')}
                   className="w-full rounded-xl border border-red-300 bg-red-50/60 p-4 text-left transition-colors hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -494,7 +507,7 @@ function App() {
           {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage campaignId={campaign.id} />}
           {activeTab === 'carnets' && user.role === 'admin' && <CarnetsPage />}
           {activeTab === 'conformite' && user.role === 'admin' && (
-            <ConformitePage onNavigate={(tab, c) => { setCible(c); setActiveTab(tab); }} />
+            <ConformitePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
           )}
           {activeTab === 'maincourante' && user.role === 'admin' && <MainCourantePage />}
           {activeTab === 'identite' && user.role === 'admin' && (
@@ -518,13 +531,12 @@ function App() {
   );
 }
 
-function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, defaultOpen }) {
-  const [open, setOpen] = useState(defaultOpen);
+function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, open, onToggle }) {
   const hasActive = items.some(i => i.key === activeTab);
   return (
     <div>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className={cn(
           // Typo resserrée : « Conformité & dépôt » doit tenir sur une ligne dans
           // une barre de 256 px, sinon le libellé se coupe ou passe à la ligne.
