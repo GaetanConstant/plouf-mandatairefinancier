@@ -20,6 +20,7 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy import select
 
+import calendrier
 import conformite
 from db.models import Document
 from db.session import campaign_session, ensure_campaign_db
@@ -105,6 +106,20 @@ def get_depot(campaign_id: str) -> dict:
     }
 
 
+ANNEXE_CALENDRIER = "B00_calendrier_de_campagne.pdf"
+
+
+def _calendrier_annexe(campaign_id: str) -> Optional[bytes]:
+    """Le calendrier, s'il y a quelque chose à représenter.
+
+    Une campagne sans date de scrutin ni événement n'en produit pas : l'export
+    du dossier ne doit pas échouer pour autant, l'annexe est simplement absente.
+    """
+    if calendrier.donnees(campaign_id)["vide"]:
+        return None
+    return calendrier.export_pdf(campaign_id)
+
+
 def pieces_sans_fichier(campaign_id: str) -> list[str]:
     """Pièces référencées en base dont le fichier a disparu de `uploads`.
 
@@ -132,6 +147,9 @@ def export_dossier_zip(campaign_id: str) -> bytes:
         zf.writestr("0_bordereau_de_depot.pdf", export_bordereau_pdf(campaign_id))
 
         etat = get_depot(campaign_id)
+        annexe = _calendrier_annexe(campaign_id)
+        if annexe:
+            zf.writestr(f"Enveloppe_B/{ANNEXE_CALENDRIER}", annexe)
         for enveloppe, pieces in (("A", etat["pieces_A"]), ("B", etat["pieces_B"])):
             for rang, piece in enumerate(pieces, start=1):
                 chemin = Path(UPLOADS_DIR) / (piece["fichier"] or "")
@@ -196,11 +214,16 @@ def export_dossier_pdf(campaign_id: str) -> bytes:
     ajouter(export_bordereau_pdf(campaign_id))
 
     etat = get_depot(campaign_id)
+    annexe_calendrier = _calendrier_annexe(campaign_id)
     non_convertibles: list[str] = []
     for enveloppe, pieces in (("A", etat["pieces_A"]), ("B", etat["pieces_B"])):
-        if not pieces:
+        annexes = 1 if (enveloppe == "B" and annexe_calendrier) else 0
+        if not pieces and not annexes:
             continue
-        ajouter(_page_intercalaire(f"ENVELOPPE {enveloppe}", f"{len(pieces)} pièce(s)"))
+        ajouter(_page_intercalaire(f"ENVELOPPE {enveloppe}", f"{len(pieces) + annexes} pièce(s)"))
+        if annexes:
+            ajouter(_page_intercalaire("B00", "Calendrier de campagne"))
+            ajouter(annexe_calendrier)
         for rang, piece in enumerate(pieces, start=1):
             chemin = Path(UPLOADS_DIR) / (piece["fichier"] or "")
             if not chemin.is_file():
@@ -272,6 +295,11 @@ def export_bordereau_pdf(campaign_id: str) -> bytes:
 
     _section("ENVELOPPE A - Formulaire + pièces justificatives des dépenses", etat["pieces_A"])
     _section("ENVELOPPE B - Annexes", etat["pieces_B"])
+    # Annexe régénérée à chaque export : elle ne figure pas parmi les documents
+    # stockés, mais elle est bien dans l'enveloppe.
+    if not calendrier.donnees(campaign_id)["vide"]:
+        pdf.set_font("helvetica", size=9)
+        pdf.multi_cell(printable, 6, _safe("  + [Annexe generee] Calendrier de campagne"))
     if etat["pieces_non_classees"]:
         _section("PIÈCES NON CLASSÉES (à affecter à une enveloppe)", etat["pieces_non_classees"])
 

@@ -10,6 +10,14 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.13.0 — 2026-09-23 — Calendrier de campagne
+
+- Un écran Calendrier reconstruit le rétro-planning de la campagne : une ligne par activité, une colonne par semaine, de l'ouverture de la période de financement au jour du scrutin.
+- Chaque activité porte son coût réel, repris du compte — il ne peut pas diverger.
+- Le calendrier s'exporte en PDF et part automatiquement en annexe du dossier (enveloppe B), régénéré à chaque export.
+- Photos et factures d'un événement remontent dans la chronologie et dans le dossier.
+- Correction : la génération des conventions de mutualisation échouait sur macOS, faute de trouver les bibliothèques Pango installées par Homebrew.
+
 ## v0.12.0 — 2026-09-23 — Complétude du dossier et export des enveloppes
 
 - Un score de complétude indique, section par section, ce qui manque avant de pouvoir déposer ; les zones incomplètes ressortent en rouge sur le tableau de bord, l'écran Identité et l'écran Dépôt.

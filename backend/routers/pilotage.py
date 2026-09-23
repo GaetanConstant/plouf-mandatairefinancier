@@ -3,6 +3,7 @@ import io
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+import calendrier
 import evenements
 import echeancier
 import frise
@@ -43,6 +44,22 @@ def delete_evenement(evenement_id: int, current_user: dict = Depends(get_current
 @router.post("/evenements/{evenement_id}/depenses")
 def link_depense(evenement_id: int, payload: evenements.LiaisonIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return evenements.link_depense(campaign_id, evenement_id, payload)
+
+
+@router.get("/calendrier")
+def get_calendrier(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    """Rétro-planning de la campagne, de son ouverture au jour du scrutin."""
+    return calendrier.donnees(campaign_id)
+
+
+@router.get("/calendrier/export-pdf")
+def export_calendrier_pdf(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    pdf = calendrier.export_pdf(campaign_id)
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=calendrier_campagne_{campaign_id}.pdf"},
+    )
 
 
 @router.get("/evenements/{evenement_id}/documents")

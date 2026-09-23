@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Archive,
   CalendarDays,
+  CalendarRange,
   GitCommitHorizontal,
   Flag,
   Users2,
@@ -51,6 +52,7 @@ import { CampaignPage } from './pages/CampaignPage';
 import { AttestationsPage } from './components/AttestationsPage';
 import { CarnetsPage } from './components/CarnetsPage';
 import { ConformitePage } from './components/ConformitePage';
+import { CalendrierPage } from './components/CalendrierPage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
@@ -258,6 +260,7 @@ function App() {
               { label: 'Campagne', icon: CalendarDays, items: [
                 { key: 'evenements', label: 'Événements', icon: CalendarDays },
                 { key: 'frise', label: 'Frise', icon: GitCommitHorizontal },
+                { key: 'calendrier', label: 'Calendrier', icon: CalendarRange },
                 { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
               ]},
               { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
@@ -488,6 +491,7 @@ function App() {
           {activeTab === 'depot' && user.role === 'admin' && <DepotPage />}
           {activeTab === 'evenements' && user.role === 'admin' && <EvenementsPage />}
           {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}
+          {activeTab === 'calendrier' && user.role === 'admin' && <CalendrierPage />}
           {activeTab === 'echeancier' && user.role === 'admin' && <EcheancierPage />}
           {activeTab === 'mutualisation' && user.role === 'admin' && <MutualisationPage />}
           {activeTab === 'listeequipe' && user.role === 'admin' && <ListeEquipePage />}
