@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import {
@@ -73,6 +73,10 @@ function App() {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  // Cible désignée par une alerte de conformité : l'écran d'arrivée s'en sert
+  // pour ouvrir ou surligner la ligne à corriger, puis la consomme.
+  const [cible, setCible] = useState(null);
+  const consommerCible = useCallback(() => setCible(null), []);
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [prefilledData, setPrefilledData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -147,6 +151,12 @@ function App() {
     }
   };
 
+
+  const { data: completude } = useQuery({
+    queryKey: ['completude'],
+    queryFn: async () => (await axios.get(`${API_URL}/identite/completude`)).data,
+    enabled: Boolean(campaign),
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['stats', campaign?.id],
@@ -347,6 +357,30 @@ function App() {
 
 
 
+              {/* Complétude du dossier : ce qui bloque le dépôt, avant les chiffres. */}
+              {completude && !completude.complet && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('identite')}
+                  className="w-full rounded-xl border border-red-300 bg-red-50/60 p-4 text-left transition-colors hover:bg-red-50"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-semibold text-red-700">
+                      Dossier de dépôt incomplet — {completude.manquants.length} élément
+                      {completude.manquants.length > 1 ? 's' : ''} à renseigner
+                    </span>
+                    <span className="text-xl font-black text-red-600">{completude.pct}%</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary">
+                    <div className="h-full bg-red-500 transition-all duration-700" style={{ width: `${completude.pct}%` }} />
+                  </div>
+                  <p className="mt-2 text-xs text-red-700/80">
+                    {completude.manquants.slice(0, 3).join(' · ')}
+                    {completude.manquants.length > 3 && ` · +${completude.manquants.length - 3} autres`}
+                  </p>
+                </button>
+              )}
+
               {/* Stats Cards */}
               <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                 <Card title="Recettes Totales" value={`${stats.total_recettes.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`} icon={TrendingUp} description={`${stats.nombre_donateurs} donateurs`} className="border-l-4 border-l-green-500" />
@@ -433,14 +467,24 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'depenses' && user.role === 'admin' && <DepensesList />}
-          {activeTab === 'recettes' && user.role === 'admin' && <RevenueList />}
+          {activeTab === 'depenses' && user.role === 'admin' && (
+            <DepensesList cible={cible?.entite === 'depense' ? cible.id : null}
+              onCibleConsommee={consommerCible} />
+          )}
+          {activeTab === 'recettes' && user.role === 'admin' && (
+            <RevenueList cible={cible?.entite === 'recette' ? cible.id : null}
+              onCibleConsommee={consommerCible} />
+          )}
           {activeTab === 'justificatifs' && user.role === 'admin' && <JustificatifsList />}
           {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage campaignId={campaign.id} />}
           {activeTab === 'carnets' && user.role === 'admin' && <CarnetsPage />}
-          {activeTab === 'conformite' && user.role === 'admin' && <ConformitePage />}
+          {activeTab === 'conformite' && user.role === 'admin' && (
+            <ConformitePage onNavigate={(tab, c) => { setCible(c); setActiveTab(tab); }} />
+          )}
           {activeTab === 'maincourante' && user.role === 'admin' && <MainCourantePage />}
-          {activeTab === 'identite' && user.role === 'admin' && <IdentitePage />}
+          {activeTab === 'identite' && user.role === 'admin' && (
+            <IdentitePage cible={cible?.entite} onCibleConsommee={consommerCible} />
+          )}
           {activeTab === 'depot' && user.role === 'admin' && <DepotPage />}
           {activeTab === 'evenements' && user.role === 'admin' && <EvenementsPage />}
           {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Download, ShieldCheck, ShieldAlert, FileText } from 'lucide-react';
+import { Download, ShieldCheck, ShieldAlert, FileText, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/Components';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
@@ -26,6 +26,10 @@ export function DepotPage() {
         queryKey: ['documents'],
         queryFn: async () => (await axios.get(`${API_URL}/documents`)).data,
     });
+    const { data: completude } = useQuery({
+        queryKey: ['completude'],
+        queryFn: async () => (await axios.get(`${API_URL}/identite/completude`)).data,
+    });
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, enveloppe }) => axios.put(`${API_URL}/documents/${id}`, { enveloppe: enveloppe || null }),
@@ -38,6 +42,9 @@ export function DepotPage() {
     if (isLoading) return <div>Chargement du dossier de dépôt...</div>;
 
     const pret = etat?.pret_a_deposer;
+    // Le serveur refuse ces exports en 409 : on désactive les boutons pour que
+    // le refus s'explique ici, plutôt que par un JSON brut dans un onglet.
+    const exportable = completude ? completude.complet : false;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -47,14 +54,59 @@ export function DepotPage() {
                     <p className="text-muted-foreground">Classement des pièces par enveloppe (A / B) et bordereau de dépôt.</p>
                 </div>
                 <div className="flex gap-2">
-                    <a href={`${API_URL}/depot/export-cnccfp`} target="_blank" rel="noopener noreferrer">
-                        <Button className="gap-2"><Download className="w-4 h-4" /> Compte au format CNCCFP (Excel)</Button>
-                    </a>
-                    <a href={`${API_URL}/depot/export`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Bordereau (PDF)</Button>
-                    </a>
+                    {exportable ? (
+                        <>
+                            <a href={`${API_URL}/depot/dossier-zip`} target="_blank" rel="noopener noreferrer">
+                                <Button className="gap-2"><Download className="w-4 h-4" /> Dossier complet (ZIP)</Button>
+                            </a>
+                            <a href={`${API_URL}/depot/dossier-pdf`} target="_blank" rel="noopener noreferrer">
+                                <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Dossier complet (PDF)</Button>
+                            </a>
+                            <a href={`${API_URL}/depot/export-cnccfp`} target="_blank" rel="noopener noreferrer">
+                                <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Compte CNCCFP (Excel)</Button>
+                            </a>
+                            <a href={`${API_URL}/depot/export`} target="_blank" rel="noopener noreferrer">
+                                <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Bordereau (PDF)</Button>
+                            </a>
+                        </>
+                    ) : (
+                        <>
+                            <Button disabled className="gap-2" title="Dossier incomplet">
+                                <Download className="w-4 h-4" /> Dossier complet (ZIP)
+                            </Button>
+                            <Button disabled variant="outline" className="gap-2" title="Dossier incomplet">
+                                <Download className="w-4 h-4" /> Dossier complet (PDF)
+                            </Button>
+                            <Button disabled variant="outline" className="gap-2" title="Dossier incomplet">
+                                <Download className="w-4 h-4" /> Compte CNCCFP (Excel)
+                            </Button>
+                            <Button disabled variant="outline" className="gap-2" title="Dossier incomplet">
+                                <Download className="w-4 h-4" /> Bordereau (PDF)
+                            </Button>
+                        </>
+                    )}
                 </div>
             </header>
+
+            {completude && !completude.complet && (
+                <div className="rounded-2xl border border-red-300 bg-red-50/60 p-6">
+                    <div className="mb-3 flex items-center gap-3">
+                        <AlertTriangle className="w-6 h-6 shrink-0 text-red-600" />
+                        <div>
+                            <h2 className="font-bold text-red-700">
+                                Export impossible — dossier complété à {completude.pct} %
+                            </h2>
+                            <p className="text-sm text-red-700/80">
+                                {completude.manquants.length} élément{completude.manquants.length > 1 ? 's' : ''} manquant
+                                {completude.manquants.length > 1 ? 's' : ''} avant de pouvoir générer les pièces officielles.
+                            </p>
+                        </div>
+                    </div>
+                    <ul className="ml-9 list-disc space-y-0.5 text-sm text-red-700">
+                        {completude.manquants.map((m, i) => <li key={i}>{m}</li>)}
+                    </ul>
+                </div>
+            )}
 
             <div className={cn("rounded-2xl border p-6 flex items-center gap-4",
                 pret ? "border-green-200 bg-green-50/10" : "border-red-200 bg-red-50/10")}>

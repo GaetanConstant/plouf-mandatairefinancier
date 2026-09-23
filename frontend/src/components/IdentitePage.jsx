@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Save, User, Briefcase, Landmark, Calculator, Vote } from 'lucide-react';
+import { Save, User, Briefcase, Landmark, Calculator, Vote, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -96,13 +96,22 @@ const SECTIONS = [
     },
 ];
 
-export function IdentitePage() {
+export function IdentitePage({ cible = null, onCibleConsommee }) {
     const { data, isLoading } = useQuery({
         queryKey: ['identite'],
         queryFn: async () => (await axios.get(`${API_URL}/identite`)).data,
     });
 
+    const { data: completude } = useQuery({
+        queryKey: ['completude'],
+        queryFn: async () => (await axios.get(`${API_URL}/identite/completude`)).data,
+    });
+
     if (isLoading) return <div>Chargement de l'identité...</div>;
+
+    const parCle = Object.fromEntries((completude?.sections || []).map(s => [s.cle, s]));
+    // La liste des candidats se saisit ailleurs : elle ne compte que dans le bandeau.
+    const sectionListe = parCle.liste;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -110,15 +119,69 @@ export function IdentitePage() {
                 <h1 className="text-3xl font-bold tracking-tight">Identité administrative</h1>
                 <p className="text-muted-foreground">Socle à compléter en premier : il alimente la checklist de conformité et le dépôt.</p>
             </header>
+
+            {completude && <BandeauCompletude etat={completude} sectionListe={sectionListe} />}
             {SECTIONS.map(section => (
-                <IdentitySection key={section.key} section={section} initial={data?.[section.key] || {}} />
+                <IdentitySection key={section.key} section={section} initial={data?.[section.key] || {}}
+                    etat={parCle[section.key]} cible={cible === section.key}
+                    onCibleConsommee={onCibleConsommee} />
             ))}
         </div>
     );
 }
 
-function IdentitySection({ section, initial }) {
+function BandeauCompletude({ etat, sectionListe }) {
+    const complet = etat.complet;
+    return (
+        <div className={`rounded-xl border p-5 ${complet ? 'border-emerald-300 bg-emerald-50/50' : 'border-red-300 bg-red-50/50'}`}>
+            <div className="flex items-center justify-between gap-4 mb-3">
+                <div className="flex items-center gap-2">
+                    {complet
+                        ? <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        : <AlertTriangle className="w-5 h-5 text-red-600" />}
+                    <h2 className="font-bold">
+                        {complet
+                            ? 'Dossier complet — export possible'
+                            : `Dossier incomplet — ${etat.manquants.length} élément${etat.manquants.length > 1 ? 's' : ''} à renseigner`}
+                    </h2>
+                </div>
+                <span className={`text-2xl font-black ${complet ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {etat.pct}%
+                </span>
+            </div>
+
+            <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                    className={`h-full transition-all duration-700 ${complet ? 'bg-emerald-500' : 'bg-red-500'}`}
+                    style={{ width: `${etat.pct}%` }}
+                />
+            </div>
+
+            <p className="mt-2 text-xs text-muted-foreground">
+                {etat.remplis} champs renseignés sur {etat.requis} exigés pour le dépôt.
+                {!complet && " Le bordereau et le compte CNCCFP restent bloqués à l'export."}
+            </p>
+
+            {sectionListe && !sectionListe.complet && (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                    Liste des candidats : {sectionListe.manquants.join(' · ')} — à corriger dans « Liste & équipe ».
+                </p>
+            )}
+        </div>
+    );
+}
+
+function IdentitySection({ section, initial, etat, cible = false, onCibleConsommee }) {
     const queryClient = useQueryClient();
+    const carte = useRef(null);
+
+    // Arrivée depuis une alerte de conformité : amener la section à l'écran.
+    useEffect(() => {
+        if (!cible) return;
+        carte.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const t = setTimeout(() => onCibleConsommee?.(), 4000);
+        return () => clearTimeout(t);
+    }, [cible, onCibleConsommee]);
     const [form, setForm] = useState({});
     const [saved, setSaved] = useState(false);
 
@@ -129,6 +192,7 @@ function IdentitySection({ section, initial }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['identite']);
             queryClient.invalidateQueries(['conformite']);
+            queryClient.invalidateQueries(['completude']);
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         },
@@ -145,13 +209,31 @@ function IdentitySection({ section, initial }) {
     };
 
     const Icon = section.icon;
+    const incomplet = etat && !etat.complet;
 
     return (
-        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-                <Icon className="w-5 h-5 text-primary" />
+        <div ref={carte}
+            className={`bg-card rounded-xl border p-6 shadow-sm transition-shadow ${
+                cible ? 'border-amber-400 ring-2 ring-amber-300' : incomplet ? 'border-red-300' : 'border-border'
+            }`}>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+                <Icon className={`w-5 h-5 ${incomplet ? 'text-red-600' : 'text-primary'}`} />
                 <h2 className="font-bold text-lg">{section.title}</h2>
+                {etat && (
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                        incomplet ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                        {etat.remplis}/{etat.requis}
+                    </span>
+                )}
+                {etat?.note && <span className="text-xs text-muted-foreground">{etat.note}</span>}
             </div>
+
+            {incomplet && (
+                <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                    À renseigner pour le dépôt : <strong>{etat.manquants.join(', ')}</strong>
+                </p>
+            )}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {section.fields.map(f => (
                     <div key={f.key}>

@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 
 from db.models import Depense, Document, Donateur, Election, Recette
 from db.session import campaign_session, ensure_campaign_db
-from db.helpers import fmt_date as _fmt_date
+from db.helpers import fmt_date as _fmt_date, media_type as _media_type
 from db import enums
 from database import UPLOADS_DIR
 
@@ -79,13 +79,6 @@ def _statut_legacy_to_orm(statut: str | None, is_nature: bool) -> tuple[enums.St
     return enums.StatutDepense.engage, False
 
 
-def _media_type(filename: str | None) -> str:
-    ext = os.path.splitext(filename or "")[1].lower()
-    if ext in (".png", ".jpg", ".jpeg", ".webp", ".heic"):
-        return "image"
-    if ext == ".pdf":
-        return "pdf"
-    return "autre"
 
 
 

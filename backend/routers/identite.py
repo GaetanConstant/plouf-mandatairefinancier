@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+import completude
 import identite
 from auth import get_current_user
 from deps import get_campaign_conn
@@ -35,3 +36,9 @@ def put_expert(payload: identite.ExpertComptableIn, current_user: dict = Depends
 @router.put("/compte-bancaire")
 def put_compte(payload: identite.CompteBancaireIn, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return identite.save_compte(campaign_id, payload)
+
+
+@router.get("/completude")
+def get_completude(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
+    """État de remplissage du dossier, section par section."""
+    return completude.evaluer(campaign_id)

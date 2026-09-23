@@ -10,8 +10,12 @@ Ce module classe les pièces (Document) par enveloppe, produit l'état du dossie
 
 from __future__ import annotations
 
+import io
 import logging
+import zipfile
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -19,6 +23,7 @@ from sqlalchemy import select
 import conformite
 from db.models import Document
 from db.session import campaign_session, ensure_campaign_db
+from database import UPLOADS_DIR
 from db import enums
 
 logger = logging.getLogger(__name__)
@@ -100,6 +105,129 @@ def get_depot(campaign_id: str) -> dict:
     }
 
 
+def pieces_sans_fichier(campaign_id: str) -> list[str]:
+    """Pièces référencées en base dont le fichier a disparu de `uploads`.
+
+    Un dossier qui les contient part incomplet sans que rien ne le signale :
+    le bordereau annonce une pièce que l'enveloppe ne contient pas.
+    """
+    presents = {p.name for p in Path(UPLOADS_DIR).iterdir() if p.is_file()}
+    return sorted(d["fichier"] for d in list_documents(campaign_id)
+                  if d["fichier"] and d["fichier"] not in presents)
+
+
+def _nom_dans_archive(enveloppe: str, rang: int, fichier: str) -> str:
+    """Nom préfixé par le numéro de pièce, pour retrouver l'ordre du bordereau."""
+    return f"Enveloppe_{enveloppe}/{enveloppe}{rang:02d}_{fichier}"
+
+
+def export_dossier_zip(campaign_id: str) -> bytes:
+    """Dossier complet : bordereau en tête, puis les pièces classées par enveloppe.
+
+    Les fichiers sont copiés tels quels — aucune recompression, aucune perte
+    sur des justificatifs qui doivent rester lisibles par la commission.
+    """
+    tampon = io.BytesIO()
+    with zipfile.ZipFile(tampon, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("0_bordereau_de_depot.pdf", export_bordereau_pdf(campaign_id))
+
+        etat = get_depot(campaign_id)
+        for enveloppe, pieces in (("A", etat["pieces_A"]), ("B", etat["pieces_B"])):
+            for rang, piece in enumerate(pieces, start=1):
+                chemin = Path(UPLOADS_DIR) / (piece["fichier"] or "")
+                if chemin.is_file():
+                    zf.write(chemin, _nom_dans_archive(enveloppe, rang, chemin.name))
+                else:
+                    logger.warning("Pièce absente du disque, ignorée à l'export : %s",
+                                   piece.get("fichier"))
+    return tampon.getvalue()
+
+
+def _safe(text: str, limit: int = 95) -> str:
+    """Tronque et rend encodable par la police core de fpdf (latin-1)."""
+    text = (text or "")[:limit]
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
+def _page_intercalaire(titre: str, sous_titre: str = "") -> bytes:
+    """Page de séparation entre deux enveloppes, pour se repérer à l'impression."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.ln(100)
+    pdf.cell(0, 12, _safe(titre, 60), align="C", new_x="LMARGIN", new_y="NEXT")
+    if sous_titre:
+        pdf.set_font("Helvetica", "", 12)
+        pdf.cell(0, 8, _safe(sous_titre, 90), align="C", new_x="LMARGIN", new_y="NEXT")
+    return bytes(pdf.output())
+
+
+def _piece_en_pdf(chemin: Path, media_type: str) -> Optional[bytes]:
+    """Ramène une pièce au format PDF, seul format assemblable.
+
+    Une image est convertie en une page ; un PDF est repris tel quel. Les
+    autres formats (tableur, texte) ne sont pas convertibles ici : ils restent
+    dans l'archive ZIP, que le PDF fusionné ne remplace donc pas.
+    """
+    if media_type == "pdf":
+        return chemin.read_bytes()
+    if media_type == "image":
+        from PIL import Image
+
+        with Image.open(chemin) as img:
+            tampon = io.BytesIO()
+            img.convert("RGB").save(tampon, format="PDF")
+            return tampon.getvalue()
+    return None
+
+
+def export_dossier_pdf(campaign_id: str) -> bytes:
+    """Dossier complet en un seul PDF : bordereau, puis les pièces par enveloppe."""
+    from pypdf import PdfReader, PdfWriter
+
+    writer = PdfWriter()
+
+    def ajouter(donnees: bytes) -> None:
+        for page in PdfReader(io.BytesIO(donnees)).pages:
+            writer.add_page(page)
+
+    ajouter(export_bordereau_pdf(campaign_id))
+
+    etat = get_depot(campaign_id)
+    non_convertibles: list[str] = []
+    for enveloppe, pieces in (("A", etat["pieces_A"]), ("B", etat["pieces_B"])):
+        if not pieces:
+            continue
+        ajouter(_page_intercalaire(f"ENVELOPPE {enveloppe}", f"{len(pieces)} pièce(s)"))
+        for rang, piece in enumerate(pieces, start=1):
+            chemin = Path(UPLOADS_DIR) / (piece["fichier"] or "")
+            if not chemin.is_file():
+                logger.warning("Pièce absente du disque, ignorée : %s", piece.get("fichier"))
+                continue
+            try:
+                donnees = _piece_en_pdf(chemin, piece.get("media_type") or "")
+            except Exception:
+                logger.exception("Conversion impossible : %s", chemin.name)
+                donnees = None
+            if donnees is None:
+                non_convertibles.append(f"{enveloppe}{rang:02d} — {chemin.name}")
+                continue
+            ajouter(_page_intercalaire(f"{enveloppe}{rang:02d}", chemin.name))
+            ajouter(donnees)
+
+    if non_convertibles:
+        ajouter(_page_intercalaire(
+            "PIECES NON INSEREES",
+            "Formats non convertibles - voir l'archive ZIP : " + ", ".join(non_convertibles[:6]),
+        ))
+
+    sortie = io.BytesIO()
+    writer.write(sortie)
+    return sortie.getvalue()
+
+
 def export_bordereau_pdf(campaign_id: str) -> bytes:
     """Bordereau de dépôt : liste des pièces par enveloppe + état de la checklist."""
     from fpdf import FPDF
@@ -108,11 +236,6 @@ def export_bordereau_pdf(campaign_id: str) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     printable = pdf.w - pdf.l_margin - pdf.r_margin
-
-    def _safe(text: str, limit: int = 95) -> str:
-        # Police core fpdf = latin-1 ; on remplace les caractères non encodables.
-        text = (text or "")[:limit]
-        return text.encode("latin-1", "replace").decode("latin-1")
 
     pdf.set_font("helvetica", "B", 16)
     pdf.cell(0, 12, "BORDEREAU DE DÉPÔT DU COMPTE DE CAMPAGNE", ln=True, align="C")

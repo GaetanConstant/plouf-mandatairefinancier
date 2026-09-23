@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { FileText, Pencil } from 'lucide-react';
@@ -7,7 +7,7 @@ import { Modal } from './ui/Components';
 import { ExpenseForm } from './ExpenseForm';
 
 
-export function DepensesList() {
+export function DepensesList({ cible = null, onCibleConsommee }) {
     const [editing, setEditing] = useState(null);
     const { data: depenses, isLoading } = useQuery({
         queryKey: ['depenses'],
@@ -16,6 +16,18 @@ export function DepensesList() {
             return response.data;
         }
     });
+
+    // Une alerte de conformité a désigné une dépense : on l'ouvre en modification,
+    // puis on libère la cible pour ne pas la rouvrir au prochain rendu.
+    useEffect(() => {
+        if (!cible || !depenses) return;
+        const trouvee = depenses.find(d => d.id === cible);
+        // Ouverture volontaire depuis une alerte de conformité. La cible est
+        // consommée dans la foulée, donc l'effet ne se rejoue pas en cascade.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (trouvee) setEditing(trouvee);
+        onCibleConsommee?.();
+    }, [cible, depenses, onCibleConsommee]);
 
     if (isLoading) return <div>Chargement des dépenses...</div>;
 

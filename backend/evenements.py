@@ -10,6 +10,7 @@ réinjectée dans les totaux globaux.
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from typing import Optional
 
@@ -17,9 +18,9 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from db.models import Depense, Evenement, EvenementDepense
+from db.models import Depense, Document, Evenement, EvenementDepense
 from db.session import campaign_session, ensure_campaign_db
-from db.helpers import election_id as _election_id, fmt_date as _fmt
+from db.helpers import election_id as _election_id, fmt_date as _fmt, media_type
 from db import enums
 
 
@@ -35,6 +36,18 @@ class EvenementIn(BaseModel):
 class LiaisonIn(BaseModel):
     depense_id: int
     quote_part: Optional[float] = None  # % ; None = 100 %
+
+
+class DocumentEvenementIn(BaseModel):
+    """Pièce rattachée à un événement : photo prise sur place, facture, contrat.
+
+    `fichier` désigne un fichier déjà téléversé dans `uploads`. `doc_id` rattache
+    au contraire une pièce déjà enregistrée (la facture d'une dépense, par
+    exemple), sans la dupliquer.
+    """
+    doc_id: Optional[int] = None
+    fichier: Optional[str] = None
+    type: str = "photo"
 
 
 def _d(s: Optional[str]) -> Optional[date]:
@@ -153,9 +166,80 @@ def detail_evenement(campaign_id: str, evenement_id: int) -> dict:
                     "quote_part": l.quote_part,
                     "cout_affecte": (dep.montant_ttc or 0.0) * ((l.quote_part if l.quote_part is not None else 100.0) / 100.0),
                 })
+        documents = [{
+            "id": doc.id,
+            "type": doc.type.value,
+            "fichier": doc.fichier,
+            "enveloppe": doc.enveloppe.value if doc.enveloppe else None,
+        } for doc in s.scalars(select(Document).where(Document.evenement_id == evenement_id)).all()]
         d = _evenement_dict(s, e)
         d["depenses"] = depenses
+        d["documents"] = documents
         return d
+
+
+def _enveloppe_par_defaut(type_doc: enums.TypeDocument) -> enums.Enveloppe:
+    """Une photo d'événement est une annexe (B) ; une facture, une pièce de A."""
+    return enums.Enveloppe.B if type_doc == enums.TypeDocument.photo else enums.Enveloppe.A
+
+
+def list_documents_evenement(campaign_id: str, evenement_id: int) -> list[dict]:
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        docs = s.scalars(select(Document).where(Document.evenement_id == evenement_id)).all()
+        return [{
+            "id": d.id,
+            "type": d.type.value,
+            "media_type": d.media_type,
+            "fichier": d.fichier,
+            "enveloppe": d.enveloppe.value if d.enveloppe else None,
+            "date_ajout": d.date_ajout.isoformat() if d.date_ajout else None,
+        } for d in docs]
+
+
+def link_document(campaign_id: str, evenement_id: int, payload: DocumentEvenementIn) -> dict:
+    """Rattache une pièce à un événement, existante ou nouvellement téléversée."""
+    ensure_campaign_db(campaign_id)
+    try:
+        type_doc = enums.TypeDocument(payload.type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Type de pièce inconnu : {payload.type}")
+
+    with campaign_session(campaign_id) as s:
+        if not s.get(Evenement, evenement_id):
+            raise HTTPException(status_code=404, detail="Événement introuvable")
+
+        if payload.doc_id is not None:
+            doc = s.get(Document, payload.doc_id)
+            if not doc:
+                raise HTTPException(status_code=404, detail="Pièce introuvable")
+            # Pièce déjà classée (facture d'une dépense) : on ne touche pas à
+            # son enveloppe, seulement à son rattachement.
+            doc.evenement_id = evenement_id
+        elif payload.fichier:
+            fichier = os.path.basename(payload.fichier)
+            s.add(Document(
+                type=type_doc,
+                media_type=media_type(fichier),
+                fichier=fichier,
+                enveloppe=_enveloppe_par_defaut(type_doc),
+                evenement_id=evenement_id,
+            ))
+        else:
+            raise HTTPException(status_code=400, detail="Fournir un fichier ou l'id d'une pièce existante")
+
+    return detail_evenement(campaign_id, evenement_id)
+
+
+def unlink_document(campaign_id: str, evenement_id: int, doc_id: int) -> dict:
+    """Détache la pièce de l'événement. Le fichier et la pièce sont conservés :
+    une facture rattachée à une dépense ne doit pas disparaître du dossier."""
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        doc = s.get(Document, doc_id)
+        if doc and doc.evenement_id == evenement_id:
+            doc.evenement_id = None
+    return detail_evenement(campaign_id, evenement_id)
 
 
 def link_depense(campaign_id: str, evenement_id: int, payload: LiaisonIn) -> dict:
