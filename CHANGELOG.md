@@ -10,6 +10,13 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.14.1 — 2026-09-23 — Correction du chargement sans fin
+
+### Corrigé
+- L'application restait sur « Chargement des données » en boucle pour un rôle sans accès au tableau de bord : les chiffres du compte étaient réclamés puis refusés, indéfiniment.
+- Un échec de chargement des chiffres affiche désormais sa raison au lieu d'un voile permanent.
+- Une session expirée ramène à la page de connexion, au lieu de faire échouer chaque écran séparément.
+
 ## v0.14.0 — 2026-09-23 — Rôles et validation des contributions
 
 - Trois rôles par campagne : mandataire, expert-comptable, équipe de campagne. Un même compte peut être mandataire d'une campagne et militant sur une autre.

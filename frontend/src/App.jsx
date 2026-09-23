@@ -69,7 +69,7 @@ import { EcheancierPage } from './components/EcheancierPage';
 import { MutualisationPage } from './components/MutualisationPage';
 import { ListeEquipePage } from './components/ListeEquipePage';
 import { EmpruntsPage } from './components/EmpruntsPage';
-import { API_URL } from './lib/api';
+import { API_URL, surSessionExpiree } from './lib/api';
 
 axios.defaults.withCredentials = true;
 
@@ -197,6 +197,16 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Session expirée côté serveur : on revient à la connexion plutôt que de
+  // laisser chaque écran afficher son propre échec.
+  useEffect(() => {
+    surSessionExpiree(() => {
+      setUser(null);
+      setCampaign(null);
+      queryClient.clear();
+    });
+  }, [queryClient]);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
@@ -256,17 +266,17 @@ function App() {
   const { data: completude } = useQuery({
     queryKey: ['completude'],
     queryFn: async () => (await axios.get(`${API_URL}/identite/completude`)).data,
-    enabled: Boolean(campaign),
+    enabled: Boolean(campaign) && peutVoir('dashboard', roleCampagne),
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['stats', campaign?.id],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/stats`);
       return response.data;
     },
     refetchInterval: 5000,
-    enabled: !!user && !!campaign // Only fetch if user is logged in and campaign selected
+    enabled: !!user && !!campaign && peutVoir('dashboard', roleCampagne),
   });
 
   const { data: depenses } = useQuery({
@@ -275,7 +285,7 @@ function App() {
       const response = await axios.get(`${API_URL}/depenses`);
       return response.data;
     },
-    enabled: !!user && !!campaign
+    enabled: !!user && !!campaign && peutVoir('depenses', roleCampagne),
   });
 
   const { data: recettes } = useQuery({
@@ -284,7 +294,7 @@ function App() {
       const response = await axios.get(`${API_URL}/recettes`);
       return response.data;
     },
-    enabled: !!user && !!campaign
+    enabled: !!user && !!campaign && peutVoir('recettes', roleCampagne),
   });
 
   if (authLoading) {
@@ -299,7 +309,10 @@ function App() {
     return <CampaignPage onSelect={setCampaign} user={user} />;
   }
 
-  if (statsLoading && !stats) { // Check !stats to avoid full page loader on refresh if cache exists
+  // Ce voile ne couvre que le tableau de bord : les autres écrans gèrent leur
+  // propre chargement, et un rôle sans accès aux chiffres ne doit pas rester
+  // bloqué derrière des données qu'il n'aura jamais.
+  if (onglet === 'dashboard' && statsLoading && !stats && !statsError) {
     return <div className="flex items-center justify-center h-screen bg-background text-foreground">Chargement des données...</div>;
   }
 
@@ -423,7 +436,18 @@ function App() {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-8">
-          {onglet === 'dashboard' && (
+          {onglet === 'dashboard' && statsError && (
+            <div className="rounded-xl border border-red-300 bg-red-50/60 p-6">
+              <h2 className="font-bold text-red-700">Les chiffres du compte n'ont pas pu être chargés.</h2>
+              <p className="mt-1 text-sm text-red-700/80">
+                {statsError.response?.status === 400
+                  ? "Aucune campagne n'est sélectionnée. Repassez par « Changer de campagne »."
+                  : statsError.response?.data?.detail || statsError.message}
+              </p>
+            </div>
+          )}
+
+          {onglet === 'dashboard' && stats && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               <header className="flex justify-between items-center mb-8">
