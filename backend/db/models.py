@@ -47,6 +47,24 @@ def _enum(py_enum):
 # Socle
 # ──────────────────────────────────────────────────────────────────────────
 
+class Tracable:
+    """Colonnes de traçabilité et de validation.
+
+    Un objet créé par le mandataire naît `valide`. Déposé par l'équipe ou par
+    l'expert-comptable, il naît `propose` et reste hors du compte jusqu'à ce
+    que le mandataire tranche. Un refus n'efface rien : le motif revient à
+    l'auteur, qui peut corriger et resoumettre.
+    """
+
+    cree_par: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    cree_le: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    statut_validation: Mapped[enums.StatutValidation] = mapped_column(
+        _enum(enums.StatutValidation), default=enums.StatutValidation.valide)
+    valide_par: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    valide_le: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    motif_refus: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class Election(Base):
     __tablename__ = "election"
 
@@ -216,7 +234,7 @@ class Donateur(Base):
     recettes: Mapped[list["Recette"]] = relationship(back_populates="donateur")
 
 
-class Recette(Base):
+class Recette(Tracable, Base):
     __tablename__ = "recette"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -270,7 +288,7 @@ class RecuDon(Base):
 # Bloc D — Dépenses & concours en nature
 # ──────────────────────────────────────────────────────────────────────────
 
-class Depense(Base):
+class Depense(Tracable, Base):
     __tablename__ = "depense"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -314,7 +332,7 @@ class ConcoursNature(Base):
 # Événements + liaisons n-n (avec quote-part)
 # ──────────────────────────────────────────────────────────────────────────
 
-class Evenement(Base):
+class Evenement(Tracable, Base):
     __tablename__ = "evenement"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -469,7 +487,7 @@ class Emprunt(Base):
 # Transverse — Documents & échéances
 # ──────────────────────────────────────────────────────────────────────────
 
-class Document(Base):
+class Document(Tracable, Base):
     __tablename__ = "document"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -480,6 +498,27 @@ class Document(Base):
     date_ajout: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     checksum: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     evenement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("evenement.id"), nullable=True)
+
+
+class DemandePiece(Base):
+    """Réclamation d'un justificatif par l'expert-comptable.
+
+    Rattachée à une dépense quand elle en vise une, libre sinon (« il manque le
+    relevé bancaire de septembre »).
+    """
+
+    __tablename__ = "demande_piece"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    depense_id: Mapped[Optional[int]] = mapped_column(ForeignKey("depense.id"), nullable=True)
+    message: Mapped[str] = mapped_column(Text)
+    statut: Mapped[enums.StatutDemandePiece] = mapped_column(
+        _enum(enums.StatutDemandePiece), default=enums.StatutDemandePiece.ouverte)
+    demande_par: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    demande_le: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    reponse: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    repondu_par: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    repondu_le: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class Echeance(Base):

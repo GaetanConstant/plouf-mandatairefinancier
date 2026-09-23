@@ -20,7 +20,7 @@ import maincourante
 import recus
 from db.session import campaign_session, ensure_campaign_db
 from db.models import Donateur, Recette, Evenement
-from db.helpers import fmt_date
+from db.helpers import fmt_date, valides as _valides
 from db import enums
 
 _MODE_LABEL = {
@@ -39,7 +39,7 @@ def _mode(m) -> str:
 
 def _recettes_par_categorie(campaign_id: str, categorie) -> list:
     with campaign_session(campaign_id) as s:
-        recs = s.scalars(select(Recette).where(Recette.categorie == categorie)
+        recs = s.scalars(_valides(select(Recette), Recette).where(Recette.categorie == categorie)
                          .order_by(Recette.date_versement)).all()
         donateurs = {d.id: d for d in s.scalars(select(Donateur)).all()}
         return [(r, donateurs.get(r.donateur_id)) for r in recs]
@@ -140,7 +140,7 @@ def generate_xlsx(campaign_id: str) -> bytes:
     headers(ws, ["Événement concerné", "Lieu", "Date", "Montant de la collecte",
                  "Date de versement en banque", "Réf écriture"])
     with campaign_session(campaign_id) as s:
-        evs = {e.id: e for e in s.scalars(select(Evenement)).all()}
+        evs = {e.id: e for e in s.scalars(_valides(select(Evenement), Evenement)).all()}
     for r, _ in _recettes_par_categorie(campaign_id, enums.CategorieRecette.collecte):
         ev = evs.get(r.evenement_id)
         ws.append([ev.titre if ev else None, ev.lieu if ev else None,

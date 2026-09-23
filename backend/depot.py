@@ -23,6 +23,7 @@ from sqlalchemy import select
 import calendrier
 import conformite
 from db.models import Document
+from db.helpers import valides as _valides
 from db.session import campaign_session, ensure_campaign_db
 from database import UPLOADS_DIR
 from db import enums
@@ -74,7 +75,7 @@ def fichiers_rattaches(campaign_ids: list[str]) -> set[str]:
 def list_documents(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        docs = s.scalars(select(Document).order_by(Document.date_ajout.desc())).all()
+        docs = s.scalars(_valides(select(Document), Document).order_by(Document.date_ajout.desc())).all()
         return [_doc_dict(d) for d in docs]
 
 

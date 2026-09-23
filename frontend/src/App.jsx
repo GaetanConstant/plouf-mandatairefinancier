@@ -15,7 +15,10 @@ import {
   Users,
   Plus,
   LogOut,
+  BellRing,
+  Inbox,
   Info,
+  MessageSquare,
   Settings,
   Shield,
   ShieldCheck,
@@ -53,6 +56,10 @@ import { AttestationsPage } from './components/AttestationsPage';
 import { CarnetsPage } from './components/CarnetsPage';
 import { ConformitePage } from './components/ConformitePage';
 import { CalendrierPage } from './components/CalendrierPage';
+import { ValidationPage } from './components/ValidationPage';
+import { SoumissionsPage } from './components/SoumissionsPage';
+import { DemandesPiecesPage } from './components/DemandesPiecesPage';
+import { AccesPage } from './components/AccesPage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
@@ -65,6 +72,38 @@ import { EmpruntsPage } from './components/EmpruntsPage';
 import { API_URL } from './lib/api';
 
 axios.defaults.withCredentials = true;
+
+const ACCES_ECRAN = {
+  identite: ['mandataire'],
+  listeequipe: ['mandataire'],
+  echeancier: ['mandataire', 'expert_comptable'],
+  maincourante: ['mandataire', 'expert_comptable'],
+  recettes: ['mandataire', 'expert_comptable'],
+  depenses: ['mandataire', 'expert_comptable'],
+  emprunts: ['mandataire'],
+  justificatifs: ['mandataire', 'expert_comptable'],
+  attestations: ['mandataire'],
+  carnets: ['mandataire'],
+  evenements: ['mandataire', 'expert_comptable', 'equipe'],
+  frise: ['mandataire', 'expert_comptable'],
+  calendrier: ['mandataire', 'expert_comptable', 'equipe'],
+  mutualisation: ['mandataire'],
+  conformite: ['mandataire', 'expert_comptable'],
+  depot: ['mandataire'],
+  demandes: ['mandataire', 'expert_comptable'],
+  validation: ['mandataire'],
+  soumissions: ['mandataire', 'expert_comptable', 'equipe'],
+  acces: ['mandataire'],
+  dashboard: ['mandataire', 'expert_comptable'],
+  settings: ['mandataire', 'expert_comptable', 'equipe'],
+  apropos: ['mandataire', 'expert_comptable', 'equipe'],
+};
+
+// Écran d'arrivée selon le rôle : l'équipe n'a pas de tableau de bord, elle
+// atterrirait sur une page vide.
+const ongletParDefaut = (role) => (role === 'equipe' ? 'soumissions' : 'dashboard');
+
+const peutVoir = (tab, role) => (ACCES_ECRAN[tab] ?? ['mandataire']).includes(role);
 
 const GROUPES_NAV = [
   { label: 'Administratif', icon: ClipboardList, items: [
@@ -92,6 +131,7 @@ const GROUPES_NAV = [
   { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
     { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
     { key: 'depot', label: 'Dépôt', icon: Archive },
+    { key: 'demandes', label: 'Demandes de pièces', icon: MessageSquare },
   ]},
 ];
 
@@ -113,6 +153,26 @@ function App() {
 
   // Accordéon : un seul groupe ouvert à la fois. Navigation centralisée pour
   // que le groupe suive l'onglet, même quand l'appel vient d'ailleurs.
+  const { data: moi } = useQuery({
+    queryKey: ['me', campaign?.id],
+    queryFn: async () => (await axios.get(`${API_URL}/me`, { withCredentials: true })).data,
+    enabled: Boolean(user),
+  });
+  const roleCampagne = moi?.role_campagne ?? null;
+  const estMandataire = roleCampagne === 'mandataire';
+  const estExpert = roleCampagne === 'expert_comptable';
+  const estEquipe = roleCampagne === 'equipe';
+
+  // File d'attente : la pastille du menu et le bandeau du tableau de bord.
+  const { data: fileValidation } = useQuery({
+    queryKey: ['validation-file', campaign?.id],
+    queryFn: async () => (await axios.get(`${API_URL}/validation/file`)).data,
+    enabled: Boolean(campaign) && estMandataire,
+    refetchInterval: 30000,
+  });
+
+  const onglet = peutVoir(activeTab, roleCampagne) ? activeTab : ongletParDefaut(roleCampagne);
+
   const [groupeOuvert, setGroupeOuvert] = useState(() => groupeDe(activeTab));
   const allerA = useCallback((tab) => {
     setActiveTab(tab);
@@ -232,7 +292,7 @@ function App() {
   }
 
   if (!user) {
-    return <LoginPage onLogin={setUser} />;
+    return <LoginPage onLogin={(u) => { setUser(u); setCampaign(null); setActiveTab('dashboard'); }} />;
   }
 
   if (!campaign) {
@@ -277,14 +337,28 @@ function App() {
 
 
           <nav className="flex-1 overflow-y-auto -mr-3 pr-3 space-y-1">
-            <NavItem icon={LayoutDashboard} label="Tableau de bord" active={activeTab === 'dashboard'} onClick={() => allerA('dashboard')} />
+            {peutVoir('dashboard', roleCampagne) && (
+              <NavItem icon={LayoutDashboard} label="Tableau de bord" active={onglet === 'dashboard'} onClick={() => allerA('dashboard')} />
+            )}
 
-            {user.role === 'admin' && GROUPES_NAV.map(g => (
-              <NavGroup key={g.label} icon={g.icon} label={g.label} items={g.items}
-                activeTab={activeTab} setActiveTab={allerA}
-                open={groupeOuvert === g.label}
-                onToggle={() => setGroupeOuvert(groupeOuvert === g.label ? null : g.label)} />
-            ))}
+            {estMandataire && (
+              <NavItem icon={BellRing} label="À valider" active={onglet === 'validation'}
+                onClick={() => allerA('validation')} badge={fileValidation?.total || 0} />
+            )}
+
+            {(estExpert || estEquipe) && (
+              <NavItem icon={Inbox} label="Mes soumissions" active={onglet === 'soumissions'}
+                onClick={() => allerA('soumissions')} />
+            )}
+
+            {GROUPES_NAV.map(g => ({ ...g, items: g.items.filter(i => peutVoir(i.key, roleCampagne)) }))
+              .filter(g => g.items.length > 0)
+              .map(g => (
+                <NavGroup key={g.label} icon={g.icon} label={g.label} items={g.items}
+                  activeTab={onglet} setActiveTab={allerA}
+                  open={groupeOuvert === g.label}
+                  onToggle={() => setGroupeOuvert(groupeOuvert === g.label ? null : g.label)} />
+              ))}
 
           </nav>
 
@@ -298,17 +372,26 @@ function App() {
             </div>
 
             <div className="space-y-1">
+              {estMandataire && (
+                <button
+                  onClick={() => allerA('acces')}
+                  className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
+                    onglet === 'acces' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <Users className="w-3 h-3" /> Accès à la campagne
+                </button>
+              )}
               <button
                 onClick={() => allerA('settings')}
                 className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
-                  activeTab === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                  onglet === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Settings className="w-3 h-3" /> Paramètres
               </button>
               <button
                 onClick={() => allerA('apropos')}
                 className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
-                  activeTab === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                  onglet === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Info className="w-3 h-3" /> À propos
               </button>
@@ -340,7 +423,7 @@ function App() {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-8">
-          {activeTab === 'dashboard' && (
+          {onglet === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               <header className="flex justify-between items-center mb-8">
@@ -348,7 +431,7 @@ function App() {
                   <h1 className="text-3xl font-bold tracking-tight">Vue d'ensemble</h1>
                   <p className="text-muted-foreground">Suivi en temps réel de la consommation du plafond.</p>
                 </div>
-                {user.role === 'admin' && (
+                {estMandataire && (
                   <div className="flex gap-4">
                     <Button onClick={() => setIsExpenseModalOpen(true)} className="gap-2">
                       <Plus className="w-4 h-4" /> Nouvelle Dépense
@@ -384,6 +467,25 @@ function App() {
               </header>
 
 
+
+              {/* Ce qui attend un arbitrage passe avant tout le reste. */}
+              {estMandataire && fileValidation?.total > 0 && (
+                <button
+                  type="button"
+                  onClick={() => allerA('validation')}
+                  className="w-full rounded-xl border border-amber-300 bg-amber-50/60 p-4 text-left transition-colors hover:bg-amber-50"
+                >
+                  <span className="font-semibold text-amber-800">
+                    {fileValidation.total} élément{fileValidation.total > 1 ? 's' : ''} en attente de votre validation
+                  </span>
+                  <p className="mt-1 text-xs text-amber-800/80">
+                    {fileValidation.nb_elements} dépôt{fileValidation.nb_elements > 1 ? 's' : ''} de l'équipe ou de
+                    l'expert-comptable
+                    {fileValidation.nb_demandes_pieces > 0 && `, ${fileValidation.nb_demandes_pieces} demande(s) de pièces`}.
+                    Rien n'entre dans le compte avant arbitrage.
+                  </p>
+                </button>
+              )}
 
               {/* Complétude du dossier : ce qui bloque le dépôt, avant les chiffres. */}
               {completude && !completude.complet && (
@@ -495,35 +597,41 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'depenses' && user.role === 'admin' && (
+          {onglet === 'depenses' && peutVoir('depenses', roleCampagne) && (
             <DepensesList cible={cible?.entite === 'depense' ? cible.id : null}
               onCibleConsommee={consommerCible} />
           )}
-          {activeTab === 'recettes' && user.role === 'admin' && (
+          {onglet === 'recettes' && peutVoir('recettes', roleCampagne) && (
             <RevenueList cible={cible?.entite === 'recette' ? cible.id : null}
               onCibleConsommee={consommerCible} />
           )}
-          {activeTab === 'justificatifs' && user.role === 'admin' && <JustificatifsList />}
-          {activeTab === 'attestations' && user.role === 'admin' && <AttestationsPage campaignId={campaign.id} />}
-          {activeTab === 'carnets' && user.role === 'admin' && <CarnetsPage />}
-          {activeTab === 'conformite' && user.role === 'admin' && (
+          {onglet === 'justificatifs' && peutVoir('justificatifs', roleCampagne) && <JustificatifsList />}
+          {onglet === 'attestations' && peutVoir('attestations', roleCampagne) && <AttestationsPage campaignId={campaign.id} />}
+          {onglet === 'carnets' && peutVoir('carnets', roleCampagne) && <CarnetsPage />}
+          {onglet === 'conformite' && peutVoir('conformite', roleCampagne) && (
             <ConformitePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
           )}
-          {activeTab === 'maincourante' && user.role === 'admin' && <MainCourantePage />}
-          {activeTab === 'identite' && user.role === 'admin' && (
+          {onglet === 'maincourante' && peutVoir('maincourante', roleCampagne) && <MainCourantePage />}
+          {onglet === 'identite' && peutVoir('identite', roleCampagne) && (
             <IdentitePage cible={cible?.entite} onCibleConsommee={consommerCible} />
           )}
-          {activeTab === 'depot' && user.role === 'admin' && <DepotPage />}
-          {activeTab === 'evenements' && user.role === 'admin' && <EvenementsPage />}
-          {activeTab === 'frise' && user.role === 'admin' && <FrisePage />}
-          {activeTab === 'calendrier' && user.role === 'admin' && <CalendrierPage />}
-          {activeTab === 'echeancier' && user.role === 'admin' && <EcheancierPage />}
-          {activeTab === 'mutualisation' && user.role === 'admin' && <MutualisationPage />}
-          {activeTab === 'listeequipe' && user.role === 'admin' && <ListeEquipePage />}
-          {activeTab === 'emprunts' && user.role === 'admin' && <EmpruntsPage />}
+          {onglet === 'depot' && peutVoir('depot', roleCampagne) && <DepotPage />}
+          {onglet === 'evenements' && peutVoir('evenements', roleCampagne) && <EvenementsPage />}
+          {onglet === 'frise' && peutVoir('frise', roleCampagne) && <FrisePage />}
+          {onglet === 'calendrier' && peutVoir('calendrier', roleCampagne) && <CalendrierPage />}
+          {onglet === 'echeancier' && peutVoir('echeancier', roleCampagne) && <EcheancierPage />}
+          {onglet === 'mutualisation' && peutVoir('mutualisation', roleCampagne) && <MutualisationPage />}
+          {onglet === 'listeequipe' && peutVoir('listeequipe', roleCampagne) && <ListeEquipePage />}
+          {onglet === 'emprunts' && peutVoir('emprunts', roleCampagne) && <EmpruntsPage />}
 
-          {activeTab === 'settings' && <SettingsPage currentUser={user} />}
-          {activeTab === 'apropos' && <AProposPage />}
+          {onglet === 'settings' && <SettingsPage currentUser={user} />}
+          {onglet === 'apropos' && <AProposPage />}
+          {onglet === 'validation' && peutVoir('validation', roleCampagne) && <ValidationPage />}
+          {onglet === 'soumissions' && peutVoir('soumissions', roleCampagne) && <SoumissionsPage />}
+          {onglet === 'demandes' && peutVoir('demandes', roleCampagne) && <DemandesPiecesPage />}
+          {onglet === 'acces' && peutVoir('acces', roleCampagne) && (
+            <AccesPage campaignId={campaign?.id} moi={moi} />
+          )}
         </main>
 
       </div>
@@ -561,7 +669,7 @@ function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, open, onT
   );
 }
 
-function NavItem({ icon: Icon, label, active, onClick }) {
+function NavItem({ icon: Icon, label, active, onClick, badge = 0 }) {
   return (
     <button
       onClick={onClick}
@@ -573,7 +681,12 @@ function NavItem({ icon: Icon, label, active, onClick }) {
       )}
     >
       <Icon className="w-5 h-5" />
-      {label}
+      <span className="flex-1 text-left">{label}</span>
+      {badge > 0 && (
+        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          {badge}
+        </span>
+      )}
     </button>
   );
 }

@@ -41,9 +41,18 @@ CREATE TABLE IF NOT EXISTS campaigns (
 CREATE TABLE IF NOT EXISTS user_campaigns (
     username TEXT,
     campaign_id TEXT,
+    role TEXT DEFAULT 'mandataire',
     PRIMARY KEY (username, campaign_id)
 );
 """
+
+# Rôles d'un utilisateur sur une campagne donnée. Le rôle est porté par le lien
+# utilisateur↔campagne, pas par le compte : on peut être mandataire d'une
+# campagne et simple militant sur une autre.
+ROLE_MANDATAIRE = "mandataire"
+ROLE_EXPERT = "expert_comptable"
+ROLE_EQUIPE = "equipe"
+ROLES = (ROLE_MANDATAIRE, ROLE_EXPERT, ROLE_EQUIPE)
 
 
 def _connect() -> sqlite3.Connection:
@@ -54,11 +63,24 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def _migrer_roles(conn: sqlite3.Connection) -> None:
+    """Ajoute la colonne de rôle aux accès existants.
+
+    Les liens créés avant l'introduction des rôles sont ceux du mandataire :
+    ils sont les seuls à avoir existé jusqu'ici.
+    """
+    colonnes = {row[1] for row in conn.execute("PRAGMA table_info(user_campaigns)")}
+    if "role" not in colonnes:
+        conn.execute(f"ALTER TABLE user_campaigns ADD COLUMN role TEXT DEFAULT '{ROLE_MANDATAIRE}'")
+        conn.execute(f"UPDATE user_campaigns SET role = '{ROLE_MANDATAIRE}' WHERE role IS NULL")
+
+
 def init_central_db() -> None:
     """Crée le schéma central et sème les comptes initiaux si la base est vide."""
     conn = _connect()
     try:
         conn.executescript(_SCHEMA)
+        _migrer_roles(conn)
         already_seeded = conn.execute("SELECT 1 FROM users LIMIT 1").fetchone()
         if not already_seeded:
             conn.executemany(

@@ -29,6 +29,7 @@ from db.models import (
     Recette,
     RecuDon,
 )
+from db.helpers import valides as _valides
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
 
@@ -74,8 +75,8 @@ def run_checks(campaign_id: str) -> dict:
         plafond = (election.plafond_depenses if election and election.plafond_depenses
                    else PLAFOND_DEFAUT)
 
-        recettes = s.scalars(select(Recette)).all()
-        depenses = s.scalars(select(Depense)).all()
+        recettes = s.scalars(_valides(select(Recette), Recette)).all()
+        depenses = s.scalars(_valides(select(Depense), Depense)).all()
         recu_recette_ids = set(s.scalars(
             select(RecuDon.recette_id).where(RecuDon.statut == enums.StatutRecuDon.delivre)
         ).all())

@@ -3,9 +3,9 @@ from pydantic import BaseModel
 
 import recus
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_requis
 
-router = APIRouter(tags=["recus"])
+router = APIRouter(tags=["recus"], dependencies=[Depends(mandataire_requis)])
 
 
 class CarnetCreate(BaseModel):

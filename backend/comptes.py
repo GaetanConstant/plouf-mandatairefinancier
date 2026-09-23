@@ -15,8 +15,10 @@ from sqlalchemy import func, select
 
 from db.models import Depense, Document, Donateur, Election, Recette
 from db.session import campaign_session, ensure_campaign_db
-from db.helpers import fmt_date as _fmt_date, media_type as _media_type
+from db.helpers import fmt_date as _fmt_date, media_type as _media_type, valides as _valides
 from db import enums
+from database import ROLE_MANDATAIRE
+import validation
 from database import UPLOADS_DIR
 
 logger = logging.getLogger(__name__)
@@ -101,7 +103,7 @@ def _recette_to_legacy(r: Recette) -> dict:
 def list_recettes(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        recettes = s.scalars(select(Recette).order_by(Recette.date_versement.desc())).all()
+        recettes = s.scalars(_valides(select(Recette), Recette).order_by(Recette.date_versement.desc())).all()
         return [_recette_to_legacy(r) for r in recettes]
 
 
@@ -116,7 +118,8 @@ def _get_or_create_donateur(s, nom: str, adresse: str | None) -> Donateur:
     return don
 
 
-def create_recette(campaign_id: str, dto) -> dict:
+def create_recette(campaign_id: str, dto, auteur: str | None = None,
+                   role: str = ROLE_MANDATAIRE) -> dict:
     ensure_campaign_db(campaign_id)
     categorie = _type_to_categorie(dto.type)
     with campaign_session(campaign_id) as s:
@@ -124,7 +127,7 @@ def create_recette(campaign_id: str, dto) -> dict:
         # Contrôle du plafond de 4 600 € par donateur (dons uniquement).
         if categorie == enums.CategorieRecette.don:
             deja = s.scalar(
-                select(func.coalesce(func.sum(Recette.montant), 0.0))
+                _valides(select(func.coalesce(func.sum(Recette.montant), 0.0)), Recette)
                 .where(Recette.donateur_id == don.id, Recette.categorie == enums.CategorieRecette.don)
             )
             if deja + dto.montant > LIMITE_DON_INDIVIDUEL:
@@ -143,6 +146,7 @@ def create_recette(campaign_id: str, dto) -> dict:
             recu_genere=getattr(dto, "recu_genere", False) or False,
             date_envoi=getattr(dto, "date_envoi", None),
         )
+        validation.estampiller(r, auteur, role)
         s.add(r)
     return {"message": "Recette ajoutée"}
 
@@ -257,7 +261,7 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None
 def list_depenses(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        depenses = s.scalars(select(Depense).order_by(Depense.date_reglement.desc())).all()
+        depenses = s.scalars(_valides(select(Depense), Depense).order_by(Depense.date_reglement.desc())).all()
         # Pré-charge les fichiers de justificatif.
         doc_ids = {d.facture_doc_id for d in depenses if d.facture_doc_id}
         docs = {}
@@ -271,7 +275,8 @@ def list_depenses(campaign_id: str) -> list[dict]:
         return resultat
 
 
-def create_depense(campaign_id: str, dto) -> dict:
+def create_depense(campaign_id: str, dto, auteur: str | None = None,
+                   role: str = ROLE_MANDATAIRE) -> dict:
     ensure_campaign_db(campaign_id)
     statut, reglee = _statut_legacy_to_orm(dto.statut, dto.is_nature)
     with campaign_session(campaign_id) as s:
@@ -287,7 +292,7 @@ def create_depense(campaign_id: str, dto) -> dict:
             s.add(doc)
             s.flush()
             facture_doc_id = doc.id
-        s.add(Depense(
+        depense = Depense(
             fournisseur=dto.fournisseur,
             nature=dto.libelle,
             montant_ttc=dto.montant_ttc,
@@ -298,7 +303,9 @@ def create_depense(campaign_id: str, dto) -> dict:
             statut=statut,
             reglee=reglee,
             facture_doc_id=facture_doc_id,
-        ))
+        )
+        validation.estampiller(depense, auteur, role)
+        s.add(depense)
     return {"message": "Dépense ajoutée"}
 
 
@@ -356,7 +363,7 @@ def list_fournisseurs(campaign_id: str) -> list[str]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
         rows = s.scalars(
-            select(Depense.fournisseur)
+            _valides(select(Depense.fournisseur), Depense)
             .where(Depense.fournisseur.is_not(None), Depense.fournisseur != "")
             .distinct()
             .order_by(Depense.fournisseur.asc())
@@ -387,18 +394,18 @@ def get_depense_pdf_data(campaign_id: str, depense_id: int) -> dict:
 def compute_stats(campaign_id: str) -> dict:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        total_depenses = s.scalar(select(func.coalesce(func.sum(Depense.montant_ttc), 0.0))) or 0.0
+        total_depenses = s.scalar(_valides(select(func.coalesce(func.sum(Depense.montant_ttc), 0.0)), Depense)) or 0.0
         total_depenses_payees = s.scalar(
-            select(func.coalesce(func.sum(Depense.montant_ttc), 0.0))
+            _valides(select(func.coalesce(func.sum(Depense.montant_ttc), 0.0)), Depense)
             .where(Depense.statut == enums.StatutDepense.paye)
         ) or 0.0
         total_nature = s.scalar(
-            select(func.coalesce(func.sum(Depense.montant_ttc), 0.0))
+            _valides(select(func.coalesce(func.sum(Depense.montant_ttc), 0.0)), Depense)
             .where(Depense.statut == enums.StatutDepense.realise_nature)
         ) or 0.0
-        total_recettes = s.scalar(select(func.coalesce(func.sum(Recette.montant), 0.0))) or 0.0
+        total_recettes = s.scalar(_valides(select(func.coalesce(func.sum(Recette.montant), 0.0)), Recette)) or 0.0
         nombre_donateurs = s.scalar(
-            select(func.count(func.distinct(Recette.donateur_id)))
+            _valides(select(func.count(func.distinct(Recette.donateur_id))), Recette)
             .where(Recette.categorie == enums.CategorieRecette.don)
         ) or 0
         election = s.scalars(select(Election)).first()

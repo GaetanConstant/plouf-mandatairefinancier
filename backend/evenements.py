@@ -20,8 +20,10 @@ from sqlalchemy import select
 
 from db.models import Depense, Document, Evenement, EvenementDepense
 from db.session import campaign_session, ensure_campaign_db
-from db.helpers import election_id as _election_id, fmt_date as _fmt, media_type
+from db.helpers import election_id as _election_id, fmt_date as _fmt, media_type, valides as _valides
 from db import enums
+from database import ROLE_MANDATAIRE
+import validation
 
 
 class EvenementIn(BaseModel):
@@ -89,11 +91,12 @@ def _evenement_dict(s, e: Evenement) -> dict:
 def list_evenements(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        evs = s.scalars(select(Evenement).order_by(Evenement.date_debut)).all()
+        evs = s.scalars(_valides(select(Evenement), Evenement).order_by(Evenement.date_debut)).all()
         return [_evenement_dict(s, e) for e in evs]
 
 
-def create_evenement(campaign_id: str, payload: EvenementIn) -> dict:
+def create_evenement(campaign_id: str, payload: EvenementIn, auteur: str | None = None,
+                     role: str = ROLE_MANDATAIRE) -> dict:
     ensure_campaign_db(campaign_id)
     if not payload.titre or not payload.date_debut:
         raise HTTPException(status_code=400, detail="Titre et date de début requis.")
@@ -107,6 +110,7 @@ def create_evenement(campaign_id: str, payload: EvenementIn) -> dict:
             lieu=payload.lieu,
             description=payload.description,
         )
+        validation.estampiller(e, auteur, role)
         s.add(e)
         s.flush()
         return _evenement_dict(s, e)
@@ -171,7 +175,7 @@ def detail_evenement(campaign_id: str, evenement_id: int) -> dict:
             "type": doc.type.value,
             "fichier": doc.fichier,
             "enveloppe": doc.enveloppe.value if doc.enveloppe else None,
-        } for doc in s.scalars(select(Document).where(Document.evenement_id == evenement_id)).all()]
+        } for doc in s.scalars(_valides(select(Document), Document).where(Document.evenement_id == evenement_id)).all()]
         d = _evenement_dict(s, e)
         d["depenses"] = depenses
         d["documents"] = documents
@@ -186,7 +190,7 @@ def _enveloppe_par_defaut(type_doc: enums.TypeDocument) -> enums.Enveloppe:
 def list_documents_evenement(campaign_id: str, evenement_id: int) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        docs = s.scalars(select(Document).where(Document.evenement_id == evenement_id)).all()
+        docs = s.scalars(_valides(select(Document), Document).where(Document.evenement_id == evenement_id)).all()
         return [{
             "id": d.id,
             "type": d.type.value,
@@ -197,7 +201,8 @@ def list_documents_evenement(campaign_id: str, evenement_id: int) -> list[dict]:
         } for d in docs]
 
 
-def link_document(campaign_id: str, evenement_id: int, payload: DocumentEvenementIn) -> dict:
+def link_document(campaign_id: str, evenement_id: int, payload: DocumentEvenementIn,
+                  auteur: str | None = None, role: str = ROLE_MANDATAIRE) -> dict:
     """Rattache une pièce à un événement, existante ou nouvellement téléversée."""
     ensure_campaign_db(campaign_id)
     try:
@@ -218,13 +223,15 @@ def link_document(campaign_id: str, evenement_id: int, payload: DocumentEvenemen
             doc.evenement_id = evenement_id
         elif payload.fichier:
             fichier = os.path.basename(payload.fichier)
-            s.add(Document(
+            doc = Document(
                 type=type_doc,
                 media_type=media_type(fichier),
                 fichier=fichier,
                 enveloppe=_enveloppe_par_defaut(type_doc),
                 evenement_id=evenement_id,
-            ))
+            )
+            validation.estampiller(doc, auteur, role)
+            s.add(doc)
         else:
             raise HTTPException(status_code=400, detail="Fournir un fichier ou l'id d'une pièce existante")
 

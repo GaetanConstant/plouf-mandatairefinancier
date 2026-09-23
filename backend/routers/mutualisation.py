@@ -6,9 +6,9 @@ from fastapi.responses import StreamingResponse
 import mutualisation
 import livre_comptes
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_requis
 
-router = APIRouter(tags=["mutualisation"])
+router = APIRouter(tags=["mutualisation"], dependencies=[Depends(mandataire_requis)])
 
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

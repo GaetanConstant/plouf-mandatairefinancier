@@ -10,6 +10,16 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.14.0 — 2026-09-23 — Rôles et validation des contributions
+
+- Trois rôles par campagne : mandataire, expert-comptable, équipe de campagne. Un même compte peut être mandataire d'une campagne et militant sur une autre.
+- L'équipe et l'expert-comptable peuvent déposer dépenses, événements et pièces : rien n'entre dans le compte — plafond, trésorerie, exports, dossier de dépôt — avant validation du mandataire.
+- Un écran « À valider » liste ce qui attend un arbitrage, avec l'auteur et la date de chaque dépôt ; une pastille dans le menu et un bandeau au tableau de bord préviennent à la connexion.
+- Un refus ne supprime rien : son auteur retrouve l'élément avec le motif, le corrige et le soumet à nouveau.
+- L'expert-comptable peut réclamer un justificatif manquant, auquel le mandataire répond.
+- Le mandataire ouvre et retire les accès de sa campagne, rôle par rôle.
+- Sécurité : les autorisations descendent dans l'API. Elles n'existaient que dans l'interface — masquer un écran n'empêchait pas d'appeler la route.
+
 ## v0.13.0 — 2026-09-23 — Calendrier de campagne
 
 - Un écran Calendrier reconstruit le rétro-planning de la campagne : une ligne par activité, une case par semaine, de l'ouverture de la période de financement au jour du scrutin.

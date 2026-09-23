@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 
 import annexes
 from auth import get_current_user
-from deps import get_campaign_conn
+from deps import get_campaign_conn, mandataire_requis
 
-router = APIRouter(tags=["annexes-cnccfp"])
+router = APIRouter(tags=["annexes-cnccfp"], dependencies=[Depends(mandataire_requis)])
 
 
 @router.get("/colistiers")
