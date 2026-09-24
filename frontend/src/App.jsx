@@ -624,7 +624,7 @@ function App() {
 
           {onglet === 'depenses' && peutVoir('depenses', roleCampagne) && (
             <DepensesList cible={cible?.entite === 'depense' ? cible.id : null}
-              onCibleConsommee={consommerCible} />
+              onCibleConsommee={consommerCible} role={roleCampagne} />
           )}
           {onglet === 'recettes' && peutVoir('recettes', roleCampagne) && (
             <RevenueList cible={cible?.entite === 'recette' ? cible.id : null}

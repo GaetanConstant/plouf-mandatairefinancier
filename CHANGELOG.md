@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.15.1 — 2026-09-24 — Dépôt de justificatif par la direction
+
+### Ajouté
+- La direction de campagne et l'équipe peuvent verser un justificatif sur une dépense existante, sans pouvoir en modifier le moindre champ. La pièce part à la validation du mandataire.
+
+### Corrigé
+- L'équipe de campagne ne pouvait pas déposer de dépense : le bouton existait mais l'API refusait l'appel.
+- Une pièce en attente de validation s'affichait déjà comme justificatif de la dépense.
+
 ## v0.15.0 — 2026-09-24 — Direction de campagne
 
 - Nouveau rôle « direction de campagne » : il lit la comptabilité — tableau de bord, plafond, dépenses, justificatifs, conformité, main courante — et dépose comme l'équipe, sous validation du mandataire.
