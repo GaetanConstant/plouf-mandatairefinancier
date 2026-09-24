@@ -120,7 +120,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                     label="Date"
                     type="date"
@@ -192,7 +192,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                 onChange={e => setFormData({ ...formData, categorie_cnccfp: e.target.value })}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                     label="Montant TTC (€)"
                     type="number"

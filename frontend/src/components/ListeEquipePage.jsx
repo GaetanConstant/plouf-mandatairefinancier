@@ -29,7 +29,7 @@ function Colistiers() {
     return (
         <section className="bg-card rounded-xl border border-border p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4"><Users className="w-5 h-5 text-primary" /><h2 className="font-bold text-lg">Colistiers</h2></div>
-            <table className="w-full text-sm mb-4">
+            <div className="w-full overflow-x-auto"><table className="w-full text-sm mb-4">
                 <thead><tr className="border-b text-muted-foreground text-left">
                     <th className="py-2 px-2 font-medium">Civ.</th><th className="py-2 px-2 font-medium">Prénom</th><th className="py-2 px-2 font-medium">Nom</th>
                     <th className="py-2 px-2 font-medium">Mandat parl.</th><th className="py-2 px-2 font-medium text-center">T1</th><th className="py-2 px-2 font-medium text-center">T2</th><th></th>
@@ -45,7 +45,7 @@ function Colistiers() {
                     ))}
                     {!data?.length && <tr><td colSpan={7} className="py-4 text-center text-muted-foreground italic">Aucun colistier.</td></tr>}
                 </tbody>
-            </table>
+            </table></div>
             <div className="flex flex-wrap gap-2 items-end border-t border-border pt-4">
                 <div className="w-20"><Input label="Civ." value={f.civilite} onChange={e => setF({ ...f, civilite: e.target.value })} /></div>
                 <div className="flex-1 min-w-[120px]"><Input label="Prénom" value={f.prenom} onChange={e => setF({ ...f, prenom: e.target.value })} /></div>
@@ -69,7 +69,7 @@ function Equipe() {
     return (
         <section className="bg-card rounded-xl border border-border p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4"><UserPlus className="w-5 h-5 text-primary" /><h2 className="font-bold text-lg">Équipe de campagne (annexe 7)</h2></div>
-            <table className="w-full text-sm mb-4">
+            <div className="w-full overflow-x-auto"><table className="w-full text-sm mb-4">
                 <thead><tr className="border-b text-muted-foreground text-left">
                     <th className="py-2 px-2 font-medium">Prénom</th><th className="py-2 px-2 font-medium">Nom</th><th className="py-2 px-2 font-medium">Fonction</th><th></th>
                 </tr></thead>
@@ -82,7 +82,7 @@ function Equipe() {
                     ))}
                     {!data?.length && <tr><td colSpan={4} className="py-4 text-center text-muted-foreground italic">Aucun membre.</td></tr>}
                 </tbody>
-            </table>
+            </table></div>
             <div className="flex flex-wrap gap-2 items-end border-t border-border pt-4">
                 <div className="flex-1 min-w-[120px]"><Input label="Prénom" value={f.prenom} onChange={e => setF({ ...f, prenom: e.target.value })} /></div>
                 <div className="flex-1 min-w-[120px]"><Input label="Nom" value={f.nom} onChange={e => setF({ ...f, nom: e.target.value })} /></div>

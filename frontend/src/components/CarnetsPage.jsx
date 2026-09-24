@@ -66,7 +66,7 @@ export function CarnetsPage() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Carnets de reçus-dons</h1>
                     <p className="text-muted-foreground">Suivi des formules retirées en préfecture, délivrées et à restituer.</p>
@@ -108,7 +108,7 @@ export function CarnetsPage() {
             <div>
                 <h2 className="text-xl font-bold tracking-tight mb-3">Reçus délivrés</h2>
                 <div className="rounded-md border border-border bg-card">
-                    <table className="w-full caption-bottom text-sm">
+                    <div className="w-full overflow-x-auto"><table className="w-full caption-bottom text-sm">
                         <thead className="[&_tr]:border-b">
                             <tr className="border-b">
                                 <th className="h-12 px-4 text-left font-medium text-muted-foreground">N° formule</th>
@@ -150,7 +150,7 @@ export function CarnetsPage() {
                                 <tr><td colSpan={7} className="p-8 text-center text-muted-foreground italic">Aucun reçu délivré pour l'instant.</td></tr>
                             )}
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             </div>
 
@@ -159,7 +159,7 @@ export function CarnetsPage() {
                     {error && <div className="p-3 text-sm bg-destructive/10 text-destructive rounded-md border border-destructive/20">{error}</div>}
                     <Input label="Numéro de carnet" placeholder="Ex: CARN-001" value={form.numero_carnet}
                         onChange={e => setForm({ ...form, numero_carnet: e.target.value })} required />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input label="Première formule" type="number" value={form.numero_formule_debut}
                             onChange={e => setForm({ ...form, numero_formule_debut: e.target.value })} required />
                         <Input label="Dernière formule" type="number" value={form.numero_formule_fin}

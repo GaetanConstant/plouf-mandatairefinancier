@@ -1,5 +1,17 @@
 [
   {
+    "version": "v0.15.2",
+    "date": "2026-09-24",
+    "dateAffichee": "24 septembre 2026",
+    "titre": "Utilisable sur téléphone",
+    "details": [
+      "Le menu occupait 256 pixels fixes : sur un téléphone, il ne restait qu'une centaine de pixels au contenu. Il devient un tiroir, ouvert par un bouton et refermé dès qu'on navigue.",
+      "Les tableaux trop larges faisaient déborder la page entière ; ils défilent désormais dans leur cadre, et les dates ne se coupent plus sur trois lignes.",
+      "Les formulaires à deux colonnes s'empilent sous 640 pixels, les en-têtes passent à la ligne au lieu d'écraser leur titre, et les marges s'ajustent à la taille de l'écran."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.15.1",
     "date": "2026-09-24",
     "dateAffichee": "24 septembre 2026",

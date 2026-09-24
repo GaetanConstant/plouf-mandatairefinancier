@@ -28,7 +28,7 @@ export function Modal({ isOpen, onClose, title, children, className }) {
                 )}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between p-6 border-b border-border">
+                <div className="flex items-center justify-between gap-3 p-4 md:p-6 border-b border-border">
                     <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
                     <button
                         onClick={onClose}
@@ -38,7 +38,7 @@ export function Modal({ isOpen, onClose, title, children, className }) {
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto">
+                <div className="p-4 md:p-6 overflow-y-auto">
                     {children}
                 </div>
             </div>

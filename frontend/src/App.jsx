@@ -18,6 +18,7 @@ import {
   BellRing,
   Inbox,
   Info,
+  Menu,
   MessageSquare,
   Settings,
   Shield,
@@ -178,7 +179,9 @@ function App() {
   const allerA = useCallback((tab) => {
     setActiveTab(tab);
     setGroupeOuvert(groupeDe(tab));
+    setMenuOuvert(false);
   }, []);
+  const [menuOuvert, setMenuOuvert] = useState(false);
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [prefilledData, setPrefilledData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -339,8 +342,22 @@ function App() {
       </Modal>
 
       <div className="flex h-screen overflow-hidden">
+        {/* Voile du tiroir : ferme le menu au clic hors de lui. */}
+        {menuOuvert && (
+          <button
+            type="button"
+            aria-label="Fermer le menu"
+            onClick={() => setMenuOuvert(false)}
+            className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          />
+        )}
         {/* Sidebar */}
-        <aside className="w-64 border-r border-border p-6 flex flex-col bg-card">
+        <aside className={cn(
+          "w-64 shrink-0 border-r border-border p-6 flex flex-col bg-card",
+          // Hors mobile : colonne fixe. Sur mobile : tiroir glissant au-dessus.
+          "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:transition-transform",
+          menuOuvert ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+        )}>
           <div className="flex items-center gap-2 mb-8">
             <Droplets className="w-8 h-8 text-primary" />
             <div className="flex flex-col">
@@ -436,7 +453,24 @@ function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          {/* Barre mobile : ouvre le tiroir, la navigation étant hors écran. */}
+          <div className="mb-4 flex items-center gap-3 md:hidden">
+            <button
+              type="button"
+              onClick={() => setMenuOuvert(true)}
+              aria-label="Ouvrir le menu"
+              className="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="truncate text-sm font-semibold">{campaign?.name}</span>
+            {estMandataire && fileValidation?.total > 0 && (
+              <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                {fileValidation.total}
+              </span>
+            )}
+          </div>
           {onglet === 'dashboard' && statsError && (
             <div className="rounded-xl border border-red-300 bg-red-50/60 p-6">
               <h2 className="font-bold text-red-700">Les chiffres du compte n'ont pas pu être chargés.</h2>
@@ -451,13 +485,13 @@ function App() {
           {onglet === 'dashboard' && stats && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-              <header className="flex justify-between items-center mb-8">
+              <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Vue d'ensemble</h1>
+                  <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Vue d'ensemble</h1>
                   <p className="text-muted-foreground">Suivi en temps réel de la consommation du plafond.</p>
                 </div>
                 {estMandataire && (
-                  <div className="flex gap-4">
+                  <div className="flex w-full flex-wrap gap-3 sm:w-auto sm:gap-4">
                     <Button onClick={() => setIsExpenseModalOpen(true)} className="gap-2">
                       <Plus className="w-4 h-4" /> Nouvelle Dépense
                     </Button>
@@ -550,7 +584,7 @@ function App() {
               <div className="grid gap-6 md:grid-cols-2">
                 {/* Plafond Légal */}
                 <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-semibold text-lg">Consommation Plafond Légal</h3>
                     <span className="text-sm font-medium text-muted-foreground">{stats.consommation_plafond.toFixed(1)}%</span>
                   </div>
@@ -568,7 +602,7 @@ function App() {
 
                 {/* Budget Réel/Trésorerie */}
                 <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-semibold text-lg">Consommation Budget Réel</h3>
                     <span className="text-sm font-medium text-muted-foreground">{stats.consommation_budget_actuel ? stats.consommation_budget_actuel.toFixed(1) : '0'}%</span>
                   </div>

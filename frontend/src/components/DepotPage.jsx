@@ -48,7 +48,7 @@ export function DepotPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Dépôt du dossier</h1>
                     <p className="text-muted-foreground">Classement des pièces par enveloppe (A / B) et bordereau de dépôt.</p>
@@ -129,7 +129,7 @@ export function DepotPage() {
             )}
 
             <div className="rounded-md border border-border bg-card">
-                <table className="w-full caption-bottom text-sm">
+                <div className="w-full overflow-x-auto"><table className="w-full caption-bottom text-sm">
                     <thead className="[&_tr]:border-b">
                         <tr className="border-b">
                             <th className="h-11 px-4 text-left font-medium text-muted-foreground">Type</th>
@@ -159,7 +159,7 @@ export function DepotPage() {
                             <tr><td colSpan={4} className="p-8 text-center text-muted-foreground italic">Aucune pièce. Les justificatifs ajoutés aux dépenses apparaîtront ici.</td></tr>
                         )}
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     );

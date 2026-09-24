@@ -24,7 +24,7 @@ export function EcheancierPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Échéancier & Rapport</h1>
                     <p className="text-muted-foreground">Échéances légales calculées depuis la date du 1er tour (renseignée dans l'Identité).</p>
