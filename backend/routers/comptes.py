@@ -5,11 +5,11 @@ from auth import get_current_user
 from deps import get_campaign_conn, lecture_donateurs, get_role, tout_role, mandataire_ou_expert, mandataire_requis
 from models import Recette, Depense, SpendingStats
 
-router = APIRouter(tags=["comptes"], dependencies=[Depends(mandataire_ou_expert)])
+router = APIRouter(tags=["comptes"], dependencies=[Depends(tout_role)])
 
 
 @router.get("/stats", response_model=SpendingStats)
-def get_stats(campaign_id: str = Depends(get_campaign_conn)):
+def get_stats(campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_ou_expert)):
     return SpendingStats(**comptes.compute_stats(campaign_id))
 
 
@@ -42,8 +42,21 @@ def update_depense(depense_id: int, update: Depense, current_user: dict = Depend
 
 
 @router.get("/depenses")
-def list_depenses(campaign_id: str = Depends(get_campaign_conn)):
+def list_depenses(campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_ou_expert)):
     return comptes.list_depenses(campaign_id)
+
+
+@router.post("/depenses/{depense_id}/piece")
+def ajouter_piece(depense_id: int, payload: comptes.PieceIn,
+                  campaign_id: str = Depends(get_campaign_conn),
+                  current_user: dict = Depends(get_current_user),
+                  role: str = Depends(get_role)):
+    """Rattache un justificatif à une dépense, sans toucher à ses montants.
+
+    Seul chemin ouvert à la direction de campagne et à l'équipe sur une dépense
+    existante : elles versent une pièce, elles ne modifient rien d'autre.
+    """
+    return comptes.ajouter_piece(campaign_id, depense_id, payload, current_user["username"], role)
 
 
 @router.get("/fournisseurs")

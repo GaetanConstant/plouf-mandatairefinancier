@@ -13,7 +13,7 @@ import conformite
 import evenements
 import maincourante
 import validation
-from database import ROLE_EQUIPE, ROLE_EXPERT, ROLE_MANDATAIRE
+from database import ROLE_DIRECTION, ROLE_EQUIPE, ROLE_EXPERT, ROLE_MANDATAIRE
 from models import Depense
 from _fixture import fresh_campaign, teardown, run_tests
 
@@ -166,6 +166,53 @@ def test_le_masquage_conserve_l_alerte_et_sa_cible():
         assert "DURAND" not in messages
         # L'alerte garde l'entité et son identifiant : elle reste actionnable.
         assert any(a["entite"] == "recette" and a["entite_id"] for a in masque["alertes"])
+    finally:
+        teardown(cid)
+
+
+def test_la_direction_depose_une_piece_sans_toucher_aux_montants():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(400.0), "gconstant", ROLE_MANDATAIRE)
+        dep = comptes.list_depenses(cid)[0]
+        assert dep["justificatif_path"] is None
+
+        comptes.ajouter_piece(cid, dep["id"], comptes.PieceIn(
+            fichier="/data/uploads/facture_direction.pdf"), "adavid", ROLE_DIRECTION)
+
+        apres = comptes.list_depenses(cid)[0]
+        assert apres["montant_ttc"] == 400.0, "le montant ne bouge pas"
+        # La pièce est en attente : elle n'apparaît pas encore au dossier.
+        assert apres["justificatif_path"] is None
+        file = validation.file_attente(cid)
+        assert file["nb_elements"] == 1
+        assert file["elements"][0]["cree_par"] == "adavid"
+
+        element = file["elements"][0]
+        validation.valider(cid, element["entite"], element["id"], "gconstant")
+        assert comptes.list_depenses(cid)[0]["justificatif_path"] == "facture_direction.pdf"
+    finally:
+        teardown(cid)
+
+
+def test_la_direction_ne_remplace_pas_une_piece_deja_validee():
+    """Remplacer une pièce du compte est une décision du mandataire."""
+    cid = fresh_campaign()
+    try:
+        d = _depense(400.0)
+        d.justificatif_path = "/data/uploads/facture_initiale.pdf"
+        comptes.create_depense(cid, d, "gconstant", ROLE_MANDATAIRE)
+        dep = comptes.list_depenses(cid)[0]
+
+        try:
+            comptes.ajouter_piece(cid, dep["id"], comptes.PieceIn(
+                fichier="/data/uploads/autre.pdf"), "adavid", ROLE_DIRECTION)
+        except HTTPException as e:
+            assert e.status_code == 409
+        else:
+            raise AssertionError("le dépôt aurait dû être refusé")
+
+        assert comptes.list_depenses(cid)[0]["justificatif_path"] == "facture_initiale.pdf"
     finally:
         teardown(cid)
 

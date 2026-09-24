@@ -1,5 +1,17 @@
 [
   {
+    "version": "v0.15.1",
+    "date": "2026-09-24",
+    "dateAffichee": "24 septembre 2026",
+    "titre": "Dépôt de justificatif par la direction",
+    "details": [
+      "La direction de campagne et l'équipe peuvent verser un justificatif sur une dépense existante, sans pouvoir en modifier le moindre champ. La pièce part à la validation du mandataire.",
+      "L'équipe de campagne ne pouvait pas déposer de dépense : le bouton existait mais l'API refusait l'appel.",
+      "Une pièce en attente de validation s'affichait déjà comme justificatif de la dépense."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.15.0",
     "date": "2026-09-24",
     "dateAffichee": "24 septembre 2026",

@@ -11,6 +11,7 @@ import os
 import unicodedata
 
 from fastapi import HTTPException
+from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from db.models import Depense, Document, Donateur, Election, Recette
@@ -266,7 +267,7 @@ def list_depenses(campaign_id: str) -> list[dict]:
         doc_ids = {d.facture_doc_id for d in depenses if d.facture_doc_id}
         docs = {}
         if doc_ids:
-            for doc in s.scalars(select(Document).where(Document.id.in_(doc_ids))).all():
+            for doc in s.scalars(_valides(select(Document), Document).where(Document.id.in_(doc_ids))).all():
                 docs[doc.id] = (doc.fichier, doc.type.value)
         resultat = []
         for d in depenses:
@@ -307,6 +308,54 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
         validation.estampiller(depense, auteur, role)
         s.add(depense)
     return {"message": "Dépense ajoutée"}
+
+
+class PieceIn(BaseModel):
+    """Justificatif versé sur une dépense existante."""
+    fichier: str
+    type_piece: str = "facture"
+
+
+def ajouter_piece(campaign_id: str, depense_id: int, payload, auteur: str,
+                  role: str) -> dict:
+    """Rattache un justificatif à une dépense sans modifier ses montants.
+
+    Ouvert à la direction de campagne et à l'équipe, qui ne peuvent rien changer
+    d'autre : la pièce naît « à valider » et n'entre au dossier qu'après
+    arbitrage du mandataire.
+
+    Refuse si la dépense porte déjà un justificatif validé : remplacer une pièce
+    du compte est une décision du mandataire, pas un dépôt.
+    """
+    ensure_campaign_db(campaign_id)
+    fichier = os.path.basename(payload.fichier)
+    with campaign_session(campaign_id) as s:
+        d = s.get(Depense, depense_id)
+        if not d:
+            raise HTTPException(status_code=404, detail="Dépense introuvable")
+
+        existante = s.get(Document, d.facture_doc_id) if d.facture_doc_id else None
+        if existante is not None and existante.statut_validation == enums.StatutValidation.valide:
+            if role != ROLE_MANDATAIRE:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cette dépense a déjà un justificatif. "
+                           "Demandez au mandataire financier de le remplacer.",
+                )
+
+        doc = Document(
+            type=_type_piece(payload.type_piece),
+            media_type=_media_type(fichier),
+            fichier=fichier,
+            enveloppe=enums.Enveloppe.A,
+        )
+        validation.estampiller(doc, auteur, role)
+        s.add(doc)
+        s.flush()
+        d.facture_doc_id = doc.id
+
+    return {"message": "Justificatif déposé."
+                       if role != ROLE_MANDATAIRE else "Justificatif rattaché."}
 
 
 def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
