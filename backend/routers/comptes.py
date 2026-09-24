@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 
 import comptes
 from auth import get_current_user
-from deps import get_campaign_conn, get_role, tout_role, mandataire_ou_expert, mandataire_requis
+from deps import get_campaign_conn, lecture_donateurs, get_role, tout_role, mandataire_ou_expert, mandataire_requis
 from models import Recette, Depense, SpendingStats
 
 router = APIRouter(tags=["comptes"], dependencies=[Depends(mandataire_ou_expert)])
@@ -24,7 +24,7 @@ def update_recette(recette_id: int, update: Recette, current_user: dict = Depend
 
 
 @router.get("/recettes")
-def list_recettes(campaign_id: str = Depends(get_campaign_conn)):
+def list_recettes(campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(lecture_donateurs)):
     return comptes.list_recettes(campaign_id)
 
 

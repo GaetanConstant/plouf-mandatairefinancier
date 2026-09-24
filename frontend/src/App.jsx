@@ -76,27 +76,27 @@ axios.defaults.withCredentials = true;
 const ACCES_ECRAN = {
   identite: ['mandataire'],
   listeequipe: ['mandataire'],
-  echeancier: ['mandataire', 'expert_comptable'],
-  maincourante: ['mandataire', 'expert_comptable'],
+  echeancier: ['mandataire', 'expert_comptable', 'direction'],
+  maincourante: ['mandataire', 'expert_comptable', 'direction'],
   recettes: ['mandataire', 'expert_comptable'],
-  depenses: ['mandataire', 'expert_comptable'],
+  depenses: ['mandataire', 'expert_comptable', 'direction'],
   emprunts: ['mandataire'],
-  justificatifs: ['mandataire', 'expert_comptable'],
+  justificatifs: ['mandataire', 'expert_comptable', 'direction'],
   attestations: ['mandataire'],
   carnets: ['mandataire'],
-  evenements: ['mandataire', 'expert_comptable', 'equipe'],
-  frise: ['mandataire', 'expert_comptable'],
-  calendrier: ['mandataire', 'expert_comptable', 'equipe'],
+  evenements: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
+  frise: ['mandataire', 'expert_comptable', 'direction'],
+  calendrier: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
   mutualisation: ['mandataire'],
-  conformite: ['mandataire', 'expert_comptable'],
+  conformite: ['mandataire', 'expert_comptable', 'direction'],
   depot: ['mandataire'],
   demandes: ['mandataire', 'expert_comptable'],
   validation: ['mandataire'],
-  soumissions: ['mandataire', 'expert_comptable', 'equipe'],
+  soumissions: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
   acces: ['mandataire'],
-  dashboard: ['mandataire', 'expert_comptable'],
-  settings: ['mandataire', 'expert_comptable', 'equipe'],
-  apropos: ['mandataire', 'expert_comptable', 'equipe'],
+  dashboard: ['mandataire', 'expert_comptable', 'direction'],
+  settings: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
+  apropos: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
 };
 
 // Écran d'arrivée selon le rôle : l'équipe n'a pas de tableau de bord, elle
@@ -162,6 +162,7 @@ function App() {
   const estMandataire = roleCampagne === 'mandataire';
   const estExpert = roleCampagne === 'expert_comptable';
   const estEquipe = roleCampagne === 'equipe';
+  const estDirection = roleCampagne === 'direction';
 
   // File d'attente : la pastille du menu et le bandeau du tableau de bord.
   const { data: fileValidation } = useQuery({
@@ -359,7 +360,7 @@ function App() {
                 onClick={() => allerA('validation')} badge={fileValidation?.total || 0} />
             )}
 
-            {(estExpert || estEquipe) && (
+            {(estExpert || estEquipe || estDirection) && (
               <NavItem icon={Inbox} label="Mes soumissions" active={onglet === 'soumissions'}
                 onClick={() => allerA('soumissions')} />
             )}

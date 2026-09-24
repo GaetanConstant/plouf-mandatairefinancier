@@ -41,7 +41,10 @@ def _mode(m) -> str:
 
 
 
-def journal(campaign_id: str) -> list[dict]:
+DONATEUR_MASQUE = "Donateur"
+
+
+def journal(campaign_id: str, voir_donateurs: bool = True) -> list[dict]:
     """Journal chronologique unifié (recettes + dépenses)."""
     ensure_campaign_db(campaign_id)
     lignes: list[dict] = []
@@ -55,7 +58,9 @@ def journal(campaign_id: str) -> list[dict]:
                 "num_cheque_remise": r.num_cheque_remise,
                 "rubrique": r.rubrique_imputation,
                 "nature": _CATEGORIE_LABEL.get(r.categorie, ""),
-                "tiers": donateurs.get(r.donateur_id),
+                # Le tiers d'une recette est un donateur nommé : masqué pour les
+            # rôles qui n'ont pas à connaître l'identité des donateurs.
+            "tiers": donateurs.get(r.donateur_id) if voir_donateurs else DONATEUR_MASQUE,
                 "mode": _mode(r.mode),
                 "montant": r.montant,
                 "num_releve": r.num_releve_bancaire,

@@ -132,5 +132,43 @@ def test_demande_de_piece_de_l_expert_compte_dans_la_file():
         teardown(cid)
 
 
+def test_la_direction_ne_voit_pas_l_identite_des_donateurs():
+    """Un don politique est une opinion : la direction voit la règle enfreinte,
+    pas qui a donné."""
+    from models import Recette as RecetteIn
+
+    cid = fresh_campaign()
+    try:
+        comptes.create_recette(cid, RecetteIn(
+            date=date(2026, 5, 4), nom_donateur="MARTIN Claire", adresse="2 rue Y",
+            montant=200.0, type="Don"), "gconstant", ROLE_MANDATAIRE)
+
+        nomme = maincourante.journal(cid, voir_donateurs=True)
+        masque = maincourante.journal(cid, voir_donateurs=False)
+        assert any(l.get("tiers") == "MARTIN Claire" for l in nomme)
+        assert all(l.get("tiers") != "MARTIN Claire" for l in masque)
+    finally:
+        teardown(cid)
+
+
+def test_le_masquage_conserve_l_alerte_et_sa_cible():
+    """Masquer le nom ne doit pas rendre l'alerte inexploitable."""
+    from models import Recette as RecetteIn
+
+    cid = fresh_campaign()
+    try:
+        comptes.create_recette(cid, RecetteIn(
+            date=date(2026, 5, 4), nom_donateur="DURAND Paul", adresse="",
+            montant=200.0, type="Don"), "gconstant", ROLE_MANDATAIRE)
+
+        masque = conformite.run_checks(cid, voir_donateurs=False)
+        messages = " ".join(a["message"] for a in masque["alertes"])
+        assert "DURAND" not in messages
+        # L'alerte garde l'entité et son identifiant : elle reste actionnable.
+        assert any(a["entite"] == "recette" and a["entite_id"] for a in masque["alertes"])
+    finally:
+        teardown(cid)
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
