@@ -109,7 +109,7 @@ export function MutualisationPage() {
                     <Input label="Clé de répartition (justification)" value={mut.cle_justification} onChange={e => setMut({ ...mut, cle_justification: e.target.value })} />
 
                     <div className="space-y-2">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <label className="text-sm font-semibold">Répartition</label>
                             <span className={cn("text-xs font-mono", Math.abs(sumPct - 100) < 0.01 ? "text-green-600" : "text-orange-600")}>Σ = {sumPct}%</span>
                         </div>

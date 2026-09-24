@@ -57,7 +57,7 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
                         <tbody className="[&_tr:last-child]:border-0">
                             {depenses?.map((depense, i) => (
                                 <tr key={i} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                    <td className="p-4 align-middle">{depense.date}</td>
+                                    <td className="p-4 align-middle whitespace-nowrap">{depense.date}</td>
                                     <td className="p-4 align-middle font-medium">
                                         {depense.libelle}
                                         {depense.is_nature && (

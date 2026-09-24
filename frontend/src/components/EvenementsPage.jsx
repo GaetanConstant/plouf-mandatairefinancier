@@ -40,7 +40,7 @@ export function EvenementsPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Événements</h1>
                     <p className="text-muted-foreground">Regroupez vos dépenses par événement (coût calculé par quote-part).</p>
@@ -79,11 +79,11 @@ export function EvenementsPage() {
             <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Nouvel événement">
                 <div className="space-y-4">
                     <Input label="Titre" value={form.titre} onChange={e => setForm({ ...form, titre: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Select label="Type" options={TYPES_EVT} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} />
                         <Input label="Lieu" value={form.lieu} onChange={e => setForm({ ...form, lieu: e.target.value })} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input label="Date de début" type="date" value={form.date_debut} onChange={e => setForm({ ...form, date_debut: e.target.value })} />
                         <Input label="Date de fin" type="date" value={form.date_fin} onChange={e => setForm({ ...form, date_fin: e.target.value })} />
                     </div>

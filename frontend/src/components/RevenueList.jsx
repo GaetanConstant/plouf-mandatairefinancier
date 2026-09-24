@@ -46,7 +46,7 @@ export function RevenueList({ cible = null, onCibleConsommee }) {
                                     ref={recette.id === cible ? ligneCible : null}
                                     className={cn("border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
                                         recette.id === cible && "bg-amber-50 ring-2 ring-inset ring-amber-400")}>
-                                    <td className="p-4 align-middle">{recette.date}</td>
+                                    <td className="p-4 align-middle whitespace-nowrap">{recette.date}</td>
                                     <td className="p-4 align-middle font-medium">{recette.nom_donateur}</td>
                                     <td className="p-4 align-middle">{recette.type}</td>
                                     <td className="p-4 align-middle">

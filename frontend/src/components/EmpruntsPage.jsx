@@ -40,7 +40,7 @@ export function EmpruntsPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Emprunts</h1>
                     <p className="text-muted-foreground">Contrats de prêt (banque / parti / personne physique) — détail exigé par la CNCCFP.</p>
@@ -85,15 +85,15 @@ export function EmpruntsPage() {
                     ) : (
                         <Input label={f.type === 'banque' ? "Établissement prêteur" : "Parti / groupement prêteur"} value={f.preteur_nom} onChange={e => setF({ ...f, preteur_nom: e.target.value })} />
                     )}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Input label="Pays" value={f.preteur_pays} onChange={e => setF({ ...f, preteur_pays: e.target.value })} />
                         <Input label="Montant (€)" type="number" value={f.montant} onChange={e => setF({ ...f, montant: e.target.value })} />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Input label="Date du contrat" type="date" value={f.date_contrat} onChange={e => setF({ ...f, date_contrat: e.target.value })} />
                         <Input label="Date de fin" type="date" value={f.date_fin} onChange={e => setF({ ...f, date_fin: e.target.value })} />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Input label="Durée (mois)" type="number" value={f.duree_mois} onChange={e => setF({ ...f, duree_mois: e.target.value })} />
                         <Input label="Taux d'intérêt (%)" type="number" value={f.taux} onChange={e => setF({ ...f, taux: e.target.value })} />
                     </div>

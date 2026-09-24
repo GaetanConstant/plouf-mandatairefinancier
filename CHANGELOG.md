@@ -10,6 +10,13 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.15.2 — 2026-09-24 — Utilisable sur téléphone
+
+### Corrigé
+- Le menu occupait 256 pixels fixes : sur un téléphone, il ne restait qu'une centaine de pixels au contenu. Il devient un tiroir, ouvert par un bouton et refermé dès qu'on navigue.
+- Les tableaux trop larges faisaient déborder la page entière ; ils défilent désormais dans leur cadre, et les dates ne se coupent plus sur trois lignes.
+- Les formulaires à deux colonnes s'empilent sous 640 pixels, les en-têtes passent à la ligne au lieu d'écraser leur titre, et les marges s'ajustent à la taille de l'écran.
+
 ## v0.15.1 — 2026-09-24 — Dépôt de justificatif par la direction
 
 ### Ajouté
