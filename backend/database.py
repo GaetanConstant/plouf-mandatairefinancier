@@ -51,8 +51,12 @@ CREATE TABLE IF NOT EXISTS user_campaigns (
 # campagne et simple militant sur une autre.
 ROLE_MANDATAIRE = "mandataire"
 ROLE_EXPERT = "expert_comptable"
+# La direction de campagne pilote : elle lit la comptabilité et dépose comme
+# l'équipe, mais n'accède pas aux donateurs — un don politique est une donnée
+# personnelle sensible, le cercle qui y accède reste le plus étroit possible.
+ROLE_DIRECTION = "direction"
 ROLE_EQUIPE = "equipe"
-ROLES = (ROLE_MANDATAIRE, ROLE_EXPERT, ROLE_EQUIPE)
+ROLES = (ROLE_MANDATAIRE, ROLE_EXPERT, ROLE_DIRECTION, ROLE_EQUIPE)
 
 
 def _connect() -> sqlite3.Connection:

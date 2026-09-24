@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.15.0 — 2026-09-24 — Direction de campagne
+
+- Nouveau rôle « direction de campagne » : il lit la comptabilité — tableau de bord, plafond, dépenses, justificatifs, conformité, main courante — et dépose comme l'équipe, sous validation du mandataire.
+- La direction ne voit pas l'identité des donateurs : l'écran des recettes lui est fermé, et les noms sont remplacés par une mention neutre dans la main courante et les alertes de conformité. Un don politique est une donnée personnelle sensible.
+- La page de connexion propose « totoenvacances » en exemple d'identifiant, comme les autres applications Plouf.
+
 ## v0.14.1 — 2026-09-23 — Correction du chargement sans fin
 
 ### Corrigé

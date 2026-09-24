@@ -66,7 +66,17 @@ def _alerte(code, niveau, message, entite=None, entite_id=None):
             "entite": entite, "entite_id": entite_id}
 
 
-def run_checks(campaign_id: str) -> dict:
+DONATEUR_MASQUE = "un donateur"
+
+
+def run_checks(campaign_id: str, voir_donateurs: bool = True) -> dict:
+    """Contrôles de conformité du compte.
+
+    `voir_donateurs=False` remplace l'identité des donateurs par une mention
+    neutre : la direction de campagne doit voir qu'une règle est enfreinte sans
+    apprendre qui a donné. L'alerte reste actionnable, elle porte l'identifiant
+    de la recette.
+    """
     ensure_campaign_db(campaign_id)
     alertes: list[dict] = []
 
@@ -90,7 +100,7 @@ def run_checks(campaign_id: str) -> dict:
             if r.categorie != enums.CategorieRecette.don:
                 continue
             don = r.donateur
-            nom = don.nom if don else "Donateur inconnu"
+            nom = (don.nom if don else "Donateur inconnu") if voir_donateurs else DONATEUR_MASQUE
             if don:
                 noms[don.id] = nom
                 dons_par_donateur[don.id] = dons_par_donateur.get(don.id, 0.0) + r.montant

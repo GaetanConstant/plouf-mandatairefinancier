@@ -103,7 +103,7 @@ export function LoginPage({ onLogin }) {
                     <form onSubmit={handleSubmit}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <label style={labelStyle}>Identifiant</label>
-                            <input type="text" placeholder="gconstant" required autoComplete="username"
+                            <input type="text" placeholder="totoenvacances" required autoComplete="username"
                                 value={username} onChange={(e) => setUsername(e.target.value)}
                                 style={inputStyle} onFocus={focusOn} onBlur={focusOff} />
                         </div>

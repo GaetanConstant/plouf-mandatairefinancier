@@ -8,6 +8,7 @@ import { API_URL } from '../lib/api';
 const ROLES = [
     { value: 'mandataire', label: 'Mandataire — accès complet' },
     { value: 'expert_comptable', label: 'Expert-comptable — lit le compte, demande des pièces' },
+    { value: 'direction', label: 'Direction de campagne — lit la compta, dépose' },
     { value: 'equipe', label: "Équipe — dépose, soumis à validation" },
 ];
 

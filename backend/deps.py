@@ -17,6 +17,7 @@ from fastapi import Depends, HTTPException, Request
 # Ré-export pratique pour les routers.
 from auth import get_current_user  # noqa: F401
 from database import (  # noqa: F401
+    ROLE_DIRECTION,
     ROLE_EQUIPE,
     ROLE_EXPERT,
     ROLE_MANDATAIRE,
@@ -82,5 +83,9 @@ def exiger_role(*roles_autorises: str) -> Callable:
 
 # Gardes prêtes à l'emploi, pour que les routers restent lisibles.
 mandataire_requis = exiger_role(ROLE_MANDATAIRE)
-mandataire_ou_expert = exiger_role(ROLE_MANDATAIRE, ROLE_EXPERT)
-tout_role = exiger_role(ROLE_MANDATAIRE, ROLE_EXPERT, ROLE_EQUIPE)
+# « mandataire ou expert » reste le nom d'usage de la lecture comptable, que la
+# direction de campagne partage désormais — sauf les recettes nominatives,
+# restreintes route par route.
+mandataire_ou_expert = exiger_role(ROLE_MANDATAIRE, ROLE_EXPERT, ROLE_DIRECTION)
+lecture_donateurs = exiger_role(ROLE_MANDATAIRE, ROLE_EXPERT)
+tout_role = exiger_role(ROLE_MANDATAIRE, ROLE_EXPERT, ROLE_DIRECTION, ROLE_EQUIPE)
