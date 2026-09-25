@@ -63,6 +63,25 @@ class StatutRecuDon(str, enum.Enum):
     non_utilise = "non_utilise"
 
 
+class BeneficiaireDevolution(str, enum.Enum):
+    """Destinataires admis par l'article L. 52-6."""
+    parti = "parti"                    # mandataire d'une formation politique
+    association = "association"        # association d'intérêt général, 3 ans d'existence
+    fonds_vie_associative = "fonds"    # destination d'office à défaut de décision
+
+
+class PriseEnCharge(str, enum.Enum):
+    """Colonne verticale du formulaire CNCCFP où figure la dépense.
+
+    Le formulaire sépare ce que règle le mandataire de ce qu'une formation
+    politique paie directement au prestataire. Les concours en nature forment
+    la troisième colonne, mais ce sont des objets distincts (`ConcoursNature`),
+    pas des dépenses.
+    """
+    mandataire = "mandataire"
+    parti = "parti"
+
+
 class OrigineConcours(str, enum.Enum):
     candidat = "candidat"
     parti = "parti"

@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.17.0 — 2026-09-25 — Mise en conformité avec le guide du mandataire
+
+- **Concours en nature** : un écran dédié les déclare avec leur origine — candidat, formation politique ou tiers personne physique —, leur nature, leur valeur et la méthode d'évaluation. Ils alimentent les annexes 4 et 4.1 du compte, et consomment le plafond légal sans toucher la trésorerie.
+- **Prise en charge des dépenses** : une dépense indique si elle est réglée par le mandataire ou directement par un parti. L'export produit la ventilation verticale qu'attend le formulaire.
+- **Classement des pièces** : les justificatifs sortent désormais dans l'ordre de la nomenclature comptable, et non plus par date d'ajout. Un dossier rendu dans l'ancien ordre était à reclasser à la main.
+- **Relevés bancaires au dossier** : le fichier importé devient une pièce de l'enveloppe B, où le guide l'exige. Son absence bloque désormais l'export.
+- **Pièces déclaratives** : les récépissés de candidature et de déclaration du mandataire se déposent depuis l'écran Identité et sont exigés au dépôt.
+- **Dévolution de l'excédent** : l'écran Dépôt calcule l'excédent, dit s'il provient de l'apport personnel — auquel cas rien n'est dû — ou de financements extérieurs, et permet de consigner la décision.
+
 ## v0.16.0 — 2026-09-25 — Relevés bancaires et rapprochement
 
 - Import d'un relevé bancaire de trois façons : fichier CSV de la banque, copier-coller des lignes, ou photo et PDF reconnus par OCR. Les transactions lues s'affichent en aperçu, à relire avant d'enregistrer.

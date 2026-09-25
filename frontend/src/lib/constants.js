@@ -13,6 +13,17 @@ export const CATEGORIES_CNCCFP = [
     { code: "I1", label: "Divers" },
 ];
 
+export const PRISES_EN_CHARGE = [
+    { value: "mandataire", label: "Payée par le mandataire" },
+    { value: "parti", label: "Payée directement par un parti" },
+];
+
+export const ORIGINES_CONCOURS = [
+    { value: "candidat", label: "Candidat" },
+    { value: "parti", label: "Formation politique" },
+    { value: "tiers_pp", label: "Tiers personne physique" },
+];
+
 export const TYPES_PIECE = [
     { value: "devis", label: "Devis" },
     { value: "facture", label: "Facture" },

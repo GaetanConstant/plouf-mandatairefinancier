@@ -304,6 +304,8 @@ class Depense(Tracable, Base):
     rapprochement: Mapped[bool] = mapped_column(Boolean, default=False)
     num_piece: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     rubrique_imputation: Mapped[str] = mapped_column(String(32))  # 6xxx (validée au service)
+    prise_en_charge: Mapped[enums.PriseEnCharge] = mapped_column(
+        _enum(enums.PriseEnCharge), default=enums.PriseEnCharge.mandataire)
     facture_doc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document.id"), nullable=True)
     type_support: Mapped[Optional[enums.TypeSupport]] = mapped_column(_enum(enums.TypeSupport), nullable=True)
     statut: Mapped[enums.StatutDepense] = mapped_column(_enum(enums.StatutDepense), default=enums.StatutDepense.engage)
@@ -575,6 +577,32 @@ class ImputationBancaire(Base):
     montant: Mapped[float] = mapped_column(Float)
 
     transaction: Mapped["TransactionBancaire"] = relationship(back_populates="imputations")
+
+
+class Devolution(Base):
+    """Dévolution de l'excédent du compte (articles L. 52-5 et L. 52-6).
+
+    Quand le compte est excédentaire et que l'excédent provient de dons ou
+    d'apports de partis, le solde ne peut pas rester au candidat : il est dévolu
+    au mandataire d'une formation politique, à une association d'intérêt
+    général déclarée depuis trois ans au moins, ou au fonds pour le
+    développement de la vie associative.
+
+    À défaut de décision dans les délais — ou si la dévolution est refusée —
+    l'actif net est versé d'office à ce fonds.
+    """
+
+    __tablename__ = "devolution"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    election_id: Mapped[int] = mapped_column(ForeignKey("election.id"))
+    beneficiaire_type: Mapped[enums.BeneficiaireDevolution] = mapped_column(
+        _enum(enums.BeneficiaireDevolution))
+    beneficiaire_nom: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    montant: Mapped[float] = mapped_column(Float)
+    date_decision: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    justificatif_doc_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document.id"), nullable=True)
+    commentaire: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class Echeance(Base):

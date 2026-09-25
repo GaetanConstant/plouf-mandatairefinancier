@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import logging
 import re
 import unicodedata
@@ -26,10 +27,12 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from db.helpers import fmt_date as _fmt, valides as _valides
-from db.models import Depense, ImputationBancaire, Releve, TransactionBancaire
+from db.helpers import fmt_date as _fmt, media_type, valides as _valides
+from db.models import Depense, Document, ImputationBancaire, Releve, TransactionBancaire
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
+import validation
+from database import ROLE_MANDATAIRE
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +283,21 @@ def create_releve(campaign_id: str, payload: ReleveIn, auteur: str) -> dict:
         raise HTTPException(status_code=400, detail="Une transaction porte une date illisible.")
 
     with campaign_session(campaign_id) as s:
+        # Le relevé lui-même est une pièce du dossier : le guide l'exige en
+        # enveloppe B, « eux seuls permettent de s'assurer du règlement effectif
+        # des dépenses ». Sans le fichier d'origine, l'import reste possible
+        # mais la pièce manquera au dépôt.
+        if payload.fichier:
+            fichier = os.path.basename(payload.fichier)
+            piece = Document(
+                type=enums.TypeDocument.releve_bancaire,
+                media_type=media_type(fichier),
+                fichier=fichier,
+                enveloppe=enums.Enveloppe.B,
+            )
+            validation.estampiller(piece, auteur, ROLE_MANDATAIRE)
+            s.add(piece)
+
         releve = Releve(
             libelle=payload.libelle, source=source, fichier=payload.fichier,
             date_debut=min(jours), date_fin=max(jours),

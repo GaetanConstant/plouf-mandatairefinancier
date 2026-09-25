@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Save, User, Briefcase, Landmark, Calculator, Vote, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Save, User, Briefcase, Landmark, Calculator, Vote, AlertTriangle, CheckCircle2, FileCheck } from 'lucide-react';
 import { Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -121,11 +121,84 @@ export function IdentitePage({ cible = null, onCibleConsommee }) {
             </header>
 
             {completude && <BandeauCompletude etat={completude} sectionListe={sectionListe} />}
+
+            <PiecesDeclaratives etat={parCle.pieces_declaratives} />
             {SECTIONS.map(section => (
                 <IdentitySection key={section.key} section={section} initial={data?.[section.key] || {}}
                     etat={parCle[section.key]} cible={cible === section.key}
                     onCibleConsommee={onCibleConsommee} />
             ))}
+        </div>
+    );
+}
+
+/**
+ * Récépissés délivrés par la préfecture, exigés en enveloppe B du compte.
+ * Les colonnes existaient dans le modèle sans que rien ne les alimente.
+ */
+function PiecesDeclaratives({ etat }) {
+    const queryClient = useQueryClient();
+    const [erreur, setErreur] = useState('');
+
+    const { data: pieces } = useQuery({
+        queryKey: ['pieces-declaratives'],
+        queryFn: async () => (await axios.get(`${API_URL}/identite/pieces-declaratives`)).data,
+    });
+
+    const deposer = useMutation({
+        mutationFn: async ({ cle, fichier }) => {
+            const body = new FormData();
+            body.append('file', fichier);
+            const { data } = await axios.post(`${API_URL}/upload`, body, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            await axios.put(`${API_URL}/identite/pieces-declaratives/${cle}`, { fichier: data.path });
+        },
+        onSuccess: () => ['pieces-declaratives', 'completude', 'documents']
+            .forEach(k => queryClient.invalidateQueries([k])),
+        onError: (err) => setErreur(err.response?.data?.detail || 'Dépôt impossible.'),
+    });
+
+    const incomplet = etat && !etat.complet;
+
+    return (
+        <div className={`rounded-xl border bg-card p-6 shadow-sm ${incomplet ? 'border-red-300' : 'border-border'}`}>
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+                <FileCheck className={`h-5 w-5 ${incomplet ? 'text-red-600' : 'text-primary'}`} />
+                <h2 className="text-lg font-bold">Pièces déclaratives</h2>
+                {etat && (
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                        incomplet ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                        {etat.remplis}/{etat.requis}
+                    </span>
+                )}
+            </div>
+            <p className="mb-4 text-sm text-muted-foreground">
+                Récépissés délivrés par la préfecture. Ils partent en enveloppe B du compte.
+            </p>
+
+            <div className="space-y-2">
+                {(pieces || []).map(p => (
+                    <div key={p.cle} className="flex flex-wrap items-center gap-3 rounded-md bg-muted/40 px-3 py-2">
+                        <span className="flex-1 text-sm">
+                            {p.libelle}
+                            {p.fichier && <span className="block text-xs text-muted-foreground">{p.fichier}</span>}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                            p.fournie ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                            {p.fournie ? 'fournie' : 'manquante'}
+                        </span>
+                        <label className="cursor-pointer text-xs font-medium text-primary hover:underline">
+                            {p.fournie ? 'Remplacer' : 'Déposer'}
+                            <input type="file" className="hidden"
+                                onChange={e => e.target.files[0] && deposer.mutate({ cle: p.cle, fichier: e.target.files[0] })} />
+                        </label>
+                    </div>
+                ))}
+            </div>
+            {erreur && <p className="mt-2 text-sm text-destructive">{erreur}</p>}
         </div>
     );
 }

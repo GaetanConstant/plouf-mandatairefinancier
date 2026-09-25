@@ -169,6 +169,8 @@ function ImportReleve({ onClose }) {
 
     const echoue = (err) => setErreur(err.response?.data?.detail || 'Lecture impossible.');
 
+    const [fichierDepose, setFichierDepose] = useState(null);
+
     const lireFichier = useMutation({
         mutationFn: async ({ fichier, route }) => {
             const body = new FormData();
@@ -176,9 +178,15 @@ function ImportReleve({ onClose }) {
             const { data } = await axios.post(`${API_URL}/releves/${route}`, body, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            return data;
+            // Le relevé lui-même part en enveloppe B du dossier de dépôt.
+            const conserve = new FormData();
+            conserve.append('file', fichier);
+            const { data: piece } = await axios.post(`${API_URL}/upload`, conserve, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            return { ...data, chemin: piece.path };
         },
-        onSuccess: (data) => { setApercu(data.transactions); setErreur(''); },
+        onSuccess: (data) => { setApercu(data.transactions); setFichierDepose(data.chemin); setErreur(''); },
         onError: echoue,
     });
 
@@ -190,11 +198,12 @@ function ImportReleve({ onClose }) {
 
     const enregistrer = useMutation({
         mutationFn: async () => axios.post(`${API_URL}/releves`, {
-            libelle, source: voie === 'texte' ? 'manuel' : voie, transactions: apercu,
+            libelle, source: voie === 'texte' ? 'manuel' : voie,
+            fichier: fichierDepose, transactions: apercu,
         }),
         onSuccess: () => {
-            queryClient.invalidateQueries(['releves']);
-            queryClient.invalidateQueries(['rapprochement-depenses']);
+            ['releves', 'rapprochement-depenses', 'documents', 'completude']
+                .forEach(k => queryClient.invalidateQueries([k]));
             onClose();
         },
         onError: echoue,
@@ -244,6 +253,10 @@ function ImportReleve({ onClose }) {
                             route: voie === 'csv' ? 'lire-csv' : 'lire-image',
                         })}
                     />
+                    <p className="text-[11px] text-muted-foreground">
+                        Le fichier est conservé comme pièce du dossier : le relevé bancaire
+                        est exigé en enveloppe B.
+                    </p>
                     {voie === 'ocr' && (
                         <p className="text-[11px] text-muted-foreground">
                             La reconnaissance se trompe : relisez l'aperçu avant d'enregistrer.

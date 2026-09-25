@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CATEGORIES_CNCCFP, STATUTS_DEPENSE, TYPES_PIECE } from '../lib/constants';
+import { CATEGORIES_CNCCFP, PRISES_EN_CHARGE, STATUTS_DEPENSE, TYPES_PIECE } from '../lib/constants';
 import { Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -20,6 +20,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
         montant_ttc: expense?.montant_ttc ?? '',
         tva: expense?.tva ?? '',
         categorie_cnccfp: expense?.categorie_cnccfp || CATEGORIES_CNCCFP[0].code,
+        prise_en_charge: expense?.prise_en_charge || PRISES_EN_CHARGE[0].value,
         statut: expense?.statut || STATUTS_DEPENSE[0].value,
         justificatif_path: expense?.justificatif_path || null,
         type_piece: expense?.type_piece || TYPES_PIECE[1].value,
@@ -184,6 +185,13 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                     error={errors.fournisseur}
                 />
             )}
+
+            <Select
+                label="Prise en charge"
+                options={PRISES_EN_CHARGE}
+                value={formData.prise_en_charge}
+                onChange={e => setFormData({ ...formData, prise_en_charge: e.target.value })}
+            />
 
             <Select
                 label="Catégorie CNCCFP"
