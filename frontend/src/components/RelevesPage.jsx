@@ -64,7 +64,7 @@ export function RelevesPage() {
                         </span>
                         {r.nb_orphelines > 0 ? (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
-                                {r.nb_orphelines} à rapprocher
+                                {r.nb_orphelines} débit(s) à rapprocher
                             </span>
                         ) : (
                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
@@ -90,7 +90,10 @@ export function RelevesPage() {
                                         t.sens === 'debit' ? 'text-foreground' : 'text-emerald-600')}>
                                         {t.sens === 'debit' ? '−' : '+'}{eur(t.montant)}
                                     </span>
-                                    {t.rapprochee ? (
+                                    {t.sens === 'credit' ? (
+                                        // Un encaissement est une recette : il ne règle pas une dépense.
+                                        <span className="text-xs text-muted-foreground">encaissement</span>
+                                    ) : t.rapprochee ? (
                                         <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
                                             <Check className="h-3.5 w-3.5" /> rapprochée
                                         </span>

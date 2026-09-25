@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.17.1 — 2026-09-25 — Correctifs du rapprochement bancaire
+
+### Corrigé
+- Supprimer un relevé laissait ses dépenses marquées « payées » et « rapprochées », en pointant un relevé qui n'existait plus : la trésorerie comptait un décaissement sans ligne bancaire derrière.
+- Une ligne au crédit pouvait régler une dépense. Un encaissement est une recette : le rapprochement aux dépenses ne concerne plus que les débits, et le compteur « à rapprocher » ne compte plus les crédits.
+- L'écran Dépôt affichait « Export impossible » et « Prêt à déposer » côte à côte. Le second ne parle que des motifs de rejet et le dit désormais.
+- La navigation débordait sur un écran de 720 pixels dès qu'un groupe de six entrées s'ouvrait. Elle tient maintenant sans défilement.
+- L'accord exprès du mandataire, facultatif au dépôt, s'affichait comme « manquant » au même titre que les deux récépissés exigés.
+
 ## v0.17.0 — 2026-09-25 — Mise en conformité avec le guide du mandataire
 
 - **Concours en nature** : un écran dédié les déclare avec leur origine — candidat, formation politique ou tiers personne physique —, leur nature, leur valeur et la méthode d'évaluation. Ils alimentent les annexes 4 et 4.1 du compte, et consomment le plafond légal sans toucher la trésorerie.

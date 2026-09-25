@@ -239,7 +239,10 @@ def _releve_dict(s, r: Releve) -> dict:
         select(TransactionBancaire)
         .where(TransactionBancaire.releve_id == r.id)
         .order_by(TransactionBancaire.date_operation)).all()]
-    rapprochees = sum(1 for t in transactions if t["rapprochee"])
+    # Seuls les débits se rapprochent de dépenses : compter les crédits
+    # empêcherait le compteur de tomber à zéro sur un relevé qui en porte un.
+    debits = [t for t in transactions if t["sens"] == "debit"]
+    rapprochees = sum(1 for t in debits if t["rapprochee"])
     return {
         "id": r.id,
         "libelle": r.libelle,
@@ -249,8 +252,9 @@ def _releve_dict(s, r: Releve) -> dict:
         "importe_par": r.importe_par,
         "importe_le": r.importe_le.isoformat() if r.importe_le else None,
         "nb_transactions": len(transactions),
+        "nb_rapprochables": len(debits),
         "nb_rapprochees": rapprochees,
-        "nb_orphelines": len(transactions) - rapprochees,
+        "nb_orphelines": len(debits) - rapprochees,
         "total_debit": round(sum(t["montant"] for t in transactions if t["sens"] == "debit"), 2),
         "total_credit": round(sum(t["montant"] for t in transactions if t["sens"] == "credit"), 2),
         "transactions": transactions,
@@ -317,12 +321,27 @@ def create_releve(campaign_id: str, payload: ReleveIn, auteur: str) -> dict:
 
 
 def delete_releve(campaign_id: str, releve_id: int) -> dict:
-    """Supprime un relevé, ses transactions et leurs rapprochements."""
+    """Supprime un relevé, ses transactions et leurs rapprochements.
+
+    Les dépenses que ce relevé réglait redeviennent non rapprochées : la
+    cascade efface les imputations sans rien dire aux dépenses, qui resteraient
+    sinon « payées » en pointant un relevé disparu.
+    """
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
         r = s.get(Releve, releve_id)
-        if r:
-            s.delete(r)
+        if not r:
+            return {"message": "Relevé supprimé."}
+        concernees = list(s.scalars(
+            select(ImputationBancaire.depense_id)
+            .join(TransactionBancaire, TransactionBancaire.id == ImputationBancaire.transaction_id)
+            .where(TransactionBancaire.releve_id == releve_id)).all())
+        s.delete(r)
+        s.flush()
+        for depense_id in set(concernees):
+            depense = s.get(Depense, depense_id)
+            if depense:
+                _actualiser_depense(s, depense, None)
     return {"message": "Relevé supprimé."}
 
 
@@ -340,6 +359,10 @@ def imputer(campaign_id: str, transaction_id: int, payload: ImputationIn) -> dic
         t = s.get(TransactionBancaire, transaction_id)
         if not t:
             raise HTTPException(status_code=404, detail="Transaction introuvable")
+        if t.sens != enums.SensTransaction.debit:
+            raise HTTPException(
+                status_code=400,
+                detail="Cette ligne est un encaissement : elle ne peut pas régler une dépense.")
         d = s.get(Depense, payload.depense_id)
         if not d:
             raise HTTPException(status_code=404, detail="Dépense introuvable")
@@ -380,9 +403,15 @@ def _actualiser_depense(s, depense: Depense, transaction: Optional[TransactionBa
         depense.statut = enums.StatutDepense.paye
         if transaction is not None:
             depense.num_releve_bancaire = transaction.releve.libelle
-    elif impute == 0:
-        depense.rapprochement = False
+    else:
+        # Plus rien ne la règle entièrement : elle redevient une facture en
+        # attente. On ne restaure pas un éventuel statut « engagé » d'origine,
+        # que le rapprochement n'a pas mémorisé — mais laisser « payée » une
+        # dépense sans ligne bancaire fausserait la trésorerie et le dossier.
+        depense.reglee = False
         depense.num_releve_bancaire = None
+        if depense.statut == enums.StatutDepense.paye:
+            depense.statut = enums.StatutDepense.facture
 
 
 def desimputer(campaign_id: str, imputation_id: int) -> dict:

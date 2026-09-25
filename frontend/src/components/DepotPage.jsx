@@ -108,18 +108,25 @@ export function DepotPage() {
                 </div>
             )}
 
-            <Devolution />
-
             <div className={cn("rounded-2xl border p-6 flex items-center gap-4",
                 pret ? "border-green-200 bg-green-50/10" : "border-red-200 bg-red-50/10")}>
                 {pret ? <ShieldCheck className="w-10 h-10 text-green-600" /> : <ShieldAlert className="w-10 h-10 text-red-600" />}
                 <div>
-                    <h2 className="text-xl font-bold">{pret ? "Prêt à déposer" : "Points bloquants à corriger"}</h2>
+                    <h2 className="text-xl font-bold">
+                        {pret ? "Aucun motif de rejet" : "Points bloquants à corriger"}
+                    </h2>
                     <p className="text-sm text-muted-foreground">
                         Enveloppe A : {etat?.pieces_A?.length || 0} pièces · Enveloppe B : {etat?.pieces_B?.length || 0} · Non classées : {etat?.pieces_non_classees?.length || 0}
                     </p>
+                    {pret && !exportable && (
+                        <p className="mt-1 text-sm text-amber-700">
+                            Le dossier reste incomplet : voir les éléments manquants ci-dessus.
+                        </p>
+                    )}
                 </div>
             </div>
+
+            <Devolution />
 
             {etat?.alertes_bloquantes?.length > 0 && (
                 <div className="rounded-md border border-red-200 bg-red-50/5 p-4 space-y-1">

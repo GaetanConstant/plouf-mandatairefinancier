@@ -11,6 +11,8 @@ from fastapi import HTTPException
 import comptes
 import maincourante
 import releves
+from db.session import campaign_session
+from db import enums
 from database import ROLE_MANDATAIRE
 from models import Depense
 from _fixture import fresh_campaign, teardown, run_tests
@@ -162,6 +164,82 @@ def test_retirer_une_imputation_defait_le_reglement():
 
         releves.desimputer(cid, t["imputations"][0]["id"])
         assert releves.depenses_a_rapprocher(cid)[0]["reste"] == 300.0
+    finally:
+        teardown(cid)
+
+
+def test_supprimer_un_releve_defait_le_reglement_des_depenses():
+    """Sans cela, la dépense reste « payée » en pointant un relevé disparu :
+    la trésorerie compte un décaissement sans ligne bancaire derrière."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(1000.0, "Salle"), "gconstant", ROLE_MANDATAIRE)
+        dep = comptes.list_depenses(cid)[0]
+        r = _releve(cid, [{"date_operation": "2026-09-21", "libelle": "CHQ SALLE",
+                           "montant": 1000.0, "sens": "debit"}])
+        releves.imputer(cid, r["transactions"][0]["id"], releves.ImputationIn(depense_id=dep["id"]))
+
+        with campaign_session(cid) as s:
+            from db.models import Depense as D
+            d = s.get(D, dep["id"])
+            assert d.rapprochement and d.reglee and d.num_releve_bancaire
+
+        releves.delete_releve(cid, r["id"])
+
+        with campaign_session(cid) as s:
+            from db.models import Depense as D
+            d = s.get(D, dep["id"])
+            assert not d.rapprochement, "plus rien ne la rapproche"
+            assert not d.reglee, "plus rien ne la règle"
+            assert d.num_releve_bancaire is None, "le relevé n'existe plus"
+            assert d.statut != enums.StatutDepense.paye
+
+        assert releves.depenses_a_rapprocher(cid)[0]["reste"] == 1000.0
+    finally:
+        teardown(cid)
+
+
+def test_un_encaissement_ne_peut_pas_regler_une_depense():
+    """Un crédit est une recette. L'imputer à une dépense fausse le compte."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(500.0), "gconstant", ROLE_MANDATAIRE)
+        dep = comptes.list_depenses(cid)[0]
+        r = _releve(cid, [{"date_operation": "2026-09-22", "libelle": "VIR RECU DON",
+                           "montant": 2000.0, "sens": "credit"}])
+
+        try:
+            releves.imputer(cid, r["transactions"][0]["id"],
+                            releves.ImputationIn(depense_id=dep["id"], montant=500.0))
+        except HTTPException as e:
+            assert e.status_code == 400
+            assert "encaissement" in e.detail
+        else:
+            raise AssertionError("imputer un crédit à une dépense doit être refusé")
+
+        assert releves.depenses_a_rapprocher(cid)[0]["reste"] == 500.0
+    finally:
+        teardown(cid)
+
+
+def test_le_compteur_a_rapprocher_ignore_les_credits():
+    """Sinon il ne tombe jamais à zéro sur un relevé portant un encaissement."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(300.0), "gconstant", ROLE_MANDATAIRE)
+        dep = comptes.list_depenses(cid)[0]
+        r = _releve(cid, [
+            {"date_operation": "2026-09-10", "libelle": "VIR FOURNISSEUR", "montant": 300.0, "sens": "debit"},
+            {"date_operation": "2026-09-12", "libelle": "VIR RECU DON", "montant": 200.0, "sens": "credit"},
+        ])
+        assert r["nb_rapprochables"] == 1
+        assert r["nb_orphelines"] == 1
+
+        debit = [t for t in r["transactions"] if t["sens"] == "debit"][0]
+        releves.imputer(cid, debit["id"], releves.ImputationIn(depense_id=dep["id"]))
+
+        etat = releves.list_releves(cid)[0]
+        assert etat["nb_orphelines"] == 0, "le crédit ne doit pas empêcher le compteur d'arriver à zéro"
     finally:
         teardown(cid)
 
