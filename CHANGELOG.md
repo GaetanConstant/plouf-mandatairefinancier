@@ -10,6 +10,16 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.18.0 — 2026-09-25 — Numérotation des pièces comptables
+
+### Ajouté
+- Chaque dépense et chaque recette porte désormais un numéro de pièce (`D001`, `R001`), attribué à son enregistrement et visible dans les tableaux Dépenses, Recettes et dans la main courante. La colonne « N° pièce » existait déjà partout mais restait vide : rien ne l'avait jamais remplie.
+- Les justificatifs du dossier exporté sont nommés et classés d'après le numéro de l'écriture qu'ils justifient (`Enveloppe_A/D001_facture.pdf`). Une ligne du journal se retrouve dans l'enveloppe sans avoir à la chercher. Les pièces déclaratives, qui ne sont pas des écritures, conservent leur rang dans l'enveloppe.
+- Les écritures déjà saisies ont été numérotées dans l'ordre chronologique, celui du journal.
+
+### Modifié
+- Les pièces de l'enveloppe sortent dans l'ordre du bordereau, et non plus dans l'ordre où elles ont été versées.
+
 ## v0.17.2 — 2026-09-25 — Démarrage local sans conflit de ports
 
 ### Corrigé
