@@ -91,6 +91,18 @@ class TypeEvenement(str, enum.Enum):
     autre = "autre"
 
 
+class SensTransaction(str, enum.Enum):
+    """Sens d'une ligne de relevé, du point de vue du compte de campagne."""
+    debit = "debit"
+    credit = "credit"
+
+
+class SourceReleve(str, enum.Enum):
+    csv = "csv"
+    ocr = "ocr"
+    manuel = "manuel"
+
+
 class StatutValidation(str, enum.Enum):
     """Cycle de vie d'un objet soumis au mandataire.
 

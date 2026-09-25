@@ -54,6 +54,9 @@ def journal(campaign_id: str, voir_donateurs: bool = True) -> list[dict]:
             lignes.append({
                 "sens": "recette",
                 "date": _fmt(r.date_versement),
+                "date_facture": _fmt(r.date_versement),
+                "date_paiement": None,
+                "libelle_releve": None,
                 "num_piece": r.num_piece,
                 "num_cheque_remise": r.num_cheque_remise,
                 "rubrique": r.rubrique_imputation,
@@ -66,10 +69,20 @@ def journal(campaign_id: str, voir_donateurs: bool = True) -> list[dict]:
                 "num_releve": r.num_releve_bancaire,
                 "rapprochement": r.rapprochement,
             })
+        # Date de paiement et libellé du relevé viennent du rapprochement
+        # bancaire : une dépense non rapprochée les laisse vides, ce qui rend
+        # visible d'un coup d'œil ce qui reste à régler.
+        import releves
+        paiements = releves.paiements_par_depense(campaign_id)
+
         for d in s.scalars(_valides(select(Depense), Depense)).all():
+            paiement = paiements.get(d.id, {})
             lignes.append({
                 "sens": "depense",
-                "date": _fmt(d.date_reglement),
+                "date": _fmt(d.date_facture),
+                "date_facture": _fmt(d.date_facture),
+                "date_paiement": paiement.get("date_paiement"),
+                "libelle_releve": paiement.get("libelle_releve"),
                 "num_piece": d.num_piece,
                 "num_cheque_remise": d.num_cheque_remise,
                 "rubrique": d.rubrique_imputation,

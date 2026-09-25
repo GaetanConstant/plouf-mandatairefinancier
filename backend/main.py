@@ -33,6 +33,7 @@ from routers import (
     mutualisation as mutualisation_routes,
     annexes as annexes_routes,
     validation as validation_routes,
+    releves as releves_routes,
 )
 import os
 import re
@@ -579,6 +580,7 @@ app.include_router(pilotage_routes.router)
 app.include_router(mutualisation_routes.router)
 app.include_router(annexes_routes.router)
 app.include_router(validation_routes.router)
+app.include_router(releves_routes.router)
 
 
 if __name__ == "__main__":

@@ -213,7 +213,7 @@ def migrate_campaign(campaign_id: str, force: bool = False) -> None:
                 nature=categorie or libelle,  # libellé humain = ancienne catégorie
                 montant_ttc=float(montant_ttc or 0),
                 tva=float(tva) if tva is not None else None,
-                date_reglement=d,
+                date_facture=d,
                 mode=None,  # inconnu dans le legacy
                 rubrique_imputation=_RUBRIQUE_DEPENSE_DEFAUT,  # à re-catégoriser
                 statut=statut_enum,

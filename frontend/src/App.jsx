@@ -61,6 +61,7 @@ import { ValidationPage } from './components/ValidationPage';
 import { SoumissionsPage } from './components/SoumissionsPage';
 import { DemandesPiecesPage } from './components/DemandesPiecesPage';
 import { AccesPage } from './components/AccesPage';
+import { RelevesPage } from './components/RelevesPage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
@@ -79,6 +80,7 @@ const ACCES_ECRAN = {
   listeequipe: ['mandataire'],
   echeancier: ['mandataire', 'expert_comptable', 'direction'],
   maincourante: ['mandataire', 'expert_comptable', 'direction'],
+  releves: ['mandataire', 'expert_comptable'],
   recettes: ['mandataire', 'expert_comptable'],
   depenses: ['mandataire', 'expert_comptable', 'direction'],
   emprunts: ['mandataire'],
@@ -114,6 +116,7 @@ const GROUPES_NAV = [
   ]},
   { label: 'Comptabilité', icon: BookText, items: [
     { key: 'maincourante', label: 'Main courante', icon: BookText },
+    { key: 'releves', label: 'Relevés bancaires', icon: Landmark },
     { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
     { key: 'depenses', label: 'Dépenses', icon: Receipt },
     { key: 'emprunts', label: 'Emprunts', icon: Landmark },
@@ -688,6 +691,7 @@ function App() {
           {onglet === 'validation' && peutVoir('validation', roleCampagne) && <ValidationPage />}
           {onglet === 'soumissions' && peutVoir('soumissions', roleCampagne) && <SoumissionsPage />}
           {onglet === 'demandes' && peutVoir('demandes', roleCampagne) && <DemandesPiecesPage />}
+          {onglet === 'releves' && peutVoir('releves', roleCampagne) && <RelevesPage />}
           {onglet === 'acces' && peutVoir('acces', roleCampagne) && (
             <AccesPage campaignId={campaign?.id} moi={moi} />
           )}
