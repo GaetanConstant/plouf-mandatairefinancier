@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.17.2 — 2026-09-25 — Démarrage local sans conflit de ports
+
+### Corrigé
+- Le lancement local échouait silencieusement quand un autre projet occupait déjà les ports 8000 et 5173 : le backend ne démarrait pas, le frontend basculait sur un autre port, et l'application appelait l'API du projet voisin. La connexion échouait alors sans explication. Le script utilise des ports propres au projet, refuse de démarrer si l'un est pris — en nommant le processus fautif — et transmet lui-même l'adresse de l'API et l'origine autorisée.
+
 ## v0.17.1 — 2026-09-25 — Correctifs du rapprochement bancaire
 
 ### Corrigé
