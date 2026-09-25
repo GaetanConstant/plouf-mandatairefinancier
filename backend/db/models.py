@@ -65,6 +65,21 @@ class Tracable:
     motif_refus: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class CompteurPiece(Base):
+    """Dernier numéro de pièce attribué, par préfixe (`D`, `R`).
+
+    Un compteur persistant, et non le plus grand numéro en base : supprimer une
+    écriture laisserait un trou que `max()` comblerait, et la suivante
+    reprendrait un numéro déjà écrit sur une facture au dossier. Un trou dans la
+    numérotation se justifie devant la commission ; deux pièces portant le même
+    numéro, non.
+    """
+    __tablename__ = "compteur_piece"
+
+    prefixe: Mapped[str] = mapped_column(String(4), primary_key=True)
+    dernier: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class Election(Base):
     __tablename__ = "election"
 

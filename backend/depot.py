@@ -22,7 +22,7 @@ from sqlalchemy import select
 
 import calendrier
 import conformite
-from db.models import Document
+from db.models import Depense, Document, Recette
 from db.helpers import valides as _valides
 from db.session import campaign_session, ensure_campaign_db
 from database import UPLOADS_DIR
@@ -125,10 +125,36 @@ def set_document(campaign_id: str, doc_id: int, enveloppe: str | None, type_: st
         return _doc_dict(d)
 
 
+def numeros_par_document(campaign_id: str) -> dict[int, str]:
+    """Numéro de pièce de l'écriture dont chaque document est le justificatif.
+
+    C'est ce qui relie une pièce de l'enveloppe à sa ligne du journal : sans
+    cette table, le bordereau annonce un nom de fichier que rien ne rattache à
+    la main courante.
+    """
+    with campaign_session(campaign_id) as s:
+        numeros: dict[int, str] = {}
+        for modele, lien in ((Depense, Depense.facture_doc_id),
+                             (Recette, Recette.justificatif_doc_id)):
+            for doc_id, numero in s.execute(
+                select(lien, modele.num_piece)
+                .where(lien.is_not(None), modele.num_piece.is_not(None))
+            ).all():
+                numeros[doc_id] = numero
+        return numeros
+
+
 def get_depot(campaign_id: str) -> dict:
     """État du dossier : pièces par enveloppe + checklist de conformité."""
     ensure_campaign_db(campaign_id)
     docs = list_documents(campaign_id)
+    numeros = numeros_par_document(campaign_id)
+    for d in docs:
+        d["num_piece"] = numeros.get(d["id"])
+    # Ordre du bordereau : les justificatifs par numéro de pièce, les pièces
+    # déclaratives ensuite. Sans ce tri, l'enveloppe annonce D001 puis D004 :
+    # celui qui la dépouille ne peut pas suivre la main courante.
+    docs.sort(key=lambda d: (d["num_piece"] is None, d["num_piece"] or "", d["id"]))
     conf = conformite.run_checks(campaign_id)
     return {
         "pieces_A": [d for d in docs if d["enveloppe"] == "A"],
@@ -165,9 +191,16 @@ def pieces_sans_fichier(campaign_id: str) -> list[str]:
                   if d["fichier"] and d["fichier"] not in presents)
 
 
-def _nom_dans_archive(enveloppe: str, rang: int, fichier: str) -> str:
-    """Nom préfixé par le numéro de pièce, pour retrouver l'ordre du bordereau."""
-    return f"Enveloppe_{enveloppe}/{enveloppe}{rang:02d}_{fichier}"
+def _nom_dans_archive(enveloppe: str, rang: int, fichier: str,
+                      num_piece: str | None = None) -> str:
+    """Nom du fichier dans l'archive, préfixé de quoi le retrouver.
+
+    Une pièce justificative porte le numéro de son écriture (`D007_...`) : c'est
+    celui qu'annonce la main courante. Une pièce déclarative n'est pas une
+    écriture et n'a pas de numéro — elle garde son rang dans l'enveloppe.
+    """
+    prefixe = num_piece or f"{enveloppe}{rang:02d}"
+    return f"Enveloppe_{enveloppe}/{prefixe}_{fichier}"
 
 
 def export_dossier_zip(campaign_id: str) -> bytes:
@@ -188,7 +221,8 @@ def export_dossier_zip(campaign_id: str) -> bytes:
             for rang, piece in enumerate(pieces, start=1):
                 chemin = Path(UPLOADS_DIR) / (piece["fichier"] or "")
                 if chemin.is_file():
-                    zf.write(chemin, _nom_dans_archive(enveloppe, rang, chemin.name))
+                    zf.write(chemin, _nom_dans_archive(enveloppe, rang, chemin.name,
+                                                       piece.get("num_piece")))
                 else:
                     logger.warning("Pièce absente du disque, ignorée à l'export : %s",
                                    piece.get("fichier"))
@@ -325,7 +359,8 @@ def export_bordereau_pdf(campaign_id: str) -> bytes:
             pdf.cell(0, 6, _safe("  (aucune piece classee)"), ln=True)
             return
         for i, p in enumerate(pieces, 1):
-            pdf.multi_cell(printable, 6, _safe(f"  {i}. [{p['type_label']}] {p['fichier']}"))
+            repere = p.get("num_piece") or f"{i}."
+            pdf.multi_cell(printable, 6, _safe(f"  {repere} [{p['type_label']}] {p['fichier']}"))
 
     _section("ENVELOPPE A - Formulaire + pièces justificatives des dépenses", etat["pieces_A"])
     _section("ENVELOPPE B - Annexes", etat["pieces_B"])

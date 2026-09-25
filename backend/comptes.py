@@ -19,6 +19,7 @@ from db.session import campaign_session, ensure_campaign_db
 from db.helpers import fmt_date as _fmt_date, media_type as _media_type, valides as _valides
 from db import enums
 from database import ROLE_MANDATAIRE
+import pieces
 import validation
 from database import UPLOADS_DIR
 
@@ -91,6 +92,7 @@ def _statut_legacy_to_orm(statut: str | None, is_nature: bool) -> tuple[enums.St
 def _recette_to_legacy(r: Recette) -> dict:
     return {
         "id": r.id,
+        "num_piece": r.num_piece,
         "date": _fmt_date(r.date_versement),
         "nom_donateur": r.donateur.nom if r.donateur else None,
         "adresse": r.donateur.adresse if r.donateur else None,
@@ -149,6 +151,8 @@ def create_recette(campaign_id: str, dto, auteur: str | None = None,
         )
         validation.estampiller(r, auteur, role)
         s.add(r)
+        s.flush()
+        pieces.attribuer(s, r)
     return {"message": "Recette ajoutée"}
 
 
@@ -254,6 +258,7 @@ def _type_piece(valeur: str | None) -> enums.TypeDocument:
 def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None = None) -> dict:
     return {
         "id": d.id,
+        "num_piece": d.num_piece,
         "date": _fmt_date(d.date_facture),
         "libelle": d.nature,
         "fournisseur": d.fournisseur,
@@ -317,6 +322,8 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
         )
         validation.estampiller(depense, auteur, role)
         s.add(depense)
+        s.flush()
+        pieces.attribuer(s, depense)
     return {"message": "Dépense ajoutée"}
 
 

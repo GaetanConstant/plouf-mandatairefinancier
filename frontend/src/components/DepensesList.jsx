@@ -44,6 +44,7 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
                     <table className="w-full caption-bottom text-sm">
                         <thead className="[&_tr]:border-b">
                             <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">N° pièce</th>
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Date</th>
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Libellé</th>
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Fournisseur</th>
@@ -57,6 +58,7 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
                         <tbody className="[&_tr:last-child]:border-0">
                             {depenses?.map((depense, i) => (
                                 <tr key={i} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                    <td className="p-4 align-middle font-mono text-xs text-muted-foreground whitespace-nowrap">{depense.num_piece || '—'}</td>
                                     <td className="p-4 align-middle whitespace-nowrap">{depense.date}</td>
                                     <td className="p-4 align-middle font-medium">
                                         {depense.libelle}
