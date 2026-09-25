@@ -1,5 +1,19 @@
 [
   {
+    "version": "v0.17.1",
+    "date": "2026-09-25",
+    "dateAffichee": "25 septembre 2026",
+    "titre": "Correctifs du rapprochement bancaire",
+    "details": [
+      "Supprimer un relevé laissait ses dépenses marquées « payées » et « rapprochées », en pointant un relevé qui n'existait plus : la trésorerie comptait un décaissement sans ligne bancaire derrière.",
+      "Une ligne au crédit pouvait régler une dépense. Un encaissement est une recette : le rapprochement aux dépenses ne concerne plus que les débits, et le compteur « à rapprocher » ne compte plus les crédits.",
+      "L'écran Dépôt affichait « Export impossible » et « Prêt à déposer » côte à côte. Le second ne parle que des motifs de rejet et le dit désormais.",
+      "La navigation débordait sur un écran de 720 pixels dès qu'un groupe de six entrées s'ouvrait. Elle tient maintenant sans défilement.",
+      "L'accord exprès du mandataire, facultatif au dépôt, s'affichait comme « manquant » au même titre que les deux récépissés exigés."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.17.0",
     "date": "2026-09-25",
     "dateAffichee": "25 septembre 2026",

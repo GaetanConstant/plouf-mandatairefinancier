@@ -360,12 +360,12 @@ function App() {
         )}
         {/* Sidebar */}
         <aside className={cn(
-          "w-64 shrink-0 border-r border-border p-6 flex flex-col bg-card",
+          "w-64 shrink-0 border-r border-border p-4 flex flex-col bg-card",
           // Hors mobile : colonne fixe. Sur mobile : tiroir glissant au-dessus.
           "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:transition-transform",
           menuOuvert ? "max-md:translate-x-0" : "max-md:-translate-x-full",
         )}>
-          <div className="flex items-center gap-2 mb-8">
+          <div className="mb-3 flex items-center gap-2">
             <Droplets className="w-8 h-8 text-primary" />
             <div className="flex flex-col">
               <span className="font-bold text-xl tracking-tight leading-none">Plouf</span>
@@ -374,7 +374,7 @@ function App() {
           </div>
 
 
-          <nav className="flex-1 overflow-y-auto -mr-3 pr-3 space-y-1">
+          <nav className="flex-1 space-y-0.5 overflow-y-auto -mr-3 pr-3">
             {peutVoir('dashboard', roleCampagne) && (
               <NavItem icon={LayoutDashboard} label="Tableau de bord" active={onglet === 'dashboard'} onClick={() => allerA('dashboard')} />
             )}
@@ -400,20 +400,17 @@ function App() {
 
           </nav>
 
-          <div className="mt-auto p-4 bg-muted/50 rounded-lg space-y-4">
-            <div>
-              <div className="flex items-center gap-2 text-sm text-foreground mb-1 font-medium">
-                <Users className="w-4 h-4" />
-                <span>{user.full_name}</span>
-              </div>
-              <div className="text-xs text-muted-foreground/80">Villeurbanne</div>
+          <div className="mt-auto space-y-0.5 rounded-lg bg-muted/50 p-2">
+            <div className="mb-1 flex items-center gap-2 px-1 text-sm font-medium text-foreground">
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="truncate">{user.full_name}</span>
             </div>
 
-            <div className="space-y-1">
+            <div>
               {estMandataire && (
                 <button
                   onClick={() => allerA('acces')}
-                  className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
+                  className={cn("w-full flex items-center gap-2 px-3 py-0.5 text-xs font-medium transition-colors",
                     onglet === 'acces' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
                 >
                   <Users className="w-3 h-3" /> Accès à la campagne
@@ -421,14 +418,14 @@ function App() {
               )}
               <button
                 onClick={() => allerA('settings')}
-                className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
+                className={cn("w-full flex items-center gap-2 px-3 py-0.5 text-xs font-medium transition-colors",
                   onglet === 'settings' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Settings className="w-3 h-3" /> Paramètres
               </button>
               <button
                 onClick={() => allerA('apropos')}
-                className={cn("w-full flex items-center gap-2 px-3 py-1 text-xs font-medium transition-colors",
+                className={cn("w-full flex items-center gap-2 px-3 py-0.5 text-xs font-medium transition-colors",
                   onglet === 'apropos' ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 <Info className="w-3 h-3" /> À propos
@@ -436,7 +433,7 @@ function App() {
             </div>
             <button
               onClick={toggleTheme}
-              className="w-full flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               {theme === 'light' ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />}
               {theme === 'light' ? 'Mode Sombre' : 'Mode Clair'}
@@ -445,14 +442,14 @@ function App() {
 
             <button
               onClick={() => setCampaign(null)}
-              className="w-full flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+              className="w-full flex items-center gap-2 px-3 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
             >
               <ChevronRight className="w-3 h-3 rotate-180" /> Changer de campagne
             </button>
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
             >
               <LogOut className="w-3 h-3" /> Se déconnecter
             </button>
@@ -716,7 +713,7 @@ function NavGroup({ icon: Icon, label, items, activeTab, setActiveTab, open, onT
         className={cn(
           // Typo resserrée : « Conformité & dépôt » doit tenir sur une ligne dans
           // une barre de 256 px, sinon le libellé se coupe ou passe à la ligne.
-          "w-full flex items-center justify-between gap-1 px-3 py-2 rounded-md text-[11px] font-semibold uppercase tracking-wide transition-colors",
+          "w-full flex items-center justify-between gap-1 rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors",
           hasActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
         )}
       >
@@ -742,7 +739,7 @@ function NavItem({ icon: Icon, label, active, onClick, badge = 0 }) {
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200",
+        "w-full flex items-center gap-3 rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200",
         active
           ? "bg-primary/10 text-primary shadow-sm"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"

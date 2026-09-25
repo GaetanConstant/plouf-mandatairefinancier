@@ -186,9 +186,11 @@ function PiecesDeclaratives({ etat }) {
                             {p.fichier && <span className="block text-xs text-muted-foreground">{p.fichier}</span>}
                         </span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                            p.fournie ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            p.fournie ? 'bg-emerald-100 text-emerald-700'
+                                : p.cle === 'accord-mandataire' ? 'bg-secondary text-muted-foreground'
+                                : 'bg-amber-100 text-amber-700'
                         }`}>
-                            {p.fournie ? 'fournie' : 'manquante'}
+                            {p.fournie ? 'fournie' : p.cle === 'accord-mandataire' ? 'facultative' : 'manquante'}
                         </span>
                         <label className="cursor-pointer text-xs font-medium text-primary hover:underline">
                             {p.fournie ? 'Remplacer' : 'Déposer'}
