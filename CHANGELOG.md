@@ -10,6 +10,18 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.16.0 — 2026-09-25 — Relevés bancaires et rapprochement
+
+- Import d'un relevé bancaire de trois façons : fichier CSV de la banque, copier-coller des lignes, ou photo et PDF reconnus par OCR. Les transactions lues s'affichent en aperçu, à relire avant d'enregistrer.
+- Chaque ligne du relevé se rapproche des dépenses qu'elle règle : une ligne peut en régler plusieurs, et une dépense peut être payée en plusieurs fois, acompte puis solde.
+- Les montants sont contrôlés : aucune imputation ne peut dépasser le montant de la transaction ni le TTC de la dépense.
+- Les lignes sans dépense en face — frais bancaires, encaissement d'un don — restent au relevé et sont signalées.
+- Une dépense intégralement rapprochée passe automatiquement en « payée ».
+- La main courante montre désormais la date de facture, la date de paiement, le libellé de la dépense et celui du relevé.
+
+### Modifié
+- La date portée par une dépense s'appelle désormais « date de facture » : elle en a toujours été une, mais son ancien nom laissait croire à une date de règlement.
+
 ## v0.15.2 — 2026-09-24 — Utilisable sur téléphone
 
 ### Corrigé

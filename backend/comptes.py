@@ -246,7 +246,7 @@ def _type_piece(valeur: str | None) -> enums.TypeDocument:
 def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None = None) -> dict:
     return {
         "id": d.id,
-        "date": _fmt_date(d.date_reglement),
+        "date": _fmt_date(d.date_facture),
         "libelle": d.nature,
         "fournisseur": d.fournisseur,
         "montant_ttc": d.montant_ttc,
@@ -262,7 +262,7 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None
 def list_depenses(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        depenses = s.scalars(_valides(select(Depense), Depense).order_by(Depense.date_reglement.desc())).all()
+        depenses = s.scalars(_valides(select(Depense), Depense).order_by(Depense.date_facture.desc())).all()
         # Pré-charge les fichiers de justificatif.
         doc_ids = {d.facture_doc_id for d in depenses if d.facture_doc_id}
         docs = {}
@@ -298,7 +298,7 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
             nature=dto.libelle,
             montant_ttc=dto.montant_ttc,
             tva=dto.tva,
-            date_reglement=dto.date,
+            date_facture=dto.date,
             mode=None,
             rubrique_imputation=dto.categorie_cnccfp,
             statut=statut,
@@ -401,7 +401,7 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
         d.nature = dto.libelle
         d.montant_ttc = dto.montant_ttc
         d.tva = dto.tva
-        d.date_reglement = dto.date
+        d.date_facture = dto.date
         d.rubrique_imputation = dto.categorie_cnccfp
         d.statut = statut
         d.reglee = reglee
@@ -426,7 +426,7 @@ def get_depense_pdf_data(campaign_id: str, depense_id: int) -> dict:
         d = s.get(Depense, depense_id)
         if not d:
             raise HTTPException(status_code=404, detail="Dépense introuvable")
-        dt = d.date_reglement
+        dt = d.date_facture
         return {
             "id": d.id,
             "date": dt.strftime("%d/%m/%Y") if hasattr(dt, "strftime") else (str(dt) if dt else "N/A"),

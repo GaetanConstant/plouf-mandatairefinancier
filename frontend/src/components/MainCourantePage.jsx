@@ -37,10 +37,12 @@ export function MainCourantePage() {
                     <thead className="[&_tr]:border-b">
                         <tr className="border-b">
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Sens</th>
-                            <th className="h-11 px-3 text-left font-medium text-muted-foreground">Date</th>
+                            <th className="h-11 px-3 text-left font-medium text-muted-foreground">Date facture</th>
+                                <th className="h-11 px-3 text-left font-medium text-muted-foreground">Date paiement</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">N° pièce</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Rubrique</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Nature</th>
+                                <th className="h-11 px-3 text-left font-medium text-muted-foreground">Libellé relevé</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Tiers</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">Mode</th>
                             <th className="h-11 px-3 text-left font-medium text-muted-foreground">N° relevé</th>
@@ -62,10 +64,14 @@ export function MainCourantePage() {
                                         {l.sens === 'recette' ? 'Recette' : 'Dépense'}
                                     </span>
                                 </td>
-                                <td className="p-3">{l.date}</td>
+                                <td className="p-3 whitespace-nowrap">{l.date_facture || l.date}</td>
+                                    {/* Vide tant que la dépense n'est pas rapprochée : on voit
+                                        d'un coup d'œil ce qui reste à régler. */}
+                                    <td className="p-3 whitespace-nowrap text-muted-foreground">{l.date_paiement || '—'}</td>
                                 <td className="p-3 text-muted-foreground">{l.num_piece || '—'}</td>
                                 <td className="p-3 font-mono text-xs">{l.rubrique || '—'}</td>
                                 <td className="p-3 font-medium">{l.nature}</td>
+                                    <td className="p-3 text-xs text-muted-foreground">{l.libelle_releve || '—'}</td>
                                 <td className="p-3">{l.tiers || '—'}</td>
                                 <td className="p-3 text-muted-foreground">{l.mode || '—'}</td>
                                 <td className="p-3 text-muted-foreground">{l.num_releve || '—'}</td>

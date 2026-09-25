@@ -297,7 +297,7 @@ class Depense(Tracable, Base):
     nature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # libellé
     montant_ttc: Mapped[float] = mapped_column(Float)
     tva: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    date_reglement: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    date_facture: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     mode: Mapped[Optional[enums.ModePaiement]] = mapped_column(_enum(enums.ModePaiement), nullable=True)
     num_releve_bancaire: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     num_cheque_remise: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -519,6 +519,62 @@ class DemandePiece(Base):
     reponse: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     repondu_par: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     repondu_le: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class Releve(Base):
+    """Un relevé bancaire importé, quelle qu'en soit la provenance."""
+
+    __tablename__ = "releve"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    compte_id: Mapped[Optional[int]] = mapped_column(ForeignKey("compte_bancaire.id"), nullable=True)
+    libelle: Mapped[str] = mapped_column(String(120))  # « Septembre 2026 »
+    date_debut: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    date_fin: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    source: Mapped[enums.SourceReleve] = mapped_column(_enum(enums.SourceReleve))
+    fichier: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    importe_par: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    importe_le: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    transactions: Mapped[list["TransactionBancaire"]] = relationship(
+        back_populates="releve", cascade="all, delete-orphan")
+
+
+class TransactionBancaire(Base):
+    """Une ligne de relevé. Conservée même sans dépense en face : le relevé doit
+    rester le reflet fidèle du compte, un écart inexpliqué est précisément ce
+    que la commission cherche."""
+
+    __tablename__ = "transaction_bancaire"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    releve_id: Mapped[int] = mapped_column(ForeignKey("releve.id"))
+    date_operation: Mapped[date] = mapped_column(Date)
+    libelle: Mapped[str] = mapped_column(String(255))
+    montant: Mapped[float] = mapped_column(Float)  # toujours positif
+    sens: Mapped[enums.SensTransaction] = mapped_column(_enum(enums.SensTransaction))
+    reference: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+    releve: Mapped["Releve"] = relationship(back_populates="transactions")
+    imputations: Mapped[list["ImputationBancaire"]] = relationship(
+        back_populates="transaction", cascade="all, delete-orphan")
+
+
+class ImputationBancaire(Base):
+    """Part d'une transaction affectée à une dépense.
+
+    Un lien porte un montant : une transaction peut régler plusieurs dépenses,
+    et une dépense peut être réglée en plusieurs fois (acompte puis solde).
+    """
+
+    __tablename__ = "imputation_bancaire"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    transaction_id: Mapped[int] = mapped_column(ForeignKey("transaction_bancaire.id"))
+    depense_id: Mapped[int] = mapped_column(ForeignKey("depense.id"))
+    montant: Mapped[float] = mapped_column(Float)
+
+    transaction: Mapped["TransactionBancaire"] = relationship(back_populates="imputations")
 
 
 class Echeance(Base):
