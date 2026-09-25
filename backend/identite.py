@@ -9,17 +9,20 @@ le moteur de dates dès que la date du 1er tour est connue.
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from typing import Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 import election_dates
-from db.models import Candidat, CompteBancaire, Election, ExpertComptable, Mandataire
+from db.models import Candidat, Document, CompteBancaire, Election, ExpertComptable, Mandataire
 from db.session import campaign_session, ensure_campaign_db
 from db.helpers import election_id as _election_id, fmt_date as _fmt
 from db import enums
+from database import ROLE_MANDATAIRE
 
 
 # ── Schémas d'entrée (tous champs optionnels : édition progressive) ───────────
@@ -203,6 +206,64 @@ def _compte_dict(c: Optional[CompteBancaire]) -> Optional[dict]:
 
 
 # ── Sauvegardes (upsert singleton) ───────────────────────────────────────────
+
+class PieceDeclarativeIn(BaseModel):
+    fichier: str
+
+
+# Pièces déclaratives exigées en enveloppe B : à quel objet elles se rattachent.
+PIECES_DECLARATIVES = {
+    "recepisse-candidature": (Candidat, "recepisse_candidature_doc_id",
+                              "Récépissé de déclaration de candidature"),
+    "recepisse-mandataire": (Mandataire, "recepisse_doc_id",
+                             "Récépissé de déclaration du mandataire en préfecture"),
+    "accord-mandataire": (Mandataire, "accord_expres_doc_id",
+                          "Accord exprès du mandataire"),
+}
+
+
+def list_pieces_declaratives(campaign_id: str) -> list[dict]:
+    """État des pièces déclaratives : ce que la préfecture a délivré.
+
+    Le guide les exige dans l'enveloppe B ; elles n'étaient jusqu'ici ni
+    demandées ni contrôlées, alors que les colonnes existaient dans le modèle.
+    """
+    ensure_campaign_db(campaign_id)
+    lignes = []
+    with campaign_session(campaign_id) as s:
+        for cle, (modele, champ, libelle) in PIECES_DECLARATIVES.items():
+            objet = s.scalars(select(modele)).first()
+            doc_id = getattr(objet, champ, None) if objet else None
+            doc = s.get(Document, doc_id) if doc_id else None
+            lignes.append({
+                "cle": cle, "libelle": libelle,
+                "fichier": doc.fichier if doc else None,
+                "fournie": doc is not None,
+            })
+    return lignes
+
+
+def save_piece_declarative(campaign_id: str, cle: str, payload: PieceDeclarativeIn,
+                           auteur: str) -> dict:
+    ensure_campaign_db(campaign_id)
+    if cle not in PIECES_DECLARATIVES:
+        raise HTTPException(status_code=400, detail=f"Pièce inconnue : {cle}")
+    modele, champ, libelle = PIECES_DECLARATIVES[cle]
+
+    import validation
+    from db.helpers import media_type
+
+    fichier = os.path.basename(payload.fichier)
+    with campaign_session(campaign_id) as s:
+        objet = _get_or_create(s, modele, election_id=_election_id(s))
+        doc = Document(type=enums.TypeDocument.recepisse, media_type=media_type(fichier),
+                       fichier=fichier, enveloppe=enums.Enveloppe.B)
+        validation.estampiller(doc, auteur, ROLE_MANDATAIRE)
+        s.add(doc)
+        s.flush()
+        setattr(objet, champ, doc.id)
+    return {"message": f"{libelle} enregistré."}
+
 
 def save_election(campaign_id: str, payload: ElectionIn) -> dict:
     ensure_campaign_db(campaign_id)

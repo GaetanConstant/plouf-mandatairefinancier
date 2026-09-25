@@ -13,7 +13,7 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -72,10 +72,43 @@ def fichiers_rattaches(campaign_ids: list[str]) -> set[str]:
     return noms
 
 
+# Ordre des colonnes verticales du formulaire CNCCFP.
+_ORDRE_PRISE_EN_CHARGE = {"mandataire": 0, "parti": 1}
+
+
+def _classement_comptable(campaign_id: str) -> dict[int, tuple]:
+    """Rang de chaque pièce dans la nomenclature comptable.
+
+    Le guide impose de classer les justificatifs « en respectant la répartition
+    verticale des dépenses puis, à l'intérieur de chaque groupe, la répartition
+    horizontale en fonction de leur objet ». Un dossier rendu dans l'ordre
+    d'ajout est à reclasser à la main.
+
+    Les pièces qui ne se rattachent à aucune dépense — récépissés, relevés,
+    photos — passent en fin de leur enveloppe.
+    """
+    from db.models import Depense
+
+    rangs: dict[int, tuple] = {}
+    with campaign_session(campaign_id) as s:
+        for d in s.scalars(select(Depense).where(Depense.facture_doc_id.is_not(None))).all():
+            rangs[d.facture_doc_id] = (
+                _ORDRE_PRISE_EN_CHARGE.get(
+                    d.prise_en_charge.value if d.prise_en_charge else "mandataire", 9),
+                d.rubrique_imputation or "zzz",
+                d.date_facture or date.max,
+                d.id,
+            )
+    return rangs
+
+
 def list_documents(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
-        docs = s.scalars(_valides(select(Document), Document).order_by(Document.date_ajout.desc())).all()
+        docs = s.scalars(_valides(select(Document), Document)).all()
+        rangs = _classement_comptable(campaign_id)
+        # Pièce rattachée à une dépense : son rang comptable. Sinon, fin de liste.
+        docs = sorted(docs, key=lambda d: rangs.get(d.id, (9, "zzz", date.max, d.id)))
         return [_doc_dict(d) for d in docs]
 
 

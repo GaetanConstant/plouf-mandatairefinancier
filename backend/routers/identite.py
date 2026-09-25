@@ -42,3 +42,16 @@ def put_compte(payload: identite.CompteBancaireIn, current_user: dict = Depends(
 def get_completude(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     """État de remplissage du dossier, section par section."""
     return completude.evaluer(campaign_id)
+
+
+@router.get("/pieces-declaratives")
+def list_pieces_declaratives(campaign_id: str = Depends(get_campaign_conn)):
+    """Récépissés exigés en enveloppe B par le guide du mandataire."""
+    return identite.list_pieces_declaratives(campaign_id)
+
+
+@router.put("/pieces-declaratives/{cle}")
+def save_piece_declarative(cle: str, payload: identite.PieceDeclarativeIn,
+                           current_user: dict = Depends(get_current_user),
+                           campaign_id: str = Depends(get_campaign_conn)):
+    return identite.save_piece_declarative(campaign_id, cle, payload, current_user["username"])

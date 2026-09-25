@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import completude
 import depot
+import devolution
 import export_cnccfp
 from auth import get_current_user
 from deps import get_campaign_conn, mandataire_ou_expert, mandataire_requis
@@ -98,3 +99,24 @@ def export_cnccfp_xlsx(current_user: dict = Depends(get_current_user), campaign_
         media_type=XLSX_MEDIA,
         headers={"Content-Disposition": f"attachment; filename=compte_campagne_format_cnccfp_{campaign_id}.xlsx"},
     )
+
+
+# ── Dévolution de l'excédent ─────────────────────────────────────────────────
+
+@router.get("/devolution")
+def etat_devolution(campaign_id: str = Depends(get_campaign_conn)):
+    """Excédent du compte, son origine, et la dévolution qu'il implique."""
+    return devolution.etat(campaign_id)
+
+
+@router.put("/devolution")
+def enregistrer_devolution(payload: devolution.DevolutionIn,
+                           campaign_id: str = Depends(get_campaign_conn),
+                           _garde: str = Depends(mandataire_requis)):
+    return devolution.enregistrer(campaign_id, payload)
+
+
+@router.delete("/devolution")
+def supprimer_devolution(campaign_id: str = Depends(get_campaign_conn),
+                         _garde: str = Depends(mandataire_requis)):
+    return devolution.supprimer(campaign_id)

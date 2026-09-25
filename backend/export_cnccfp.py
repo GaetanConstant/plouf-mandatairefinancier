@@ -15,6 +15,8 @@ import io
 from sqlalchemy import select
 
 import annexes
+import comptes
+import concours
 import identite
 import maincourante
 import recus
@@ -190,6 +192,43 @@ def generate_xlsx(campaign_id: str) -> bytes:
     headers(ws, ["Prénom", "Nom", "Fonction"])
     for m in annexes.list_equipe(campaign_id):
         ws.append([m["prenom"], m["nom"], m["fonction"]])
+
+    # ── Annexe 4 — Concours en nature (synthèse) ──────────────────────────
+    synthese = concours.synthese(campaign_id)
+    ws = new_sheet("Concours nature - Annexe 4")
+    headers(ws, ["Origine du concours", "Montant total (€)"])
+    for bloc in synthese["par_origine"].values():
+        ws.append([bloc["libelle"], bloc["montant"]])
+    ws.append(["TOTAL", synthese["total"]])
+
+    # ── Annexe 4.1 — Liste des concours en nature ─────────────────────────
+    ws = new_sheet("Concours nature - Annexe 4.1")
+    headers(ws, ["Origine", "Nature du concours", "Valeur estimée (€)",
+                 "Méthode d'évaluation", "Rubrique", "Justificatif"])
+    for c in concours.list_concours(campaign_id):
+        ws.append([c["origine_label"], c["nature"], c["valeur_estimee"],
+                   c["methode_evaluation"], c["rubrique_imputation"],
+                   c["justificatif_path"]])
+
+    # ── Dépenses par prise en charge ──────────────────────────────────────
+    # Le formulaire sépare verticalement ce que règle le mandataire de ce
+    # qu'une formation politique paie directement, les concours en nature
+    # formant la troisième colonne.
+    ws = new_sheet("Depenses par prise en charge")
+    headers(ws, ["Rubrique", "Payées par le mandataire (€)",
+                 "Payées par un parti (€)", "Concours en nature (€)"])
+    par_rubrique: dict[str, dict[str, float]] = {}
+    for d in comptes.list_depenses(campaign_id):
+        bloc = par_rubrique.setdefault(d["categorie_cnccfp"] or "—",
+                                       {"mandataire": 0.0, "parti": 0.0, "nature": 0.0})
+        bloc[d.get("prise_en_charge") or "mandataire"] += d["montant_ttc"] or 0.0
+    for c in concours.list_concours(campaign_id):
+        bloc = par_rubrique.setdefault(c["rubrique_imputation"] or "—",
+                                       {"mandataire": 0.0, "parti": 0.0, "nature": 0.0})
+        bloc["nature"] += c["valeur_estimee"] or 0.0
+    for rubrique in sorted(par_rubrique):
+        b = par_rubrique[rubrique]
+        ws.append([rubrique, round(b["mandataire"], 2), round(b["parti"], 2), round(b["nature"], 2)])
 
     # Largeur de colonnes auto (cap à 50)
     for sheet in wb.worksheets:

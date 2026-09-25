@@ -175,6 +175,30 @@ def evaluer(campaign_id: str) -> dict:
                                  *_evaluer_objet(compte, CHAMPS_COMPTE)))
         sections.append(_section_liste(colistiers))
 
+    # Récépissés de candidature et de déclaration du mandataire : exigés en
+    # enveloppe B, et jusqu'ici ni demandés ni contrôlés par l'application.
+    import identite
+    pieces = identite.list_pieces_declaratives(campaign_id)
+    # L'accord exprès du mandataire n'est pas systématiquement exigé : il ne
+    # bloque pas le dépôt, contrairement aux deux récépissés.
+    exigees = [p for p in pieces if p["cle"] != "accord-mandataire"]
+    manquantes = [p["libelle"] for p in exigees if not p["fournie"]]
+    sections.append(_section(
+        "pieces_declaratives", "Pièces déclaratives", len(exigees),
+        len(exigees) - len(manquantes), manquantes,
+    ))
+
+    # Le relevé bancaire est exigé en enveloppe B : lui seul atteste du
+    # règlement effectif des dépenses. Sans lui, le dossier est incomplet quelle
+    # que soit la qualité du reste.
+    import releves
+    nb_releves = len(releves.list_releves(campaign_id))
+    sections.append(_section(
+        "releves", "Relevés bancaires", 1, 1 if nb_releves else 0,
+        [] if nb_releves else ["Aucun relevé bancaire importé"],
+        note=f"{nb_releves} relevé(s)" if nb_releves else None,
+    ))
+
     # Pièces annoncées au bordereau mais absentes du disque : l'enveloppe
     # partirait avec un trou que rien ne signale au dépôt.
     import depot  # import tardif : depot dépend de conformite, pas l'inverse.

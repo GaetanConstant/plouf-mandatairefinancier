@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from db.models import Depense, Document, Donateur, Election, Recette
+from db.models import ConcoursNature, Depense, Document, Donateur, Election, Recette
 from db.session import campaign_session, ensure_campaign_db
 from db.helpers import fmt_date as _fmt_date, media_type as _media_type, valides as _valides
 from db import enums
@@ -231,6 +231,14 @@ def _supprimer_fichier_remplace(session, ancien: str | None, nouveau: str) -> No
         logger.warning("Suppression de %s impossible : %s", chemin, e)
 
 
+def _prise_en_charge(valeur: str | None) -> enums.PriseEnCharge:
+    """Qui règle la dépense. Le mandataire par défaut : c'est le cas courant."""
+    try:
+        return enums.PriseEnCharge(valeur) if valeur else enums.PriseEnCharge.mandataire
+    except ValueError:
+        return enums.PriseEnCharge.mandataire
+
+
 def _type_piece(valeur: str | None) -> enums.TypeDocument:
     """Nature de la pièce jointe à une dépense (devis, facture…).
 
@@ -255,6 +263,7 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None
         "statut": _STATUT_TO_LEGACY.get(d.statut, "Engagé"),
         "justificatif_path": doc_fichier,
         "type_piece": doc_type or enums.TypeDocument.facture.value,
+        "prise_en_charge": d.prise_en_charge.value if d.prise_en_charge else "mandataire",
         "is_nature": d.statut == enums.StatutDepense.realise_nature,
     }
 
@@ -303,6 +312,7 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
             rubrique_imputation=dto.categorie_cnccfp,
             statut=statut,
             reglee=reglee,
+            prise_en_charge=_prise_en_charge(getattr(dto, "prise_en_charge", None)),
             facture_doc_id=facture_doc_id,
         )
         validation.estampiller(depense, auteur, role)
@@ -405,6 +415,7 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
         d.rubrique_imputation = dto.categorie_cnccfp
         d.statut = statut
         d.reglee = reglee
+        d.prise_en_charge = _prise_en_charge(getattr(dto, "prise_en_charge", None))
     return {"message": "Dépense mise à jour"}
 
 
@@ -448,10 +459,18 @@ def compute_stats(campaign_id: str) -> dict:
             _valides(select(func.coalesce(func.sum(Depense.montant_ttc), 0.0)), Depense)
             .where(Depense.statut == enums.StatutDepense.paye)
         ) or 0.0
-        total_nature = s.scalar(
+        # Les concours en nature entrent dans le plafond sans toucher la
+        # trésorerie. Ils vivent dans leur propre table depuis l'annexe 4 ; le
+        # statut « réalisé en nature » d'une dépense reste compté pour les
+        # saisies antérieures à cette séparation.
+        nature_depenses = s.scalar(
             _valides(select(func.coalesce(func.sum(Depense.montant_ttc), 0.0)), Depense)
             .where(Depense.statut == enums.StatutDepense.realise_nature)
         ) or 0.0
+        nature_concours = s.scalar(
+            select(func.coalesce(func.sum(ConcoursNature.valeur_estimee), 0.0))
+        ) or 0.0
+        total_nature = nature_depenses + nature_concours
         total_recettes = s.scalar(_valides(select(func.coalesce(func.sum(Recette.montant), 0.0)), Recette)) or 0.0
         nombre_donateurs = s.scalar(
             _valides(select(func.count(func.distinct(Recette.donateur_id))), Recette)
@@ -461,10 +480,13 @@ def compute_stats(campaign_id: str) -> dict:
         plafond = (election.plafond_depenses if election and election.plafond_depenses
                    else PLAFOND_LEGAL_DEFAUT)
 
-    consommation = (total_depenses / plafond) * 100 if plafond else 0.0
+    # Le plafond se mesure sur l'ensemble : les concours en nature n'ont pas
+    # coûté d'argent mais consomment bien du plafond légal.
+    total_plafond = total_depenses + nature_concours
+    consommation = (total_plafond / plafond) * 100 if plafond else 0.0
     estimation_remboursement = min((total_depenses - total_nature) * TAUX_REMBOURSEMENT,
                                    plafond * TAUX_REMBOURSEMENT)
-    reste_a_depenser = plafond - total_depenses
+    reste_a_depenser = plafond - total_plafond
     solde_tresorerie = total_recettes - total_depenses_payees
     solde_previsionnel = total_recettes - (total_depenses - total_nature)
     if total_recettes > 0:
@@ -485,6 +507,8 @@ def compute_stats(campaign_id: str) -> dict:
         "solde_previsionnel": solde_previsionnel,
         "consommation_budget_actuel": consommation_budget_actuel,
         "total_nature_hors_tresorerie": total_nature,
+        "total_concours_nature": round(nature_concours, 2),
+        "total_impute_plafond": round(total_plafond, 2),
     }
 
 

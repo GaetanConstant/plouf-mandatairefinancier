@@ -23,6 +23,8 @@ class Depense(BaseModel):
     is_nature: bool = False
     # Nature de la pièce jointe : un devis devient une facture en cours de route.
     type_piece: str = "facture"
+    # Colonne verticale du formulaire CNCCFP.
+    prise_en_charge: str = "mandataire"
 
 class SpendingStats(BaseModel):
     total_depenses: float

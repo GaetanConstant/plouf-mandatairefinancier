@@ -17,6 +17,7 @@ import {
   LogOut,
   BellRing,
   Inbox,
+  Gift,
   Info,
   Menu,
   MessageSquare,
@@ -62,6 +63,7 @@ import { SoumissionsPage } from './components/SoumissionsPage';
 import { DemandesPiecesPage } from './components/DemandesPiecesPage';
 import { AccesPage } from './components/AccesPage';
 import { RelevesPage } from './components/RelevesPage';
+import { ConcoursNaturePage } from './components/ConcoursNaturePage';
 import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
@@ -81,6 +83,7 @@ const ACCES_ECRAN = {
   echeancier: ['mandataire', 'expert_comptable', 'direction'],
   maincourante: ['mandataire', 'expert_comptable', 'direction'],
   releves: ['mandataire', 'expert_comptable'],
+  concours: ['mandataire', 'expert_comptable', 'direction'],
   recettes: ['mandataire', 'expert_comptable'],
   depenses: ['mandataire', 'expert_comptable', 'direction'],
   emprunts: ['mandataire'],
@@ -120,6 +123,7 @@ const GROUPES_NAV = [
     { key: 'recettes', label: 'Recettes / Dons', icon: TrendingUp },
     { key: 'depenses', label: 'Dépenses', icon: Receipt },
     { key: 'emprunts', label: 'Emprunts', icon: Landmark },
+    { key: 'concours', label: 'Concours en nature', icon: Gift },
     { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
   ]},
   { label: 'Dons & reçus', icon: BookOpen, items: [
@@ -692,6 +696,7 @@ function App() {
           {onglet === 'soumissions' && peutVoir('soumissions', roleCampagne) && <SoumissionsPage />}
           {onglet === 'demandes' && peutVoir('demandes', roleCampagne) && <DemandesPiecesPage />}
           {onglet === 'releves' && peutVoir('releves', roleCampagne) && <RelevesPage />}
+          {onglet === 'concours' && peutVoir('concours', roleCampagne) && <ConcoursNaturePage />}
           {onglet === 'acces' && peutVoir('acces', roleCampagne) && (
             <AccesPage campaignId={campaign?.id} moi={moi} />
           )}
