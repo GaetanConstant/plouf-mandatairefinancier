@@ -10,6 +10,14 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.19.0 — 2026-09-27 — Modification d'un événement
+
+### Ajouté
+- Un événement peut être modifié : titre, type, lieu, dates et description. Le formulaire s'ouvre prérempli depuis le crayon sur la carte de l'événement. Le serveur acceptait déjà la modification, mais aucun bouton ne la déclenchait.
+
+### Corrigé
+- L'équipe de campagne et la direction voyaient les boutons « Nouvel événement » et « Supprimer », réservés au mandataire : ils ne pouvaient que renvoyer une erreur. Ces actions ne s'affichent plus qu'au mandataire.
+
 ## v0.18.0 — 2026-09-25 — Numérotation des pièces comptables
 
 ### Ajouté

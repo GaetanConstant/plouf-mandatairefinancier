@@ -679,7 +679,7 @@ function App() {
             <IdentitePage cible={cible?.entite} onCibleConsommee={consommerCible} />
           )}
           {onglet === 'depot' && peutVoir('depot', roleCampagne) && <DepotPage />}
-          {onglet === 'evenements' && peutVoir('evenements', roleCampagne) && <EvenementsPage />}
+          {onglet === 'evenements' && peutVoir('evenements', roleCampagne) && <EvenementsPage role={roleCampagne} />}
           {onglet === 'frise' && peutVoir('frise', roleCampagne) && <FrisePage />}
           {onglet === 'calendrier' && peutVoir('calendrier', roleCampagne) && <CalendrierPage />}
           {onglet === 'echeancier' && peutVoir('echeancier', roleCampagne) && <EcheancierPage />}
