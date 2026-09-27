@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.19.0",
+    "date": "2026-09-27",
+    "dateAffichee": "27 septembre 2026",
+    "titre": "Modification d'un événement",
+    "details": [
+      "Un événement peut être modifié : titre, type, lieu, dates et description. Le formulaire s'ouvre prérempli depuis le crayon sur la carte de l'événement. Le serveur acceptait déjà la modification, mais aucun bouton ne la déclenchait.",
+      "L'équipe de campagne et la direction voyaient les boutons « Nouvel événement » et « Supprimer », réservés au mandataire : ils ne pouvaient que renvoyer une erreur. Ces actions ne s'affichent plus qu'au mandataire."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.18.0",
     "date": "2026-09-25",
     "dateAffichee": "25 septembre 2026",

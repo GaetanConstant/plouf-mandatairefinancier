@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CalendarDays, Plus, Trash2, Link2, X, FileText } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, Trash2, Link2, X, FileText } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -11,11 +11,29 @@ const TYPES_EVT = ['reunion_publique', 'collecte', 'tractage', 'meeting', 'porte
 
 const eur = (v) => (v || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
-export function EvenementsPage() {
+const FORM_VIDE = { titre: '', type: 'meeting', date_debut: '', date_fin: '', lieu: '', description: '' };
+
+export function EvenementsPage({ role }) {
     const queryClient = useQueryClient();
-    const [createOpen, setCreateOpen] = useState(false);
+    // Créer, modifier et supprimer un événement sont réservés au mandataire
+    // côté API : afficher les boutons aux autres rôles ne produirait que des 403.
+    const peutModifier = role === 'mandataire';
+    // Un seul formulaire pour les deux usages : `editId` null = création.
+    const [formOpen, setFormOpen] = useState(false);
+    const [editId, setEditId] = useState(null);
     const [detailId, setDetailId] = useState(null);
-    const [form, setForm] = useState({ titre: '', type: 'meeting', date_debut: '', date_fin: '', lieu: '', description: '' });
+    const [form, setForm] = useState(FORM_VIDE);
+
+    const ouvrirCreation = () => { setEditId(null); setForm(FORM_VIDE); setFormOpen(true); };
+    const ouvrirEdition = (e) => {
+        setEditId(e.id);
+        setForm({
+            titre: e.titre || '', type: e.type || 'meeting',
+            date_debut: e.date_debut || '', date_fin: e.date_fin || '',
+            lieu: e.lieu || '', description: e.description || '',
+        });
+        setFormOpen(true);
+    };
 
     const { data: evenements, isLoading } = useQuery({
         queryKey: ['evenements'],
@@ -27,9 +45,16 @@ export function EvenementsPage() {
         queryClient.invalidateQueries(['frise']);
     };
 
-    const createMutation = useMutation({
-        mutationFn: async (p) => axios.post(`${API_URL}/evenements`, p),
-        onSuccess: () => { invalidate(); setCreateOpen(false); setForm({ titre: '', type: 'meeting', date_debut: '', date_fin: '', lieu: '', description: '' }); },
+    const saveMutation = useMutation({
+        mutationFn: async (p) => (editId === null
+            ? axios.post(`${API_URL}/evenements`, p)
+            : axios.put(`${API_URL}/evenements/${editId}`, p)),
+        onSuccess: () => {
+            invalidate();
+            // Le détail ouvert porte le titre : il doit suivre la modification.
+            if (editId !== null) queryClient.invalidateQueries(['evenement', editId]);
+            setFormOpen(false); setEditId(null); setForm(FORM_VIDE);
+        },
     });
     const deleteMutation = useMutation({
         mutationFn: async (id) => axios.delete(`${API_URL}/evenements/${id}`),
@@ -45,7 +70,9 @@ export function EvenementsPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Événements</h1>
                     <p className="text-muted-foreground">Regroupez vos dépenses par événement (coût calculé par quote-part).</p>
                 </div>
-                <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="w-4 h-4" /> Nouvel événement</Button>
+                {peutModifier && (
+                    <Button onClick={ouvrirCreation} className="gap-2"><Plus className="w-4 h-4" /> Nouvel événement</Button>
+                )}
             </header>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -57,9 +84,20 @@ export function EvenementsPage() {
                                 <CalendarDays className="w-5 h-5 text-primary" />
                                 <h3 className="font-bold">{e.titre}</h3>
                             </div>
-                            <button onClick={(ev) => { ev.stopPropagation(); deleteMutation.mutate(e.id); }} className="text-muted-foreground hover:text-red-600">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            {peutModifier && (
+                            <div className="flex items-center gap-2">
+                                <button onClick={(ev) => { ev.stopPropagation(); ouvrirEdition(e); }}
+                                    title="Modifier l'événement"
+                                    className="text-muted-foreground hover:text-primary transition-colors">
+                                    <Pencil className="w-4 h-4" />
+                                </button>
+                                <button onClick={(ev) => { ev.stopPropagation(); deleteMutation.mutate(e.id); }}
+                                    title="Supprimer l'événement"
+                                    className="text-muted-foreground hover:text-red-600 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                            )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 capitalize">{(e.type || '').replace(/_/g, ' ')} • {e.date_debut}{e.lieu ? ` • ${e.lieu}` : ''}</p>
                         <div className="mt-3 flex items-center justify-between">
@@ -76,7 +114,8 @@ export function EvenementsPage() {
                 )}
             </div>
 
-            <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Nouvel événement">
+            <Modal isOpen={formOpen} onClose={() => setFormOpen(false)}
+                title={editId === null ? 'Nouvel événement' : "Modifier l'événement"}>
                 <div className="space-y-4">
                     <Input label="Titre" value={form.titre} onChange={e => setForm({ ...form, titre: e.target.value })} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -89,8 +128,9 @@ export function EvenementsPage() {
                     </div>
                     <Input label="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                     <div className="pt-2 flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
-                        <Button onClick={() => createMutation.mutate({ ...form, date_fin: form.date_fin || null })} isLoading={createMutation.isPending}>Créer</Button>
+                        <Button variant="outline" onClick={() => setFormOpen(false)}>Annuler</Button>
+                        <Button onClick={() => saveMutation.mutate({ ...form, date_fin: form.date_fin || null })}
+                            isLoading={saveMutation.isPending}>{editId === null ? 'Créer' : 'Enregistrer'}</Button>
                     </div>
                 </div>
             </Modal>

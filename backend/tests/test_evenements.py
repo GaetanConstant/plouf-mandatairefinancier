@@ -62,5 +62,43 @@ def test_garde_quote_part_superieure_100():
         teardown(cid)
 
 
+def test_renommer_un_evenement_conserve_ses_depenses():
+    """Renommer ne doit pas défaire les liaisons, ni le coût calculé."""
+    cid = fresh_campaign()
+    try:
+        ev = evenements.create_evenement(cid, evenements.EvenementIn(
+            titre="Réunion publique", type="reunion_publique", date_debut="2026-02-10",
+            lieu="Villeurbanne"))["id"]
+        d = _add_depense(cid, 800)
+        evenements.link_depense(cid, ev, evenements.LiaisonIn(depense_id=d))
+
+        evenements.update_evenement(cid, ev, evenements.EvenementIn(
+            titre="Meeting de campagne", lieu="Saint-Fons"))
+
+        detail = evenements.detail_evenement(cid, ev)
+        assert detail["titre"] == "Meeting de campagne", detail["titre"]
+        assert detail["lieu"] == "Saint-Fons", detail["lieu"]
+        # Champs non transmis : inchangés, pas écrasés.
+        assert detail["type"] == "reunion_publique", detail["type"]
+        assert detail["date_debut"] == "2026-02-10", detail["date_debut"]
+        assert detail["nb_depenses"] == 1 and detail["cout"] == 800.0, detail
+    finally:
+        teardown(cid)
+
+
+def test_renommer_un_evenement_inexistant_rejete():
+    cid = fresh_campaign()
+    try:
+        raised = False
+        try:
+            evenements.update_evenement(cid, 999, evenements.EvenementIn(titre="X"))
+        except HTTPException as e:
+            raised = True
+            assert e.status_code == 404
+        assert raised, "un événement inexistant aurait dû donner un 404"
+    finally:
+        teardown(cid)
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
