@@ -8,6 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import HTTPException
 
 import completude
+import comptes
+from datetime import date
+from models import Depense, Recette
 from db.session import campaign_session
 from db.models import Colistier, ExpertComptable
 from db.helpers import election_id
@@ -21,6 +24,121 @@ def _colistiers(cid, civilites, ordres=None):
         eid = election_id(s)
         for rang, civ in zip(ordres, civilites):
             s.add(Colistier(election_id=eid, ordre=rang, civilite=civ, nom=f"NOM{rang}"))
+
+
+def _section(cid, cle):
+    return {s["cle"]: s for s in completude.evaluer(cid)["sections"]}[cle]
+
+
+def test_depense_sans_facture_compte_dans_le_restant():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Location véhicule", fournisseur="F",
+            montant_ttc=145.13, tva=0.0, categorie_cnccfp="D1", statut="Facturé"))
+        sec = _section(cid, "justificatifs_depenses")
+        assert sec["requis"] == 1 and sec["remplis"] == 0, sec
+        # Repérable par son numéro de pièce : c'est par lui qu'on classe.
+        assert sec["manquants"] == ["D001 — Location véhicule (145 €)"], sec["manquants"]
+    finally:
+        teardown(cid)
+
+
+def test_depense_avec_facture_ne_compte_pas():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Impression", fournisseur="F",
+            montant_ttc=900.0, tva=0.0, categorie_cnccfp="A1", statut="Facturé",
+            justificatif_path="facture.pdf"))
+        sec = _section(cid, "justificatifs_depenses")
+        assert sec["complet"] and sec["remplis"] == 1, sec
+    finally:
+        teardown(cid)
+
+
+def test_concours_en_nature_n_exige_pas_de_facture():
+    """Une prestation donnée n'a pas de facture — même exception que la conformité."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Salle prêtée", fournisseur="Mairie",
+            montant_ttc=300.0, tva=0.0, categorie_cnccfp="B1", statut="Payé",
+            is_nature=True))
+        sec = _section(cid, "justificatifs_depenses")
+        assert sec["requis"] == 0 and sec["complet"], sec
+    finally:
+        teardown(cid)
+
+
+def test_recette_sans_justificatif_compte_dans_le_restant():
+    cid = fresh_campaign()
+    try:
+        comptes.create_recette(cid, Recette(
+            date=date(2026, 2, 10), nom_donateur="DUPONT Jean", adresse="1 rue X",
+            montant=2000.0, type="Pret"))
+        sec = _section(cid, "justificatifs_recettes")
+        assert sec["requis"] == 1 and sec["remplis"] == 0, sec
+        assert sec["manquants"] == ["R001 — Prêt (2000 €)"], sec["manquants"]
+    finally:
+        teardown(cid)
+
+
+def test_justificatifs_manquants_bloquent_l_export():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Location", fournisseur="F",
+            montant_ttc=145.0, tva=0.0, categorie_cnccfp="D1", statut="Facturé"))
+        etat = completude.evaluer(cid)
+        assert any("Justificatifs de dépenses" in m for m in etat["manquants"]), etat["manquants"]
+    finally:
+        teardown(cid)
+
+
+def test_depense_non_validee_hors_decompte():
+    """Ce qui attend l'arbitrage n'est pas encore une étape du dossier."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Bière", fournisseur="Cave",
+            montant_ttc=22.82, tva=0.0, categorie_cnccfp="B2", statut="Facturé"),
+            auteur="militant", role="equipe")
+        sec = _section(cid, "justificatifs_depenses")
+        assert sec["requis"] == 0, sec
+    finally:
+        teardown(cid)
+
+
+def test_piece_deposee_sur_une_recette_sort_du_restant():
+    """La section recettes doit être actionnable : sinon elle bloque l'export à vie."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_recette(cid, Recette(
+            date=date(2026, 2, 10), nom_donateur="DUPONT Jean", adresse="1 rue X",
+            montant=500.0, type="Don"))
+        rec = comptes.list_recettes(cid)[0]
+        assert not _section(cid, "justificatifs_recettes")["complet"]
+
+        comptes.ajouter_piece_recette(
+            cid, rec["id"], comptes.PieceIn(fichier="recu_001.pdf", type_piece="recu"),
+            auteur="gaetan", role="mandataire")
+
+        assert _section(cid, "justificatifs_recettes")["complet"]
+        assert comptes.list_recettes(cid)[0]["justificatif_path"] == "recu_001.pdf"
+    finally:
+        teardown(cid)
+
+
+def test_recette_creee_avec_sa_piece():
+    cid = fresh_campaign()
+    try:
+        comptes.create_recette(cid, Recette(
+            date=date(2026, 2, 10), nom_donateur="MARTIN Claire", adresse="2 rue Y",
+            montant=300.0, type="Don", justificatif_path="recu_002.pdf"))
+        assert _section(cid, "justificatifs_recettes")["complet"]
+    finally:
+        teardown(cid)
 
 
 def test_campagne_neuve_incomplete():

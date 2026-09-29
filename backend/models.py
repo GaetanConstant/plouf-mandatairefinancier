@@ -10,6 +10,10 @@ class Recette(BaseModel):
     type: str # 'Don', 'Apport', 'Pret'
     recu_genere: bool = False
     date_envoi: Optional[str] = None
+    # Pièce justificative de la recette : reçu-don, bordereau de remise, contrat
+    # de prêt. Exigée au dossier au même titre qu'une facture de dépense.
+    justificatif_path: Optional[str] = None
+    type_piece: str = "recu"
 
 class Depense(BaseModel):
     date: date

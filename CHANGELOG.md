@@ -10,6 +10,16 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.21.0 — 2026-09-29 — Les justificatifs manquants dans le score de complétude
+
+### Ajouté
+- Les dépenses et les recettes sans justificatif comptent désormais dans le pourcentage de complétude du dossier. Chaque manque est listé par son numéro de pièce et son montant, dans la barre du tableau de bord comme dans l'écran Dépôt : c'est la liste de ce qui reste à réunir avant de pouvoir déposer.
+- Une recette peut recevoir sa pièce justificative — reçu-don, bordereau de remise, contrat de prêt — depuis la liste des recettes. La colonne du même nom ouvre la pièce quand elle existe, propose de la déposer sinon.
+
+### Modifié
+- Un concours en nature n'est pas compté comme dépense sans facture : c'est une prestation donnée, pas achetée. Même règle que la checklist de conformité.
+- Une dépense ou une recette en attente de validation n'entre pas encore dans le décompte : elle n'est une étape du dossier qu'une fois acceptée par le mandataire.
+
 ## v0.20.0 — 2026-09-29 — Rattachement d'une dépense depuis son formulaire
 
 ### Ajouté

@@ -29,6 +29,15 @@ export const TYPES_PIECE = [
     { value: "facture", label: "Facture" },
 ];
 
+// Pièces qui justifient une recette : reçu-don détaché du carnet, bordereau de
+// remise en banque, contrat pour un prêt.
+export const TYPES_PIECE_RECETTE = [
+    { value: "recu", label: "Reçu-don" },
+    { value: "releve_bancaire", label: "Bordereau de remise" },
+    { value: "contrat", label: "Contrat de prêt" },
+    { value: "autre", label: "Autre pièce" },
+];
+
 export const TYPES_RECETTE = [
     { value: "Don", label: "Don (Personne Physique)" },
     { value: "Apport", label: "Apport Personnel" },

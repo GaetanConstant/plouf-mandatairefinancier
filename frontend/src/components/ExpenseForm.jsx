@@ -111,6 +111,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['depenses']);
             queryClient.invalidateQueries(['stats']);
+            queryClient.invalidateQueries(['completude']);
             // Le coût d'un événement dépend de ces liaisons.
             queryClient.invalidateQueries(['evenements']);
             queryClient.invalidateQueries(['frise']);

@@ -90,9 +90,26 @@ def _statut_legacy_to_orm(statut: str | None, is_nature: bool) -> tuple[enums.St
 
 # ── Recettes ─────────────────────────────────────────────────────────────────
 
-def _recette_to_legacy(r: Recette) -> dict:
+def _creer_document(s, chemin: str, type_piece: str) -> int:
+    """Enregistre une pièce versée au dossier et rend son identifiant."""
+    fichier = os.path.basename(chemin)
+    doc = Document(
+        type=_type_piece(type_piece),
+        media_type=_media_type(fichier),
+        fichier=fichier,
+        enveloppe=enums.Enveloppe.A,
+    )
+    s.add(doc)
+    s.flush()
+    return doc.id
+
+
+def _recette_to_legacy(r: Recette, doc_fichier: str | None = None,
+                       doc_type: str | None = None) -> dict:
     return {
         "id": r.id,
+        "justificatif_path": doc_fichier,
+        "type_piece": doc_type or enums.TypeDocument.recu.value,
         "num_piece": r.num_piece,
         "date": _fmt_date(r.date_versement),
         "nom_donateur": r.donateur.nom if r.donateur else None,
@@ -108,7 +125,14 @@ def list_recettes(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
         recettes = s.scalars(_valides(select(Recette), Recette).order_by(Recette.date_versement.desc())).all()
-        return [_recette_to_legacy(r) for r in recettes]
+        doc_ids = {r.justificatif_doc_id for r in recettes if r.justificatif_doc_id}
+        docs = {}
+        if doc_ids:
+            for doc in s.scalars(_valides(select(Document), Document)
+                                 .where(Document.id.in_(doc_ids))).all():
+                docs[doc.id] = (doc.fichier, doc.type.value)
+        return [_recette_to_legacy(r, *docs.get(r.justificatif_doc_id, (None, None)))
+                for r in recettes]
 
 
 def _get_or_create_donateur(s, nom: str, adresse: str | None) -> Donateur:
@@ -140,8 +164,13 @@ def create_recette(campaign_id: str, dto, auteur: str | None = None,
                     detail=f"Le donateur {dto.nom_donateur} dépasse le plafond de "
                            f"{LIMITE_DON_INDIVIDUEL}€ (Déjà donné: {deja}€)",
                 )
+        justificatif_id = None
+        if getattr(dto, "justificatif_path", None):
+            justificatif_id = _creer_document(s, dto.justificatif_path,
+                                              getattr(dto, "type_piece", "recu"))
         r = Recette(
             donateur=don,
+            justificatif_doc_id=justificatif_id,
             categorie=categorie,
             montant=dto.montant,
             date_versement=dto.date,
@@ -172,6 +201,22 @@ def update_recette(campaign_id: str, recette_id: int, dto) -> dict:
         if dto.adresse:
             don.adresse = dto.adresse
         r.donateur = don
+
+        # Même règle que pour une dépense : la pièce est remplacée en place,
+        # sinon l'ancienne resterait listée au dépôt comme pièce orpheline.
+        if getattr(dto, "justificatif_path", None):
+            fichier = os.path.basename(dto.justificatif_path)
+            doc = s.get(Document, r.justificatif_doc_id) if r.justificatif_doc_id else None
+            if doc is None:
+                r.justificatif_doc_id = _creer_document(s, fichier,
+                                                        getattr(dto, "type_piece", "recu"))
+            else:
+                ancien = doc.fichier
+                doc.fichier = fichier
+                doc.media_type = _media_type(fichier)
+                doc.type = _type_piece(getattr(dto, "type_piece", "recu"))
+                s.flush()
+                _supprimer_fichier_remplace(s, ancien, fichier)
     return {"message": "Recette mise à jour"}
 
 
@@ -391,6 +436,46 @@ def ajouter_piece(campaign_id: str, depense_id: int, payload, auteur: str,
         s.add(doc)
         s.flush()
         d.facture_doc_id = doc.id
+
+    return {"message": "Justificatif déposé."
+                       if role != ROLE_MANDATAIRE else "Justificatif rattaché."}
+
+
+def ajouter_piece_recette(campaign_id: str, recette_id: int, payload, auteur: str,
+                          role: str) -> dict:
+    """Rattache un justificatif à une recette sans toucher à son montant.
+
+    Pendant exact d'`ajouter_piece` côté dépense : l'équipe et la direction
+    versent une pièce, elles ne modifient rien d'autre, et remplacer une pièce
+    déjà validée reste une décision du mandataire.
+    """
+    ensure_campaign_db(campaign_id)
+    fichier = os.path.basename(payload.fichier)
+    with campaign_session(campaign_id) as s:
+        r = s.get(Recette, recette_id)
+        if not r:
+            raise HTTPException(status_code=404, detail="Recette introuvable")
+
+        existante = s.get(Document, r.justificatif_doc_id) if r.justificatif_doc_id else None
+        if (existante is not None
+                and existante.statut_validation == enums.StatutValidation.valide
+                and role != ROLE_MANDATAIRE):
+            raise HTTPException(
+                status_code=409,
+                detail="Cette recette a déjà un justificatif. "
+                       "Demandez au mandataire financier de le remplacer.",
+            )
+
+        doc = Document(
+            type=_type_piece(payload.type_piece),
+            media_type=_media_type(fichier),
+            fichier=fichier,
+            enveloppe=enums.Enveloppe.A,
+        )
+        validation.estampiller(doc, auteur, role)
+        s.add(doc)
+        s.flush()
+        r.justificatif_doc_id = doc.id
 
     return {"message": "Justificatif déposé."
                        if role != ROLE_MANDATAIRE else "Justificatif rattaché."}

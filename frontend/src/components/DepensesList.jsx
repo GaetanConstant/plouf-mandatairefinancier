@@ -170,6 +170,7 @@ function DepotJustificatif({ depense, onClose }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['depenses']);
             queryClient.invalidateQueries(['mes-soumissions']);
+            queryClient.invalidateQueries(['completude']);
             onClose();
         },
         onError: (err) => setErreur(err.response?.data?.detail || "Le dépôt a échoué."),
