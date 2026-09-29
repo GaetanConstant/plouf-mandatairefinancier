@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.20.0",
+    "date": "2026-09-29",
+    "dateAffichee": "29 septembre 2026",
+    "titre": "Rattachement d'une dépense depuis son formulaire",
+    "details": [
+      "Une dépense se rattache à un événement directement depuis son formulaire, à l'enregistrement comme à la modification, avec sa quote-part. Il fallait jusqu'ici ouvrir l'événement et y chercher la dépense. Une dépense ventilée entre plusieurs événements reste possible, la somme des quote-parts ne pouvant dépasser 100 %.",
+      "Le coût d'un événement additionnait les dépenses en attente de validation. Une dépense déposée par l'équipe ou l'expert-comptable ne déplace plus le coût affiché avant l'arbitrage du mandataire, comme partout ailleurs dans l'application."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.19.0",
     "date": "2026-09-27",
     "dateAffichee": "27 septembre 2026",

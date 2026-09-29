@@ -40,6 +40,67 @@ class LiaisonIn(BaseModel):
     quote_part: Optional[float] = None  # % ; None = 100 %
 
 
+class LiaisonEvenementIn(BaseModel):
+    """Rattachement vu depuis la dépense : l'événement, et la part qui lui revient."""
+    evenement_id: int
+    quote_part: Optional[float] = None  # % ; None = 100 %
+
+
+QUOTE_PART_TOTALE = 100.0
+
+
+def part(quote_part: Optional[float]) -> float:
+    """Quote-part effective : absente vaut la totalité de la dépense."""
+    return quote_part if quote_part is not None else QUOTE_PART_TOTALE
+
+
+def appliquer_liaisons(s, depense_id: int, liaisons: list[LiaisonEvenementIn]) -> None:
+    """Remplace les rattachements d'une dépense par la liste fournie.
+
+    Vu depuis la dépense, contrairement à `link_depense` qui ajoute un lien vu
+    depuis l'événement. La liste fait foi : un événement absent est détaché.
+    La règle Σ quote-parts ≤ 100 % reste la même — c'est le garde-fou contre le
+    double comptage d'une même facture sur deux événements.
+    """
+    vus: set[int] = set()
+    total = 0.0
+    for liaison in liaisons:
+        if liaison.evenement_id in vus:
+            raise HTTPException(status_code=400,
+                detail="Le même événement est rattaché deux fois à cette dépense.")
+        vus.add(liaison.evenement_id)
+        if not s.get(Evenement, liaison.evenement_id):
+            raise HTTPException(status_code=404, detail="Événement introuvable")
+        if liaison.quote_part is not None and not (0 < liaison.quote_part <= QUOTE_PART_TOTALE):
+            raise HTTPException(status_code=400,
+                detail="Une quote-part doit être comprise entre 0 et 100 %.")
+        total += part(liaison.quote_part)
+    if total > QUOTE_PART_TOTALE:
+        raise HTTPException(status_code=400,
+            detail=f"Quote-part totale de cette dépense : {total:.0f} % (maximum 100 %).")
+
+    existants = {l.evenement_id: l for l in s.scalars(
+        select(EvenementDepense).where(EvenementDepense.depense_id == depense_id)).all()}
+    for liaison in liaisons:
+        lien = existants.pop(liaison.evenement_id, None)
+        if lien:
+            lien.quote_part = liaison.quote_part
+        else:
+            s.add(EvenementDepense(evenement_id=liaison.evenement_id,
+                                   depense_id=depense_id, quote_part=liaison.quote_part))
+    for orphelin in existants.values():
+        s.delete(orphelin)
+
+
+def liaisons_de_depense(s, depense_id: int) -> list[dict]:
+    """Événements rattachés à une dépense, pour préremplir son formulaire."""
+    liens = s.scalars(select(EvenementDepense)
+                      .where(EvenementDepense.depense_id == depense_id)).all()
+    titres = {e.id: e.titre for e in s.scalars(select(Evenement)).all()}
+    return [{"evenement_id": l.evenement_id, "titre": titres.get(l.evenement_id),
+             "quote_part": l.quote_part} for l in liens]
+
+
 class DocumentEvenementIn(BaseModel):
     """Pièce rattachée à un événement : photo prise sur place, facture, contrat.
 
@@ -60,21 +121,34 @@ def _d(s: Optional[str]) -> Optional[date]:
 
 
 
+def depenses_liees(s, evenement_id: int) -> list[tuple]:
+    """Couples (lien, dépense) rattachés à l'événement, dépenses validées seules.
+
+    Le filtre `valides` compte : une dépense déposée par l'équipe ou l'expert
+    reste en attente d'arbitrage, et ne doit pas gonfler le coût affiché d'un
+    événement avant que le mandataire l'ait acceptée.
+    """
+    liens = s.scalars(select(EvenementDepense)
+                      .where(EvenementDepense.evenement_id == evenement_id)).all()
+    if not liens:
+        return []
+    depenses = {d.id: d for d in s.scalars(
+        _valides(select(Depense), Depense)
+        .where(Depense.id.in_([l.depense_id for l in liens]))).all()}
+    return [(l, depenses[l.depense_id]) for l in liens if l.depense_id in depenses]
+
+
+def cout_affecte(lien, depense) -> float:
+    return (depense.montant_ttc or 0.0) * part(lien.quote_part) / QUOTE_PART_TOTALE
+
+
 def _cout(s, evenement_id: int) -> float:
-    """Σ (montant dépense × quote-part) des dépenses liées à l'événement."""
-    liens = s.scalars(select(EvenementDepense).where(EvenementDepense.evenement_id == evenement_id)).all()
-    total = 0.0
-    for l in liens:
-        dep = s.get(Depense, l.depense_id)
-        if not dep:
-            continue
-        part = (l.quote_part if l.quote_part is not None else 100.0) / 100.0
-        total += (dep.montant_ttc or 0.0) * part
-    return total
+    """Σ (montant dépense × quote-part) des dépenses validées de l'événement."""
+    return sum(cout_affecte(l, d) for l, d in depenses_liees(s, evenement_id))
 
 
 def _evenement_dict(s, e: Evenement) -> dict:
-    liens = s.scalars(select(EvenementDepense).where(EvenementDepense.evenement_id == e.id)).all()
+    liees = depenses_liees(s, e.id)
     return {
         "id": e.id,
         "titre": e.titre,
@@ -83,8 +157,8 @@ def _evenement_dict(s, e: Evenement) -> dict:
         "date_fin": _fmt(e.date_fin),
         "lieu": e.lieu,
         "description": e.description,
-        "nb_depenses": len(liens),
-        "cout": _cout(s, e.id),
+        "nb_depenses": len(liees),
+        "cout": sum(cout_affecte(l, d) for l, d in liees),
     }
 
 
@@ -157,19 +231,15 @@ def detail_evenement(campaign_id: str, evenement_id: int) -> dict:
         e = s.get(Evenement, evenement_id)
         if not e:
             raise HTTPException(status_code=404, detail="Événement introuvable")
-        liens = s.scalars(select(EvenementDepense).where(EvenementDepense.evenement_id == evenement_id)).all()
-        depenses = []
-        for l in liens:
-            dep = s.get(Depense, l.depense_id)
-            if dep:
-                depenses.append({
-                    "depense_id": dep.id,
-                    "libelle": dep.nature,
-                    "fournisseur": dep.fournisseur,
-                    "montant_ttc": dep.montant_ttc,
-                    "quote_part": l.quote_part,
-                    "cout_affecte": (dep.montant_ttc or 0.0) * ((l.quote_part if l.quote_part is not None else 100.0) / 100.0),
-                })
+        depenses = [{
+            "depense_id": dep.id,
+            "num_piece": dep.num_piece,
+            "libelle": dep.nature,
+            "fournisseur": dep.fournisseur,
+            "montant_ttc": dep.montant_ttc,
+            "quote_part": l.quote_part,
+            "cout_affecte": cout_affecte(l, dep),
+        } for l, dep in depenses_liees(s, evenement_id)]
         documents = [{
             "id": doc.id,
             "type": doc.type.value,
@@ -260,9 +330,9 @@ def link_depense(campaign_id: str, evenement_id: int, payload: LiaisonIn) -> dic
         autres = s.scalars(select(EvenementDepense).where(
             EvenementDepense.depense_id == payload.depense_id,
             EvenementDepense.evenement_id != evenement_id)).all()
-        deja = sum((l.quote_part if l.quote_part is not None else 100.0) for l in autres)
-        nouvelle = payload.quote_part if payload.quote_part is not None else 100.0
-        if deja + nouvelle > 100.0:
+        deja = sum(part(l.quote_part) for l in autres)
+        nouvelle = part(payload.quote_part)
+        if deja + nouvelle > QUOTE_PART_TOTALE:
             raise HTTPException(status_code=400,
                 detail=f"Quote-part totale de cette dépense dépasserait 100 % (déjà affecté : {deja:.0f} %).")
         lien = s.get(EvenementDepense, {"evenement_id": evenement_id, "depense_id": payload.depense_id})

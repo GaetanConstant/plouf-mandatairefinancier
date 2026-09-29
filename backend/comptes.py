@@ -19,6 +19,7 @@ from db.session import campaign_session, ensure_campaign_db
 from db.helpers import fmt_date as _fmt_date, media_type as _media_type, valides as _valides
 from db import enums
 from database import ROLE_MANDATAIRE
+import evenements
 import pieces
 import validation
 from database import UPLOADS_DIR
@@ -255,8 +256,23 @@ def _type_piece(valeur: str | None) -> enums.TypeDocument:
         return enums.TypeDocument.facture
 
 
-def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None = None) -> dict:
+def _liaisons_dto(dto) -> list | None:
+    """Liaisons événement portées par le DTO, converties pour `evenements`.
+
+    Absent du payload = ne pas y toucher : un appelant qui ignore ce champ ne
+    doit pas détacher les rattachements faits depuis la page Événements.
+    """
+    liaisons = getattr(dto, "evenements", None)
+    if liaisons is None:
+        return None
+    return [evenements.LiaisonEvenementIn(evenement_id=l.evenement_id,
+                                          quote_part=l.quote_part) for l in liaisons]
+
+
+def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None = None,
+                       liaisons: list[dict] | None = None) -> dict:
     return {
+        "evenements": liaisons or [],
         "id": d.id,
         "num_piece": d.num_piece,
         "date": _fmt_date(d.date_facture),
@@ -286,7 +302,8 @@ def list_depenses(campaign_id: str) -> list[dict]:
         resultat = []
         for d in depenses:
             fichier, type_doc = docs.get(d.facture_doc_id, (None, None))
-            resultat.append(_depense_to_legacy(d, fichier, type_doc))
+            resultat.append(_depense_to_legacy(
+                d, fichier, type_doc, evenements.liaisons_de_depense(s, d.id)))
         return resultat
 
 
@@ -324,7 +341,11 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
         s.add(depense)
         s.flush()
         pieces.attribuer(s, depense)
-    return {"message": "Dépense ajoutée"}
+        liaisons = _liaisons_dto(dto)
+        if liaisons is not None:
+            evenements.appliquer_liaisons(s, depense.id, liaisons)
+        return {"message": "Dépense ajoutée", "id": depense.id,
+                "num_piece": depense.num_piece}
 
 
 class PieceIn(BaseModel):
@@ -423,6 +444,10 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
         d.statut = statut
         d.reglee = reglee
         d.prise_en_charge = _prise_en_charge(getattr(dto, "prise_en_charge", None))
+
+        liaisons = _liaisons_dto(dto)
+        if liaisons is not None:
+            evenements.appliquer_liaisons(s, d.id, liaisons)
     return {"message": "Dépense mise à jour"}
 
 
