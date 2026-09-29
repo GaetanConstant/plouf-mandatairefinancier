@@ -113,17 +113,29 @@ def _evaluer_objet(obj, champs: list[tuple[str, str]]) -> tuple[int, list[str]]:
 
 
 def _section(cle: str, titre: str, total: int, remplis: int, manquants: list[str],
-             note: Optional[str] = None) -> dict:
+             note: Optional[str] = None, actions: Optional[list[dict]] = None) -> dict:
+    """Une section du dossier.
+
+    `manquants` énonce ce qui manque ; `actions` dit **où le corriger**. Les
+    deux vont de pair : une liste de manques qu'on ne peut pas traiter depuis
+    l'écran qui les affiche n'est qu'un constat.
+    """
     return {
         "cle": cle,
         "titre": titre,
         "requis": total,
         "remplis": remplis,
         "manquants": manquants,
+        "actions": actions or [],
         "pct": round(remplis / total * 100) if total else 100,
         "complet": not manquants,
         "note": note,
     }
+
+
+def _vers_ecran(onglet: str, libelle: str, cible: Optional[str] = None) -> dict:
+    """Action « aller corriger ailleurs », pour ce qui ne se règle pas par un fichier."""
+    return {"type": "ecran", "onglet": onglet, "cible": cible, "libelle": libelle}
 
 
 def _section_liste(colistiers: list[Colistier]) -> dict:
@@ -134,7 +146,8 @@ def _section_liste(colistiers: list[Colistier]) -> dict:
     manquants: list[str] = []
     if not colistiers:
         return _section("liste", "Liste des candidats", 3, 0,
-                        ["Aucun candidat saisi", "Rangs de la liste", "Alternance femme / homme"])
+                        ["Aucun candidat saisi", "Rangs de la liste", "Alternance femme / homme"],
+                        actions=[_vers_ecran("listeequipe", "Saisir dans Liste & équipe")])
 
     ordres = [c.ordre for c in colistiers]
     if any(o is None for o in ordres):
@@ -152,7 +165,8 @@ def _section_liste(colistiers: list[Colistier]) -> dict:
         manquants.append("Alternance femme / homme rompue")
 
     return _section("liste", "Liste des candidats", 3, 3 - len(manquants), manquants,
-                    note=f"{len(colistiers)} candidats")
+                    note=f"{len(colistiers)} candidats",
+                    actions=[_vers_ecran("listeequipe", "Corriger dans Liste & équipe")])
 
 
 def _libelle_ecriture(num_piece: Optional[str], intitule: Optional[str],
@@ -172,12 +186,16 @@ def _section_justificatifs_depenses(s) -> dict:
     depenses = [d for d in s.scalars(_valides(select(Depense), Depense)
                                      .order_by(Depense.num_piece)).all()
                 if d.statut != enums.StatutDepense.realise_nature]
+    sans_piece = [d for d in depenses if not d.facture_doc_id]
     manquants = [_libelle_ecriture(d.num_piece, d.nature, d.montant_ttc, "dépense")
-                 for d in depenses if not d.facture_doc_id]
+                 for d in sans_piece]
+    actions = [{"type": "depense", "id": d.id, "num_piece": d.num_piece,
+                "libelle": d.nature or "dépense", "tiers": d.fournisseur,
+                "montant": d.montant_ttc} for d in sans_piece]
     total = len(depenses)
     return _section(
         "justificatifs_depenses", "Justificatifs de dépenses", total,
-        total - len(manquants), manquants,
+        total - len(manquants), manquants, actions=actions,
         note=f"{total - len(manquants)}/{total} dépenses justifiées" if total else
              "Aucune dépense enregistrée",
     )
@@ -187,13 +205,17 @@ def _section_justificatifs_recettes(s) -> dict:
     """Recettes validées sans pièce au dossier (reçu, bordereau de remise…)."""
     recettes = list(s.scalars(_valides(select(Recette), Recette)
                               .order_by(Recette.num_piece)).all())
+    sans_piece = [r for r in recettes if not r.justificatif_doc_id]
     manquants = [_libelle_ecriture(r.num_piece, _CATEGORIE_RECETTE.get(r.categorie),
-                                   r.montant, "recette")
-                 for r in recettes if not r.justificatif_doc_id]
+                                   r.montant, "recette") for r in sans_piece]
+    actions = [{"type": "recette", "id": r.id, "num_piece": r.num_piece,
+                "libelle": _CATEGORIE_RECETTE.get(r.categorie) or "recette",
+                "tiers": r.donateur.nom if r.donateur else None,
+                "montant": r.montant} for r in sans_piece]
     total = len(recettes)
     return _section(
         "justificatifs_recettes", "Justificatifs de recettes", total,
-        total - len(manquants), manquants,
+        total - len(manquants), manquants, actions=actions,
         note=f"{total - len(manquants)}/{total} recettes justifiées" if total else
              "Aucune recette enregistrée",
     )
@@ -210,13 +232,17 @@ def evaluer(campaign_id: str) -> dict:
         compte = s.scalars(select(CompteBancaire)).first()
         colistiers = list(s.scalars(select(Colistier)).all())
 
+        vers_identite = lambda cle: [_vers_ecran("identite", "Compléter dans Identité", cle)]
         sections = [
             _section("election", "Élection", len(CHAMPS_ELECTION),
-                     *_evaluer_objet(election, CHAMPS_ELECTION)),
+                     *_evaluer_objet(election, CHAMPS_ELECTION),
+                     actions=vers_identite("election")),
             _section("candidat", "Candidat", len(CHAMPS_CANDIDAT),
-                     *_evaluer_objet(candidat, CHAMPS_CANDIDAT)),
+                     *_evaluer_objet(candidat, CHAMPS_CANDIDAT),
+                     actions=vers_identite("candidat")),
             _section("mandataire", "Mandataire financier", len(CHAMPS_MANDATAIRE),
-                     *_evaluer_objet(mandataire, CHAMPS_MANDATAIRE)),
+                     *_evaluer_objet(mandataire, CHAMPS_MANDATAIRE),
+                     actions=vers_identite("mandataire")),
         ]
 
         # L'expert-comptable est obligatoire sauf dispense explicite du compte.
@@ -226,10 +252,12 @@ def evaluer(campaign_id: str) -> dict:
         else:
             sections.append(_section("expert_comptable", "Expert-comptable", len(CHAMPS_EXPERT),
                                      *_evaluer_objet(expert, CHAMPS_EXPERT),
-                                     note=None if expert else "Aucun expert-comptable enregistré"))
+                                     note=None if expert else "Aucun expert-comptable enregistré",
+                                     actions=vers_identite("expert_comptable")))
 
         sections.append(_section("compte_bancaire", "Compte bancaire", len(CHAMPS_COMPTE),
-                                 *_evaluer_objet(compte, CHAMPS_COMPTE)))
+                                 *_evaluer_objet(compte, CHAMPS_COMPTE),
+                                 actions=vers_identite("compte_bancaire")))
         sections.append(_section_liste(colistiers))
 
         # Les justificatifs pèsent dans le score : ce sont eux qui restent à
@@ -248,6 +276,8 @@ def evaluer(campaign_id: str) -> dict:
     sections.append(_section(
         "pieces_declaratives", "Pièces déclaratives", len(exigees),
         len(exigees) - len(manquantes), manquantes,
+        actions=[{"type": "piece_declarative", "cle": p["cle"], "libelle": p["libelle"]}
+                 for p in exigees if not p["fournie"]],
     ))
 
     # Le relevé bancaire est exigé en enveloppe B : lui seul atteste du
@@ -259,6 +289,7 @@ def evaluer(campaign_id: str) -> dict:
         "releves", "Relevés bancaires", 1, 1 if nb_releves else 0,
         [] if nb_releves else ["Aucun relevé bancaire importé"],
         note=f"{nb_releves} relevé(s)" if nb_releves else None,
+        actions=[] if nb_releves else [_vers_ecran("releves", "Importer un relevé")],
     ))
 
     # Pièces annoncées au bordereau mais absentes du disque : l'enveloppe
@@ -269,6 +300,7 @@ def evaluer(campaign_id: str) -> dict:
         "pieces", "Pièces justificatives", 1, 0 if absentes else 1,
         [f"Fichier introuvable : {f}" for f in absentes],
         note=None if absentes else "Tous les fichiers sont présents",
+        actions=[_vers_ecran("depot", "Vérifier dans Dépôt")] if absentes else [],
     ))
 
     requis = sum(sec["requis"] for sec in sections)
