@@ -41,6 +41,16 @@ def update_depense(depense_id: int, update: Depense, current_user: dict = Depend
     return comptes.update_depense(campaign_id, depense_id, update)
 
 
+@router.post("/recettes/{recette_id}/piece")
+def ajouter_piece_recette(recette_id: int, payload: comptes.PieceIn,
+                          campaign_id: str = Depends(get_campaign_conn),
+                          current_user: dict = Depends(get_current_user),
+                          role: str = Depends(get_role)):
+    """Rattache un justificatif à une recette, sans toucher à son montant."""
+    return comptes.ajouter_piece_recette(campaign_id, recette_id, payload,
+                                         current_user["username"], role)
+
+
 @router.get("/depenses")
 def list_depenses(campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_ou_expert)):
     return comptes.list_depenses(campaign_id)

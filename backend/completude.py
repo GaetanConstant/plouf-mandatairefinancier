@@ -19,11 +19,15 @@ from db.models import (
     Candidat,
     Colistier,
     CompteBancaire,
+    Depense,
     Election,
     ExpertComptable,
     Mandataire,
+    Recette,
 )
+from db.helpers import valides as _valides
 from db.session import campaign_session, ensure_campaign_db
+from db import enums
 
 
 # Champs exigés pour un dépôt, par section : (attribut, libellé affiché).
@@ -72,6 +76,15 @@ CHAMPS_EXPERT = [
     ("adresse_postale", "Adresse postale"),
     ("date_designation", "Date de désignation"),
 ]
+
+_CATEGORIE_RECETTE = {
+    enums.CategorieRecette.don: "Don",
+    enums.CategorieRecette.apport_perso: "Apport personnel",
+    enums.CategorieRecette.pret: "Prêt",
+    enums.CategorieRecette.contribution_parti: "Contribution d'un parti",
+    enums.CategorieRecette.produit_divers: "Produit divers",
+    enums.CategorieRecette.collecte: "Collecte",
+}
 
 CHAMPS_COMPTE = [
     ("banque", "Banque"),
@@ -142,6 +155,50 @@ def _section_liste(colistiers: list[Colistier]) -> dict:
                     note=f"{len(colistiers)} candidats")
 
 
+def _libelle_ecriture(num_piece: Optional[str], intitule: Optional[str],
+                      montant: Optional[float], defaut: str) -> str:
+    """Ligne actionnable : le numéro de pièce d'abord, c'est par lui qu'on classe."""
+    repere = f"{num_piece} — " if num_piece else ""
+    return f"{repere}{intitule or defaut} ({(montant or 0):.0f} €)"
+
+
+def _section_justificatifs_depenses(s) -> dict:
+    """Dépenses validées sans facture au dossier.
+
+    Un concours en nature n'a pas de facture — c'est une prestation donnée, pas
+    achetée. Même exception que le moteur de conformité, pour que les deux
+    modules ne se contredisent pas.
+    """
+    depenses = [d for d in s.scalars(_valides(select(Depense), Depense)
+                                     .order_by(Depense.num_piece)).all()
+                if d.statut != enums.StatutDepense.realise_nature]
+    manquants = [_libelle_ecriture(d.num_piece, d.nature, d.montant_ttc, "dépense")
+                 for d in depenses if not d.facture_doc_id]
+    total = len(depenses)
+    return _section(
+        "justificatifs_depenses", "Justificatifs de dépenses", total,
+        total - len(manquants), manquants,
+        note=f"{total - len(manquants)}/{total} dépenses justifiées" if total else
+             "Aucune dépense enregistrée",
+    )
+
+
+def _section_justificatifs_recettes(s) -> dict:
+    """Recettes validées sans pièce au dossier (reçu, bordereau de remise…)."""
+    recettes = list(s.scalars(_valides(select(Recette), Recette)
+                              .order_by(Recette.num_piece)).all())
+    manquants = [_libelle_ecriture(r.num_piece, _CATEGORIE_RECETTE.get(r.categorie),
+                                   r.montant, "recette")
+                 for r in recettes if not r.justificatif_doc_id]
+    total = len(recettes)
+    return _section(
+        "justificatifs_recettes", "Justificatifs de recettes", total,
+        total - len(manquants), manquants,
+        note=f"{total - len(manquants)}/{total} recettes justifiées" if total else
+             "Aucune recette enregistrée",
+    )
+
+
 def evaluer(campaign_id: str) -> dict:
     """État de complétude du dossier, section par section."""
     ensure_campaign_db(campaign_id)
@@ -174,6 +231,11 @@ def evaluer(campaign_id: str) -> dict:
         sections.append(_section("compte_bancaire", "Compte bancaire", len(CHAMPS_COMPTE),
                                  *_evaluer_objet(compte, CHAMPS_COMPTE)))
         sections.append(_section_liste(colistiers))
+
+        # Les justificatifs pèsent dans le score : ce sont eux qui restent à
+        # réunir quand tout le reste est saisi, et leur absence empêche le dépôt.
+        sections.append(_section_justificatifs_depenses(s))
+        sections.append(_section_justificatifs_recettes(s))
 
     # Récépissés de candidature et de déclaration du mandataire : exigés en
     # enveloppe B, et jusqu'ici ni demandés ni contrôlés par l'application.
