@@ -321,7 +321,7 @@ function App() {
   }
 
   if (!campaign) {
-    return <CampaignPage onSelect={setCampaign} user={user} />;
+    return <CampaignPage onSelect={setCampaign} user={user} onLogout={handleLogout} />;
   }
 
   // Ce voile ne couvre que le tableau de bord : les autres écrans gèrent leur

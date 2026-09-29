@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.23.0 — 2026-09-29 — Déconnexion depuis l'écran de choix des campagnes
+
+### Ajouté
+- Un bouton « Se déconnecter » sur l'écran de sélection des campagnes, avec le nom du compte connecté. Le bouton n'existait que dans la barre latérale, qui n'apparaît qu'une fois une campagne ouverte : il fallait donc entrer dans une campagne pour pouvoir sortir.
+
 ## v0.22.0 — 2026-09-29 — Onglet « Reste à faire »
 
 ### Ajouté

@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Droplets, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Droplets, ChevronRight, Loader2, LogOut, Plus, Trash2 } from 'lucide-react';
 import { Button, Modal, Input } from '../components/ui/Components';
 import { API_URL } from '../lib/api';
 
 
-export function CampaignPage({ onSelect, user }) {
+export function CampaignPage({ onSelect, user, onLogout }) {
     const queryClient = useQueryClient();
     const { data: campaigns, isLoading, error } = useQuery({
         queryKey: ['campaigns'],
@@ -85,6 +85,21 @@ export function CampaignPage({ onSelect, user }) {
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+            {onLogout && (
+                <div className="fixed top-0 right-0 left-0 flex items-center justify-end gap-3 p-4">
+                    {user?.full_name && (
+                        <span className="text-sm text-muted-foreground truncate max-w-[50vw]">
+                            {user.full_name}
+                        </span>
+                    )}
+                    <button
+                        onClick={onLogout}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                    >
+                        <LogOut className="w-3.5 h-3.5" /> Se déconnecter
+                    </button>
+                </div>
+            )}
             <Modal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
