@@ -25,6 +25,15 @@ class Depense(BaseModel):
     type_piece: str = "facture"
     # Colonne verticale du formulaire CNCCFP.
     prise_en_charge: str = "mandataire"
+    # Rattachement à des événements, avec la part du montant qui revient à
+    # chacun. `None` laisse les liaisons existantes intactes (les appelants qui
+    # ignorent ce champ ne doivent rien détacher) ; `[]` détache tout.
+    evenements: Optional[List["LiaisonEvenement"]] = None
+
+
+class LiaisonEvenement(BaseModel):
+    evenement_id: int
+    quote_part: Optional[float] = None  # % ; None = 100 %
 
 class SpendingStats(BaseModel):
     total_depenses: float

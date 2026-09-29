@@ -10,6 +10,14 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.20.0 — 2026-09-29 — Rattachement d'une dépense depuis son formulaire
+
+### Ajouté
+- Une dépense se rattache à un événement directement depuis son formulaire, à l'enregistrement comme à la modification, avec sa quote-part. Il fallait jusqu'ici ouvrir l'événement et y chercher la dépense. Une dépense ventilée entre plusieurs événements reste possible, la somme des quote-parts ne pouvant dépasser 100 %.
+
+### Corrigé
+- Le coût d'un événement additionnait les dépenses en attente de validation. Une dépense déposée par l'équipe ou l'expert-comptable ne déplace plus le coût affiché avant l'arbitrage du mandataire, comme partout ailleurs dans l'application.
+
 ## v0.19.0 — 2026-09-27 — Modification d'un événement
 
 ### Ajouté

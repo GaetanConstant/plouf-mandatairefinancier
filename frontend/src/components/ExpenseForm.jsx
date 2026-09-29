@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { CATEGORIES_CNCCFP, PRISES_EN_CHARGE, STATUTS_DEPENSE, TYPES_PIECE } from '../lib/constants';
 import { Button, Input, Select } from './ui/Components';
+import { CalendarDays, Plus, X } from 'lucide-react';
 import { API_URL } from '../lib/api';
 
 
 
 // Valeur sentinelle de l'option « nouveau fournisseur » du menu déroulant.
 const NOUVEAU_FOURNISSEUR = '__nouveau__';
+
+// Une quote-part vide vaut la totalité de la dépense, comme côté serveur.
+const QUOTE_PART_TOTALE = 100;
+const part = (q) => (q === '' || q === null || q === undefined ? QUOTE_PART_TOTALE : Number(q));
 
 export function ExpenseForm({ onClose, prefilledData, expense }) {
     const queryClient = useQueryClient();
@@ -29,6 +34,32 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
     // Le fournisseur se choisit dans la liste des fournisseurs déjà saisis ;
     // `newSupplier` bascule le champ en saisie libre pour en créer un nouveau.
     const [newSupplier, setNewSupplier] = useState(false);
+
+    // Rattachements à des événements. Une dépense peut être ventilée sur
+    // plusieurs (Σ des quote-parts ≤ 100 %), d'où une liste et non un champ.
+    const [liaisons, setLiaisons] = useState(
+        (expense?.evenements || []).map(l => ({
+            evenement_id: l.evenement_id,
+            quote_part: l.quote_part ?? '',
+        })));
+
+    const { data: evenements } = useQuery({
+        queryKey: ['evenements'],
+        queryFn: async () => (await axios.get(`${API_URL}/evenements`)).data,
+    });
+
+    const totalQuotePart = liaisons.reduce((t, l) => t + part(l.quote_part), 0);
+    const quotePartExcessive = totalQuotePart > QUOTE_PART_TOTALE;
+
+    const ajouterLiaison = () => {
+        const libres = (evenements || []).filter(
+            e => !liaisons.some(l => l.evenement_id === e.id));
+        if (!libres.length) return;
+        setLiaisons([...liaisons, { evenement_id: libres[0].id, quote_part: '' }]);
+    };
+    const modifierLiaison = (i, champ, valeur) =>
+        setLiaisons(liaisons.map((l, j) => (j === i ? { ...l, [champ]: valeur } : l)));
+    const retirerLiaison = (i) => setLiaisons(liaisons.filter((_, j) => j !== i));
 
     const [file, setFile] = useState(null);
     const [errors, setErrors] = useState({});
@@ -80,6 +111,9 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
         onSuccess: () => {
             queryClient.invalidateQueries(['depenses']);
             queryClient.invalidateQueries(['stats']);
+            // Le coût d'un événement dépend de ces liaisons.
+            queryClient.invalidateQueries(['evenements']);
+            queryClient.invalidateQueries(['frise']);
             // Re-fetch suppliers to include the newly added one if it's new
             axios.get(`${API_URL}/fournisseurs`).then(res => setSuppliers(res.data));
             onClose();
@@ -92,6 +126,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
         if (!formData.libelle) newErrors.libelle = "Le libellé est requis";
         if (!formData.fournisseur) newErrors.fournisseur = "Le fournisseur est requis";
         if (!formData.montant_ttc || Number(formData.montant_ttc) <= 0) newErrors.montant_ttc = "Montant invalide";
+        if (quotePartExcessive) newErrors.liaisons = `Quote-part totale : ${totalQuotePart} % (maximum 100 %)`;
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
@@ -115,7 +150,12 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
             tva: Number(formData.tva || 0),
             // En édition sans nouveau fichier, on ne renvoie rien : le service
             // conserve alors le justificatif déjà rattaché.
-            justificatif_path: justificatifPath
+            justificatif_path: justificatifPath,
+            // Liste explicite : le serveur détache ce qui n'y figure plus.
+            evenements: liaisons.map(l => ({
+                evenement_id: Number(l.evenement_id),
+                quote_part: l.quote_part === '' ? null : Number(l.quote_part),
+            })),
         });
     };
 
@@ -229,6 +269,71 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                 <label htmlFor="is_nature" className="text-sm font-medium cursor-pointer">
                     C'est un concours en nature (Don de prestation/matériel)
                 </label>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border/50 bg-muted/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                        <CalendarDays className="w-4 h-4 text-primary" />
+                        Rattachement à un événement
+                    </label>
+                    {Boolean(evenements?.length) && (
+                        <button type="button" onClick={ajouterLiaison}
+                            disabled={liaisons.length >= evenements.length}
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-40 disabled:no-underline">
+                            <Plus className="w-3 h-3" /> Rattacher un événement
+                        </button>
+                    )}
+                </div>
+
+                {!evenements?.length && (
+                    <p className="text-xs text-muted-foreground italic">
+                        Aucun événement enregistré — créez-en un depuis l'onglet Événements.
+                    </p>
+                )}
+                {Boolean(evenements?.length) && !liaisons.length && (
+                    <p className="text-xs text-muted-foreground italic">
+                        Cette dépense n'est rattachée à aucun événement.
+                    </p>
+                )}
+
+                {liaisons.map((liaison, i) => (
+                    <div key={i} className="flex items-end gap-2">
+                        <div className="flex-1 min-w-0">
+                            <Select
+                                label={i === 0 ? 'Événement' : ''}
+                                options={(evenements || [])
+                                    .filter(e => e.id === Number(liaison.evenement_id)
+                                        || !liaisons.some(l => Number(l.evenement_id) === e.id))
+                                    .map(e => ({ value: e.id, label: e.titre }))}
+                                value={liaison.evenement_id}
+                                onChange={e => modifierLiaison(i, 'evenement_id', e.target.value)}
+                            />
+                        </div>
+                        <div className="w-28 shrink-0">
+                            <Input
+                                label={i === 0 ? 'Quote-part %' : ''}
+                                type="number" min="0" max="100" placeholder="100"
+                                value={liaison.quote_part}
+                                onChange={e => modifierLiaison(i, 'quote_part', e.target.value)}
+                            />
+                        </div>
+                        <button type="button" onClick={() => retirerLiaison(i)}
+                            title="Détacher cet événement"
+                            className="mb-2 text-muted-foreground hover:text-red-600 transition-colors">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                ))}
+
+                {liaisons.length > 0 && (
+                    <p className={`text-[11px] ${quotePartExcessive ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                        {quotePartExcessive
+                            ? `Quote-part totale : ${totalQuotePart} % — le maximum est 100 %.`
+                            : `Quote-part totale : ${totalQuotePart} %. Vide = 100 %, le reste est hors événement.`}
+                    </p>
+                )}
+                {errors.liaisons && <p className="text-sm text-destructive">{errors.liaisons}</p>}
             </div>
 
             <div className="space-y-2 rounded-lg border border-border/50 bg-muted/40 p-3">
