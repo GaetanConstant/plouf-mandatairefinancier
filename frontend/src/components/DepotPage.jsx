@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Download, ShieldCheck, ShieldAlert, FileText, AlertTriangle } from 'lucide-react';
+import { Download, ShieldCheck, ShieldAlert, FileText, AlertTriangle, ChevronRight } from 'lucide-react';
 import { Button, Input, Select } from './ui/Components';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
@@ -14,7 +14,7 @@ const ENVELOPPES = [
     { value: 'hors_depot', label: 'Hors dépôt' },
 ];
 
-export function DepotPage() {
+export function DepotPage({ onNavigate }) {
     const queryClient = useQueryClient();
 
     const { data: etat, isLoading } = useQuery({
@@ -89,7 +89,8 @@ export function DepotPage() {
             </header>
 
             {completude && !completude.complet && (
-                <div className="rounded-2xl border border-red-300 bg-red-50/60 p-6">
+                <button type="button" onClick={() => onNavigate?.('restantafaire')}
+                    className="w-full rounded-2xl border border-red-300 bg-red-50/60 p-6 text-left transition-colors hover:border-red-400 hover:bg-red-50">
                     <div className="mb-3 flex items-center gap-3">
                         <AlertTriangle className="w-6 h-6 shrink-0 text-red-600" />
                         <div>
@@ -105,7 +106,10 @@ export function DepotPage() {
                     <ul className="ml-9 list-disc space-y-0.5 text-sm text-red-700">
                         {completude.manquants.map((m, i) => <li key={i}>{m}</li>)}
                     </ul>
-                </div>
+                    <p className="mt-4 ml-9 inline-flex items-center gap-1 text-sm font-medium text-red-700 underline underline-offset-2">
+                        Traiter ces éléments <ChevronRight className="h-4 w-4" />
+                    </p>
+                </button>
             )}
 
             <div className={cn("rounded-2xl border p-6 flex items-center gap-4",

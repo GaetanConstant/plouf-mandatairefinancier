@@ -40,7 +40,8 @@ import {
   ChevronRight,
   ChevronDown,
   Sun,
-  Moon
+  Moon,
+  ListChecks
 } from 'lucide-react';
 import { cn } from './lib/utils'; // Keep this relative import!
 import { Modal, Button } from './components/ui/Components';
@@ -68,6 +69,7 @@ import { MainCourantePage } from './components/MainCourantePage';
 import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
 import { EvenementsPage } from './components/EvenementsPage';
+import { ResteAFairePage } from './components/ResteAFairePage';
 import { FrisePage } from './components/FrisePage';
 import { EcheancierPage } from './components/EcheancierPage';
 import { MutualisationPage } from './components/MutualisationPage';
@@ -96,6 +98,7 @@ const ACCES_ECRAN = {
   mutualisation: ['mandataire'],
   conformite: ['mandataire', 'expert_comptable', 'direction'],
   depot: ['mandataire'],
+  restantafaire: ['mandataire'],
   demandes: ['mandataire', 'expert_comptable'],
   validation: ['mandataire'],
   soumissions: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
@@ -137,6 +140,7 @@ const GROUPES_NAV = [
     { key: 'mutualisation', label: 'Mutualisation', icon: Users2 },
   ]},
   { label: 'Conformité & dépôt', icon: ShieldCheck, items: [
+    { key: 'restantafaire', label: 'Reste à faire', icon: ListChecks },
     { key: 'conformite', label: 'Conformité', icon: ShieldCheck },
     { key: 'depot', label: 'Dépôt', icon: Archive },
     { key: 'demandes', label: 'Demandes de pièces', icon: MessageSquare },
@@ -550,11 +554,13 @@ function App() {
                 </button>
               )}
 
-              {/* Complétude du dossier : ce qui bloque le dépôt, avant les chiffres. */}
+              {/* Complétude du dossier : ce qui bloque le dépôt, avant les chiffres.
+                  Mène au « Reste à faire », où chaque manque se traite, et non
+                  à Identité, qui n'en couvre qu'une partie. */}
               {completude && !completude.complet && (
                 <button
                   type="button"
-                  onClick={() => allerA('identite')}
+                  onClick={() => allerA('restantafaire')}
                   className="w-full rounded-xl border border-red-300 bg-red-50/60 p-4 text-left transition-colors hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -671,6 +677,9 @@ function App() {
           {onglet === 'justificatifs' && peutVoir('justificatifs', roleCampagne) && <JustificatifsList />}
           {onglet === 'attestations' && peutVoir('attestations', roleCampagne) && <AttestationsPage campaignId={campaign.id} />}
           {onglet === 'carnets' && peutVoir('carnets', roleCampagne) && <CarnetsPage />}
+          {onglet === 'restantafaire' && peutVoir('restantafaire', roleCampagne) && (
+            <ResteAFairePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
+          )}
           {onglet === 'conformite' && peutVoir('conformite', roleCampagne) && (
             <ConformitePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
           )}
@@ -678,7 +687,7 @@ function App() {
           {onglet === 'identite' && peutVoir('identite', roleCampagne) && (
             <IdentitePage cible={cible?.entite} onCibleConsommee={consommerCible} />
           )}
-          {onglet === 'depot' && peutVoir('depot', roleCampagne) && <DepotPage />}
+          {onglet === 'depot' && peutVoir('depot', roleCampagne) && <DepotPage onNavigate={allerA} />}
           {onglet === 'evenements' && peutVoir('evenements', roleCampagne) && <EvenementsPage role={roleCampagne} />}
           {onglet === 'frise' && peutVoir('frise', roleCampagne) && <FrisePage />}
           {onglet === 'calendrier' && peutVoir('calendrier', roleCampagne) && <CalendrierPage />}

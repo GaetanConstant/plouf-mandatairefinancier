@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.22.0",
+    "date": "2026-09-29",
+    "dateAffichee": "29 septembre 2026",
+    "titre": "Onglet « Reste à faire »",
+    "details": [
+      "Un onglet « Reste à faire », dans le groupe Conformité & dépôt, réunit tout ce qui manque avant de pouvoir déposer le compte. Ce qui se règle par un fichier — facture d'une dépense, justificatif d'une recette, récépissé de préfecture — se dépose directement sur la ligne concernée, identifiée par son numéro de pièce, son tiers et son montant. Le reste renvoie d'un clic à l'écran de saisie.",
+      "Le bandeau « Dossier de dépôt incomplet » du tableau de bord et le bandeau « Export impossible » de l'écran Dépôt mènent désormais à cet onglet. Le premier renvoyait vers Identité, qui ne couvre qu'une partie des manques."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.21.0",
     "date": "2026-09-29",
     "dateAffichee": "29 septembre 2026",

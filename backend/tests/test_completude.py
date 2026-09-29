@@ -141,6 +141,52 @@ def test_recette_creee_avec_sa_piece():
         teardown(cid)
 
 
+def test_chaque_manque_porte_de_quoi_le_traiter():
+    """Un manque sans action est un constat : l'écran ne saurait pas quoi proposer."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Location", fournisseur="F",
+            montant_ttc=145.0, tva=0.0, categorie_cnccfp="D1", statut="Facturé"))
+        comptes.create_recette(cid, Recette(
+            date=date(2026, 2, 10), nom_donateur="DUPONT Jean", adresse="1 rue X",
+            montant=500.0, type="Don"))
+        sans_action = [s["titre"] for s in completude.evaluer(cid)["sections"]
+                       if not s["complet"] and not s["actions"]]
+        assert not sans_action, sans_action
+    finally:
+        teardown(cid)
+
+
+def test_action_de_depense_porte_son_identifiant():
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, Depense(
+            date=date(2026, 2, 10), libelle="Location", fournisseur="Rent",
+            montant_ttc=145.0, tva=0.0, categorie_cnccfp="D1", statut="Facturé"))
+        depense_id = comptes.list_depenses(cid)[0]["id"]
+        action = _section(cid, "justificatifs_depenses")["actions"][0]
+        assert action["type"] == "depense" and action["id"] == depense_id, action
+        assert action["num_piece"] == "D001" and action["tiers"] == "Rent", action
+    finally:
+        teardown(cid)
+
+
+def test_action_disparait_une_fois_la_piece_deposee():
+    cid = fresh_campaign()
+    try:
+        comptes.create_recette(cid, Recette(
+            date=date(2026, 2, 10), nom_donateur="DUPONT Jean", adresse="1 rue X",
+            montant=500.0, type="Don"))
+        rec = comptes.list_recettes(cid)[0]
+        comptes.ajouter_piece_recette(
+            cid, rec["id"], comptes.PieceIn(fichier="recu.pdf", type_piece="recu"),
+            auteur="gaetan", role="mandataire")
+        assert _section(cid, "justificatifs_recettes")["actions"] == []
+    finally:
+        teardown(cid)
+
+
 def test_campagne_neuve_incomplete():
     cid = fresh_campaign()
     try:

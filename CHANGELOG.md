@@ -10,6 +10,14 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.22.0 — 2026-09-29 — Onglet « Reste à faire »
+
+### Ajouté
+- Un onglet « Reste à faire », dans le groupe Conformité & dépôt, réunit tout ce qui manque avant de pouvoir déposer le compte. Ce qui se règle par un fichier — facture d'une dépense, justificatif d'une recette, récépissé de préfecture — se dépose directement sur la ligne concernée, identifiée par son numéro de pièce, son tiers et son montant. Le reste renvoie d'un clic à l'écran de saisie.
+
+### Modifié
+- Le bandeau « Dossier de dépôt incomplet » du tableau de bord et le bandeau « Export impossible » de l'écran Dépôt mènent désormais à cet onglet. Le premier renvoyait vers Identité, qui ne couvre qu'une partie des manques.
+
 ## v0.21.0 — 2026-09-29 — Les justificatifs manquants dans le score de complétude
 
 ### Ajouté
