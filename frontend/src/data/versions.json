@@ -1,5 +1,15 @@
 [
   {
+    "version": "v0.23.0",
+    "date": "2026-09-29",
+    "dateAffichee": "29 septembre 2026",
+    "titre": "Déconnexion depuis l'écran de choix des campagnes",
+    "details": [
+      "Un bouton « Se déconnecter » sur l'écran de sélection des campagnes, avec le nom du compte connecté. Le bouton n'existait que dans la barre latérale, qui n'apparaît qu'une fois une campagne ouverte : il fallait donc entrer dans une campagne pour pouvoir sortir."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.22.0",
     "date": "2026-09-29",
     "dateAffichee": "29 septembre 2026",
