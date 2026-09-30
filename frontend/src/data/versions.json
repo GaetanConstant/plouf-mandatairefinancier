@@ -1,5 +1,15 @@
 [
   {
+    "version": "v0.24.0",
+    "date": "2026-09-30",
+    "dateAffichee": "30 septembre 2026",
+    "titre": "Le mandataire s'affiche sur l'écran de choix",
+    "details": [
+      "Chaque carte de campagne indique désormais son mandataire financier, à la place de la mention « Mandat en cours • 2026 » qui était écrite en dur, année comprise. Rien n'interdit à deux campagnes de porter le même nom : c'est ce repère qui permet de les distinguer, notamment pour un administrateur qui les voit toutes."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.23.0",
     "date": "2026-09-29",
     "dateAffichee": "29 septembre 2026",

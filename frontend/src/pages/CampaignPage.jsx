@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Droplets, ChevronRight, Loader2, LogOut, Plus, Trash2 } from 'lucide-react';
+import { Droplets, ChevronRight, Loader2, LogOut, Plus, Trash2, UserRound } from 'lucide-react';
 import { Button, Modal, Input } from '../components/ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -178,7 +178,12 @@ export function CampaignPage({ onSelect, user, onLogout }) {
                                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transform group-hover:translate-x-1 transition-all" />
                                 </div>
                                 <h3 className="text-xl font-bold mb-1">{campaign.name}</h3>
-                                <p className="text-sm text-muted-foreground">Mandat en cours • 2026</p>
+                                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                    <UserRound className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate">
+                                        {campaign.proprietaire || 'Mandataire non renseigné'}
+                                    </span>
+                                </p>
 
                                 {selecting === campaign.id && (
                                     <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">

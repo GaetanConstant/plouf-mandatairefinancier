@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.24.0 — 2026-09-30 — Le mandataire s'affiche sur l'écran de choix
+
+### Modifié
+- Chaque carte de campagne indique désormais son mandataire financier, à la place de la mention « Mandat en cours • 2026 » qui était écrite en dur, année comprise. Rien n'interdit à deux campagnes de porter le même nom : c'est ce repère qui permet de les distinguer, notamment pour un administrateur qui les voit toutes.
+
 ## v0.23.0 — 2026-09-29 — Déconnexion depuis l'écran de choix des campagnes
 
 ### Ajouté

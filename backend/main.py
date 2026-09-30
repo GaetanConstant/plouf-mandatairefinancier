@@ -152,19 +152,34 @@ def login(credentials: LoginRequest, response: Response):
 
     return {"message": "Login successful", "user": {"username": user[0], "full_name": user[1], "role": user[3]}}
 
+# Le mandataire de la campagne, nom complet si connu. Deux campagnes peuvent
+# porter le même nom — rien ne l'interdit, et ce sera le cas avec plusieurs
+# testeurs — donc l'écran de choix a besoin de ce repère pour les distinguer.
+_PROPRIETAIRE = """
+    LEFT JOIN user_campaigns prop
+           ON prop.campaign_id = c.id AND prop.role = 'mandataire'
+    LEFT JOIN users pu ON pu.username = prop.username
+"""
+
+
 @app.get("/campaigns")
 def list_my_campaigns(current_user: dict = Depends(get_current_user)):
+    colonnes = "c.id, c.name, COALESCE(MIN(pu.full_name), MIN(prop.username))"
     with get_central_db_connection() as conn:
         if current_user["role"] == "admin":
-            campaigns = conn.execute("SELECT id, name FROM campaigns").fetchall()
+            campaigns = conn.execute(
+                f"SELECT {colonnes} FROM campaigns c {_PROPRIETAIRE} GROUP BY c.id, c.name"
+            ).fetchall()
         else:
-            campaigns = conn.execute("""
-                SELECT c.id, c.name 
-                FROM campaigns c 
-                JOIN user_campaigns uc ON c.id = uc.campaign_id 
+            campaigns = conn.execute(f"""
+                SELECT {colonnes}
+                FROM campaigns c
+                JOIN user_campaigns uc ON c.id = uc.campaign_id
+                {_PROPRIETAIRE}
                 WHERE uc.username = ?
+                GROUP BY c.id, c.name
             """, [current_user["username"]]).fetchall()
-    return [{"id": c[0], "name": c[1]} for c in campaigns]
+    return [{"id": c[0], "name": c[1], "proprietaire": c[2]} for c in campaigns]
 
 @app.post("/campaigns")
 def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_current_user)):
