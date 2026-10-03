@@ -57,6 +57,103 @@ class ReleveIn(BaseModel):
     transactions: list[TransactionIn] = []
 
 
+class PieceReleveIn(BaseModel):
+    """Le relevé d'origine, scanné : pièce exigée en enveloppe B."""
+    fichier: str
+
+
+def _bornes(s, releve: Releve) -> None:
+    """Recale les dates du relevé sur ses transactions."""
+    jours = [t.date_operation for t in releve.transactions if t.date_operation]
+    releve.date_debut = min(jours) if jours else None
+    releve.date_fin = max(jours) if jours else None
+
+
+def ajouter_transaction(campaign_id: str, releve_id: int, payload: TransactionIn) -> dict:
+    """Ajoute une ligne saisie à la main sur un relevé existant.
+
+    Toutes les banques ne donnent pas un export exploitable : la saisie directe
+    reste le seul moyen sûr de reporter ce qu'on lit sur le relevé papier.
+    """
+    ensure_campaign_db(campaign_id)
+    jour = _lire_date(payload.date_operation)
+    if jour is None:
+        raise HTTPException(status_code=400, detail="Date illisible.")
+    if payload.montant is None or payload.montant <= 0:
+        raise HTTPException(status_code=400,
+                            detail="Le montant doit être positif ; c'est le sens qui dit débit ou crédit.")
+    try:
+        sens = enums.SensTransaction(payload.sens)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Sens inconnu : {payload.sens}")
+
+    with campaign_session(campaign_id) as s:
+        releve = s.get(Releve, releve_id)
+        if not releve:
+            raise HTTPException(status_code=404, detail="Relevé introuvable")
+        t = TransactionBancaire(
+            releve_id=releve.id, date_operation=jour,
+            libelle=payload.libelle or "Opération", montant=abs(payload.montant),
+            sens=sens, reference=payload.reference)
+        s.add(t)
+        s.flush()
+        s.refresh(releve)
+        _bornes(s, releve)
+        return _transaction_dict(s, t)
+
+
+def supprimer_transaction(campaign_id: str, transaction_id: int) -> dict:
+    """Retire une ligne du relevé, et délie ce qu'elle réglait.
+
+    Sans ce recalcul, une dépense resterait « payée » en pointant une ligne
+    bancaire qui n'existe plus.
+    """
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        t = s.get(TransactionBancaire, transaction_id)
+        if not t:
+            raise HTTPException(status_code=404, detail="Transaction introuvable")
+        depenses = [i.depense_id for i in s.scalars(
+            select(ImputationBancaire).where(ImputationBancaire.transaction_id == t.id)).all()]
+        recettes = [i.recette_id for i in s.scalars(
+            select(ImputationRecette).where(ImputationRecette.transaction_id == t.id)).all()]
+        releve = s.get(Releve, t.releve_id)
+        s.delete(t)
+        s.flush()
+        for depense_id in set(depenses):
+            d = s.get(Depense, depense_id)
+            if d:
+                _actualiser_depense(s, d, None)
+        for recette_id in set(recettes):
+            r = s.get(Recette, recette_id)
+            if r:
+                _actualiser_recette(s, r, None)
+        if releve:
+            s.refresh(releve)
+            _bornes(s, releve)
+    return {"message": "Ligne retirée du relevé."}
+
+
+def attacher_piece(campaign_id: str, releve_id: int, fichier: str, auteur: str) -> dict:
+    """Rattache le relevé scanné, quand les lignes ont été saisies à la main."""
+    ensure_campaign_db(campaign_id)
+    nom = os.path.basename(fichier)
+    with campaign_session(campaign_id) as s:
+        releve = s.get(Releve, releve_id)
+        if not releve:
+            raise HTTPException(status_code=404, detail="Relevé introuvable")
+        piece = Document(
+            type=enums.TypeDocument.releve_bancaire,
+            media_type=media_type(nom),
+            fichier=nom,
+            enveloppe=enums.Enveloppe.B,
+        )
+        validation.estampiller(piece, auteur, ROLE_MANDATAIRE)
+        s.add(piece)
+        releve.fichier = nom
+    return {"message": "Relevé rattaché au dossier."}
+
+
 class ImputationIn(BaseModel):
     depense_id: int
     montant: Optional[float] = None  # None = solde restant de la dépense
@@ -292,6 +389,8 @@ def _releve_dict(s, r: Releve) -> dict:
         "id": r.id,
         "libelle": r.libelle,
         "source": r.source.value,
+        # Le relevé scanné : pièce de l'enveloppe B, distincte des lignes.
+        "fichier": r.fichier,
         "date_debut": _fmt(r.date_debut),
         "date_fin": _fmt(r.date_fin),
         "importe_par": r.importe_par,

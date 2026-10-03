@@ -1,5 +1,17 @@
 [
   {
+    "version": "v0.32.0",
+    "date": "2026-10-03",
+    "dateAffichee": "3 octobre 2026",
+    "titre": "Saisie manuelle des transactions bancaires",
+    "details": [
+      "Les lignes d'un relevé peuvent être saisies directement : date, libellé, numéro de chèque ou référence, sens et montant. Toutes les banques ne proposent pas un export exploitable, et reporter ce qu'on lit sur le relevé papier reste parfois le seul moyen. La saisie s'ajoute aux trois voies existantes — fichier CSV, copier-coller, PDF ou photo.",
+      "Une ligne oubliée s'ajoute à un relevé déjà enregistré, et se retire si elle a été saisie en double. Retirer une ligne délie ce qu'elle réglait, pour qu'aucune dépense ne reste payée en pointant un mouvement disparu.",
+      "Le relevé compte désormais deux fois dans le dossier : comme source des transactions, et comme pièce de l'enveloppe B. Des lignes saisies à la main sans le relevé scanné laissent le dossier incomplet — ce que rien ne signalait. Le document se dépose depuis le « Reste à faire » ou depuis l'écran des relevés."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.31.0",
     "date": "2026-10-03",
     "dateAffichee": "3 octobre 2026",

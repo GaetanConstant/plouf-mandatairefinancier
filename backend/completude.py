@@ -396,13 +396,27 @@ def evaluer(campaign_id: str) -> dict:
     # règlement effectif des dépenses. Sans lui, le dossier est incomplet quelle
     # que soit la qualité du reste.
     import releves
-    nb_releves = len(releves.list_releves(campaign_id))
-    sections.append(_section(
-        "releves", "Relevés bancaires", 1, 1 if nb_releves else 0,
-        [] if nb_releves else ["Aucun relevé bancaire importé"],
-        note=f"{nb_releves} relevé(s)" if nb_releves else None,
-        actions=[] if nb_releves else [_vers_ecran("releves", "Importer un relevé")],
-    ))
+    liste_releves = releves.list_releves(campaign_id)
+    nb_releves = len(liste_releves)
+    if not nb_releves:
+        sections.append(_section(
+            "releves", "Relevés bancaires", 1, 0, ["Aucun relevé bancaire importé"],
+            actions=[_vers_ecran("releves", "Importer ou saisir un relevé")],
+        ))
+    else:
+        # Le relevé compte deux fois : comme source des transactions, et comme
+        # pièce de l'enveloppe B. Des lignes saisies à la main sans le relevé
+        # scanné laissent le dossier incomplet, ce que rien ne signalait.
+        sans_piece = [r for r in liste_releves if not r.get("fichier")]
+        sections.append(_section(
+            "releves", "Relevés bancaires", nb_releves, nb_releves - len(sans_piece),
+            [f"Relevé « {r['libelle']} » : le document d'origine manque"
+             for r in sans_piece],
+            actions=[{"type": "releve_piece", "id": r["id"], "libelle": r["libelle"],
+                      "tiers": None, "montant": None, "num_piece": None}
+                     for r in sans_piece],
+            note=f"{nb_releves - len(sans_piece)}/{nb_releves} relevés au dossier",
+        ))
 
     # Compte toujours, relevé importé ou non : sans ce décompte, un dossier
     # dont aucune écriture n'est rapprochée s'affichait à 95 %, alors qu'il est

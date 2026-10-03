@@ -68,6 +68,31 @@ def delete_releve(releve_id: int, campaign_id: str = Depends(get_campaign_conn),
     return releves.delete_releve(campaign_id, releve_id)
 
 
+@router.post("/releves/{releve_id}/transactions")
+def ajouter_transaction(releve_id: int, payload: releves.TransactionIn,
+                        campaign_id: str = Depends(get_campaign_conn),
+                        _garde: str = Depends(mandataire_requis)):
+    """Ajoute une ligne saisie à la main sur un relevé existant."""
+    return releves.ajouter_transaction(campaign_id, releve_id, payload)
+
+
+@router.delete("/transactions/{transaction_id}")
+def supprimer_transaction(transaction_id: int,
+                          campaign_id: str = Depends(get_campaign_conn),
+                          _garde: str = Depends(mandataire_requis)):
+    return releves.supprimer_transaction(campaign_id, transaction_id)
+
+
+@router.post("/releves/{releve_id}/piece")
+def attacher_piece(releve_id: int, payload: releves.PieceReleveIn,
+                   current_user: dict = Depends(get_current_user),
+                   campaign_id: str = Depends(get_campaign_conn),
+                   _garde: str = Depends(mandataire_requis)):
+    """Rattache le relevé scanné, quand les lignes ont été saisies à la main."""
+    return releves.attacher_piece(campaign_id, releve_id, payload.fichier,
+                                  current_user["username"])
+
+
 @router.get("/rapprochement/depenses")
 def depenses_a_rapprocher(campaign_id: str = Depends(get_campaign_conn)):
     """Dépenses qu'il reste à régler, avec ce qui a déjà été imputé."""
