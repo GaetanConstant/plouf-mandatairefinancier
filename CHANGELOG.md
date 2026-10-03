@@ -10,6 +10,16 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.34.0 — 2026-10-03 — Rapprocher une ligne au moment où on la saisit
+
+### Ajouté
+- Chaque ligne saisie propose une liste déroulante des dépenses — ou des recettes pour un encaissement — qu'il reste à rapprocher, avec leur numéro de pièce et le montant dû. Désigner l'écriture réglée rapproche la ligne aussitôt : plus besoin de la retrouver ensuite dans un autre écran.
+- La liste est disponible aux trois endroits où l'on saisit des lignes : création d'un relevé, ajout sur un relevé existant, et « Reste à faire ».
+
+### Sécurité
+- Un décaissement ne peut pas alimenter une recette, ni un encaissement régler une dépense. Changer le sens d'une ligne efface l'écriture désignée.
+- Le montant imputé ne dépasse jamais ce qui reste dû : une ligne plus grosse que la facture la solde sans plus, une ligne plus petite laisse la dépense ouverte pour un second versement.
+
 ## v0.33.0 — 2026-10-03 — Saisir un relevé depuis le « Reste à faire »
 
 ### Ajouté

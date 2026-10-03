@@ -1,13 +1,45 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import { API_URL } from '../lib/api';
 import { Plus, X } from 'lucide-react';
 
 // Une ligne vierge du tableau de saisie.
-export const LIGNE_VIDE = { date_operation: '', libelle: '', montant: '', sens: 'debit', reference: '' };
+export const LIGNE_VIDE = { date_operation: '', libelle: '', montant: '', sens: 'debit', reference: '', cible: '' };
 
 /** Lignes retenues : une date et un montant suffisent à faire une écriture. */
+/** Lignes retenues : une date et un montant suffisent à faire une écriture.
+ *  `cible` encode l'écriture réglée — « d:12 » une dépense, « r:3 » une recette. */
 export const lignesPretes = (lignes) => lignes
     .filter(l => l.date_operation && l.montant !== '')
-    .map(l => ({ ...l, montant: Math.abs(Number(l.montant)) }));
+    .map(({ cible, ...l }) => ({
+        ...l,
+        montant: Math.abs(Number(l.montant)),
+        depense_id: cible?.startsWith('d:') ? Number(cible.slice(2)) : null,
+        recette_id: cible?.startsWith('r:') ? Number(cible.slice(2)) : null,
+    }));
+
+/** Écritures qu'il reste à rapprocher, pour les proposer à la saisie. */
+export function useCibles() {
+    const { data: depenses } = useQuery({
+        queryKey: ['rapprochement-depenses'],
+        queryFn: async () => (await axios.get(`${API_URL}/rapprochement/depenses`)).data,
+    });
+    const { data: recettes } = useQuery({
+        queryKey: ['rapprochement-recettes'],
+        queryFn: async () => (await axios.get(`${API_URL}/rapprochement/recettes`)).data,
+    });
+    return {
+        debit: (depenses || []).map(d => ({
+            valeur: `d:${d.id}`,
+            label: `${d.num_piece || ''} ${d.libelle} — reste ${d.reste.toFixed(2)} €`.trim(),
+        })),
+        credit: (recettes || []).map(r => ({
+            valeur: `r:${r.id}`,
+            label: `${r.num_piece || ''} ${r.libelle} — reste ${r.reste.toFixed(2)} €`.trim(),
+        })),
+    };
+}
 
 /** Saisie directe des lignes d'un relevé, quand la banque n'offre pas d'export. */
 function AjoutLigne({ releve, onClose }) {
@@ -53,15 +85,20 @@ function AjoutLigne({ releve, onClose }) {
 
 
 export function SaisieLignes({ lignes, setLignes }) {
+    const cibles = useCibles();
+    // Changer de sens invalide la cible choisie : un débit ne règle pas une recette.
     const modifier = (i, champ, valeur) =>
-        setLignes(lignes.map((l, j) => (j === i ? { ...l, [champ]: valeur } : l)));
+        setLignes(lignes.map((l, j) => (j === i
+            ? { ...l, [champ]: valeur, ...(champ === 'sens' ? { cible: '' } : {}) }
+            : l)));
 
     return (
         <div className="space-y-2">
             <label className="text-sm font-medium">Lignes du relevé</label>
             <p className="text-[11px] text-muted-foreground">
                 Reportez ce que vous lisez sur le relevé. Le montant reste positif :
-                c'est le sens qui dit débit ou crédit.
+                c'est le sens qui dit débit ou crédit. Désignez l'écriture réglée pour
+                la rapprocher aussitôt — sinon la ligne reste à rapprocher plus tard.
             </p>
             <div className="space-y-2">
                 {lignes.map((l, i) => (
@@ -88,6 +125,17 @@ export function SaisieLignes({ lignes, setLignes }) {
                             className="col-span-1 text-muted-foreground hover:text-destructive disabled:opacity-30">
                             <X className="mx-auto h-3.5 w-3.5" />
                         </button>
+                        <select value={l.cible || ''} onChange={e => modifier(i, 'cible', e.target.value)}
+                            className="col-span-11 h-9 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
+                            <option value="">
+                                {l.sens === 'credit' ? '— recette encaissée (facultatif) —'
+                                    : '— dépense réglée par cette ligne (facultatif) —'}
+                            </option>
+                            {(l.sens === 'credit' ? cibles.credit : cibles.debit).map(c => (
+                                <option key={c.valeur} value={c.valeur}>{c.label}</option>
+                            ))}
+                        </select>
+                        <div className="col-span-1" />
                     </div>
                 ))}
             </div>
