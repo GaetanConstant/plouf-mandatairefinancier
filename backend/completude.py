@@ -251,6 +251,42 @@ def _section_justificatifs_recettes(s) -> dict:
     )
 
 
+def _section_rapprochement(campaign_id: str) -> dict:
+    """Écritures que le relevé bancaire ne justifie pas encore.
+
+    Le compte de campagne doit se lire ligne à ligne sur le relevé : une
+    dépense ou une recette qu'aucun mouvement bancaire ne porte est exactement
+    ce que la commission cherche. Les concours en nature font exception — ils
+    ne passent pas par le compte, c'est leur définition.
+    """
+    import releves
+    depenses = [d for d in releves.depenses_a_rapprocher(campaign_id)]
+    recettes = releves.recettes_a_rapprocher(campaign_id)
+    manquants = (
+        [f"Dépense {d['num_piece'] or ''} — {d['libelle']} ({d['reste']:.0f} € non rapprochés)".replace("  ", " ")
+         for d in depenses]
+        + [f"Recette {r['num_piece'] or ''} — {r['libelle']} ({r['reste']:.0f} € non rapprochés)".replace("  ", " ")
+           for r in recettes]
+    )
+    total = _nb_ecritures_rapprochables(campaign_id)
+    return _section(
+        "rapprochement", "Rapprochement bancaire", total,
+        max(total - len(manquants), 0), manquants,
+        actions=[_vers_ecran("releves", "Rapprocher dans Relevés")] if manquants else [],
+        note=f"{max(total - len(manquants), 0)}/{total} écritures rapprochées" if total else
+             "Aucune écriture à rapprocher",
+    )
+
+
+def _nb_ecritures_rapprochables(campaign_id: str) -> int:
+    """Dépenses (hors concours en nature) et recettes validées."""
+    with campaign_session(campaign_id) as s:
+        depenses = sum(1 for d in s.scalars(_valides(select(Depense), Depense)).all()
+                       if d.statut != enums.StatutDepense.realise_nature)
+        recettes = len(list(s.scalars(_valides(select(Recette), Recette)).all()))
+    return depenses + recettes
+
+
 def evaluer(campaign_id: str) -> dict:
     """État de complétude du dossier, section par section."""
     ensure_campaign_db(campaign_id)
@@ -322,6 +358,11 @@ def evaluer(campaign_id: str) -> dict:
         note=f"{nb_releves} relevé(s)" if nb_releves else None,
         actions=[] if nb_releves else [_vers_ecran("releves", "Importer un relevé")],
     ))
+
+    # Exigé seulement une fois qu'un relevé existe : sans relevé importé, la
+    # section précédente le dit déjà, et tout afficher deux fois serait du bruit.
+    if nb_releves:
+        sections.append(_section_rapprochement(campaign_id))
 
     # Pièces annoncées au bordereau mais absentes du disque : l'enveloppe
     # partirait avec un trou que rien ne signale au dépôt.

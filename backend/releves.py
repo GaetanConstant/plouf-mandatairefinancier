@@ -28,7 +28,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from db.helpers import fmt_date as _fmt, media_type, valides as _valides
-from db.models import Depense, Document, ImputationBancaire, Releve, TransactionBancaire
+from db.models import (Depense, Document, ImputationBancaire, ImputationRecette,
+                       Recette, Releve, TransactionBancaire)
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
 import validation
@@ -59,6 +60,11 @@ class ReleveIn(BaseModel):
 class ImputationIn(BaseModel):
     depense_id: int
     montant: Optional[float] = None  # None = solde restant de la dépense
+
+
+class ImputationRecetteIn(BaseModel):
+    recette_id: int
+    montant: Optional[float] = None  # None = solde restant de la recette
 
 
 # ── Lecture des formats ──────────────────────────────────────────────────────
@@ -206,9 +212,48 @@ def _impute_sur_depense(s, depense_id: int) -> float:
                     .where(ImputationBancaire.depense_id == depense_id)) or 0.0
 
 
+def _impute_recette_sur_transaction(s, transaction_id: int) -> float:
+    return s.scalar(select(func.coalesce(func.sum(ImputationRecette.montant), 0.0))
+                    .where(ImputationRecette.transaction_id == transaction_id)) or 0.0
+
+
+def _impute_sur_recette(s, recette_id: int) -> float:
+    return s.scalar(select(func.coalesce(func.sum(ImputationRecette.montant), 0.0))
+                    .where(ImputationRecette.recette_id == recette_id)) or 0.0
+
+
 def _transaction_dict(s, t: TransactionBancaire) -> dict:
-    impute = _impute_sur_transaction(s, t.id)
+    # Un débit s'impute sur des dépenses, un crédit sur des recettes : une
+    # seule des deux tables porte quelque chose pour une ligne donnée.
+    credit = t.sens == enums.SensTransaction.credit
+    impute = (_impute_recette_sur_transaction(s, t.id) if credit
+              else _impute_sur_transaction(s, t.id))
     imputations = []
+    if credit:
+        for i in s.scalars(select(ImputationRecette)
+                           .where(ImputationRecette.transaction_id == t.id)).all():
+            rec = s.get(Recette, i.recette_id)
+            imputations.append({
+                "id": i.id,
+                "recette_id": i.recette_id,
+                "montant": i.montant,
+                "libelle_recette": (rec.donateur.nom if rec and rec.donateur
+                                    else "Recette" if rec else "Recette supprimée"),
+                "num_piece": rec.num_piece if rec else None,
+                "montant_recette": rec.montant if rec else None,
+            })
+        return {
+            "id": t.id,
+            "date_operation": _fmt(t.date_operation),
+            "libelle": t.libelle,
+            "montant": t.montant,
+            "sens": t.sens.value,
+            "reference": t.reference,
+            "montant_impute": round(impute, 2),
+            "reste": round(t.montant - impute, 2),
+            "rapprochee": abs(t.montant - impute) < TOLERANCE,
+            "imputations": imputations,
+        }
     for i in s.scalars(select(ImputationBancaire)
                        .where(ImputationBancaire.transaction_id == t.id)).all():
         dep = s.get(Depense, i.depense_id)
@@ -336,12 +381,20 @@ def delete_releve(campaign_id: str, releve_id: int) -> dict:
             select(ImputationBancaire.depense_id)
             .join(TransactionBancaire, TransactionBancaire.id == ImputationBancaire.transaction_id)
             .where(TransactionBancaire.releve_id == releve_id)).all())
+        recettes_liees = list(s.scalars(
+            select(ImputationRecette.recette_id)
+            .join(TransactionBancaire, TransactionBancaire.id == ImputationRecette.transaction_id)
+            .where(TransactionBancaire.releve_id == releve_id)).all())
         s.delete(r)
         s.flush()
         for depense_id in set(concernees):
             depense = s.get(Depense, depense_id)
             if depense:
                 _actualiser_depense(s, depense, None)
+        for recette_id in set(recettes_liees):
+            recette = s.get(Recette, recette_id)
+            if recette:
+                _actualiser_recette(s, recette, None)
     return {"message": "Relevé supprimé."}
 
 
@@ -387,6 +440,97 @@ def imputer(campaign_id: str, transaction_id: int, payload: ImputationIn) -> dic
         s.flush()
         _actualiser_depense(s, d, t)
         return _transaction_dict(s, t)
+
+
+def imputer_recette(campaign_id: str, transaction_id: int, payload) -> dict:
+    """Affecte une part d'encaissement à une recette.
+
+    Pendant d'`imputer` côté crédit. Mêmes garde-fous : ni plus que ce qui est
+    entré sur le compte, ni plus que le montant annoncé de la recette.
+    """
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        t = s.get(TransactionBancaire, transaction_id)
+        if not t:
+            raise HTTPException(status_code=404, detail="Transaction introuvable")
+        if t.sens != enums.SensTransaction.credit:
+            raise HTTPException(
+                status_code=400,
+                detail="Cette ligne est un décaissement : elle ne peut pas alimenter une recette.")
+        r = s.get(Recette, payload.recette_id)
+        if not r:
+            raise HTTPException(status_code=404, detail="Recette introuvable")
+
+        reste_transaction = round(t.montant - _impute_recette_sur_transaction(s, t.id), 2)
+        reste_recette = round((r.montant or 0.0) - _impute_sur_recette(s, r.id), 2)
+        montant = payload.montant if payload.montant is not None else min(reste_transaction, reste_recette)
+        montant = round(montant, 2)
+
+        if montant <= 0:
+            raise HTTPException(status_code=400, detail="Le montant imputé doit être positif.")
+        if montant > reste_transaction + TOLERANCE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Il ne reste que {reste_transaction:.2f} € à imputer sur cette transaction.")
+        if montant > reste_recette + TOLERANCE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Il ne reste que {reste_recette:.2f} € à rapprocher sur cette recette.")
+
+        s.add(ImputationRecette(transaction_id=t.id, recette_id=r.id, montant=montant))
+        s.flush()
+        _actualiser_recette(s, r, t)
+        return _transaction_dict(s, t)
+
+
+def _actualiser_recette(s, recette: Recette, transaction: Optional[TransactionBancaire]) -> None:
+    """Répercute l'état du rapprochement sur la recette.
+
+    Une recette intégralement retrouvée au relevé est rapprochée. Le numéro de
+    relevé vient de la ligne bancaire, plus d'une saisie manuelle.
+    """
+    impute = _impute_sur_recette(s, recette.id)
+    soldee = abs((recette.montant or 0.0) - impute) < TOLERANCE
+    recette.rapprochement = soldee
+    if soldee and transaction is not None:
+        recette.num_releve_bancaire = transaction.releve.libelle
+        recette.date_remise_banque = transaction.date_operation
+    elif not soldee:
+        recette.num_releve_bancaire = None
+
+
+def desimputer_recette(campaign_id: str, imputation_id: int) -> dict:
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        i = s.get(ImputationRecette, imputation_id)
+        if not i:
+            raise HTTPException(status_code=404, detail="Imputation introuvable")
+        recette = s.get(Recette, i.recette_id)
+        transaction_id = i.transaction_id
+        s.delete(i)
+        s.flush()
+        if recette:
+            _actualiser_recette(s, recette, None)
+        t = s.get(TransactionBancaire, transaction_id)
+        return _transaction_dict(s, t) if t else {"message": "Imputation retirée."}
+
+
+def recettes_a_rapprocher(campaign_id: str) -> list[dict]:
+    """Recettes validées dont le compte ne porte pas encore la trace complète."""
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        lignes = []
+        for r in s.scalars(_valides(select(Recette), Recette)
+                           .order_by(Recette.num_piece)).all():
+            impute = _impute_sur_recette(s, r.id)
+            reste = round((r.montant or 0.0) - impute, 2)
+            if reste > TOLERANCE:
+                lignes.append({
+                    "id": r.id, "num_piece": r.num_piece,
+                    "libelle": r.donateur.nom if r.donateur else "Recette",
+                    "montant": r.montant, "deja_impute": impute, "reste": reste,
+                })
+        return lignes
 
 
 def _actualiser_depense(s, depense: Depense, transaction: Optional[TransactionBancaire]) -> None:
@@ -437,12 +581,15 @@ def depenses_a_rapprocher(campaign_id: str) -> list[dict]:
         lignes = []
         for d in s.scalars(_valides(select(Depense), Depense)
                            .order_by(Depense.date_facture)).all():
+            if d.statut == enums.StatutDepense.realise_nature:
+                continue
             impute = _impute_sur_depense(s, d.id)
             reste = round((d.montant_ttc or 0.0) - impute, 2)
             if reste <= TOLERANCE:
                 continue
             lignes.append({
                 "id": d.id,
+                "num_piece": d.num_piece,
                 "date_facture": _fmt(d.date_facture),
                 "libelle": d.nature,
                 "fournisseur": d.fournisseur,
