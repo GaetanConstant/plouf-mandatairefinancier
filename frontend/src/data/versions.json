@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.25.0",
+    "date": "2026-10-03",
+    "dateAffichee": "3 octobre 2026",
+    "titre": "Rattachement des dépenses aux événements",
+    "details": [
+      "Le « Reste à faire » signale les dépenses qui ne sont rattachées à aucun événement, et permet de les rattacher sur place en choisissant dans la liste. Presque toute dépense relève d'un moment de campagne — même la colle d'un collage.",
+      "Une dépense peut être déclarée « hors événement », depuis la même liste ou depuis son formulaire. C'est un arbitrage, pas un oubli : sans lui, une dépense sans rattachement resterait signalée indéfiniment."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.24.0",
     "date": "2026-09-30",
     "dateAffichee": "30 septembre 2026",

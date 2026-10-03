@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.25.0 — 2026-10-03 — Rattachement des dépenses aux événements
+
+### Ajouté
+- Le « Reste à faire » signale les dépenses qui ne sont rattachées à aucun événement, et permet de les rattacher sur place en choisissant dans la liste. Presque toute dépense relève d'un moment de campagne — même la colle d'un collage.
+- Une dépense peut être déclarée « hors événement », depuis la même liste ou depuis son formulaire. C'est un arbitrage, pas un oubli : sans lui, une dépense sans rattachement resterait signalée indéfiniment.
+
 ## v0.24.0 — 2026-09-30 — Le mandataire s'affiche sur l'écran de choix
 
 ### Modifié
