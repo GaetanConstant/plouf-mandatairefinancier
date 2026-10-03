@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.26.0 — 2026-10-03 — Événements récurrents
+
+### Ajouté
+- Un événement peut se répéter sur plusieurs dates : un tractage tous les samedis, une série de collages. Le formulaire propose un générateur — « chaque samedi, du 1er au 30 septembre » — qui remplit la liste des dates, puis chaque date se retire ou s'ajoute à la main. Le samedi où il pleuvait se supprime d'un clic.
+- Chaque date retenue devient un événement à part entière : une dépense se rattache à l'occurrence précise qui la justifie, et le calendrier comme la frise les affichent individuellement.
+
 ## v0.25.0 — 2026-10-03 — Rattachement des dépenses aux événements
 
 ### Ajouté
