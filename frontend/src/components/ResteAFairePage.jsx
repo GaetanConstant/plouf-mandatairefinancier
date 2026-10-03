@@ -19,6 +19,10 @@ const DEPOTS = {
     contrat_pret: (a, chemin) =>
         axios.post(`${API_URL}/recettes/${a.id}/contrat-pret`,
                    { fichier: chemin, type_piece: 'contrat' }),
+    // Le relevé scanné est une pièce de l'enveloppe B, distincte de ses lignes :
+    // elles peuvent avoir été saisies à la main sans le document d'origine.
+    releve_piece: (a, chemin) =>
+        axios.post(`${API_URL}/releves/${a.id}/piece`, { fichier: chemin }),
 };
 
 const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -216,7 +220,7 @@ function LigneFichier({ action }) {
             await DEPOTS[action.type](action, data.path);
         },
         onSuccess: () => ['completude', 'depenses', 'recettes', 'pieces-declaratives',
-                          'documents', 'emprunts']
+                          'documents', 'emprunts', 'releves']
             .forEach(k => queryClient.invalidateQueries([k])),
         onError: (err) => setErreur(err.response?.data?.detail || 'Le dépôt a échoué.'),
     });

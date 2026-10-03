@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Landmark, Upload, ClipboardPaste, ScanLine, Link2, X, Trash2, Check } from 'lucide-react';
+import { Landmark, Upload, ClipboardPaste, ScanLine, Keyboard, Link2, Plus, X, Trash2, Check } from 'lucide-react';
 import { Button, Input, Modal, Select } from './ui/Components';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
@@ -12,12 +12,19 @@ const VOIES = [
     { cle: 'csv', label: 'Fichier CSV', icon: Upload },
     { cle: 'texte', label: 'Copier-coller', icon: ClipboardPaste },
     { cle: 'ocr', label: 'PDF ou photo', icon: ScanLine },
+    // Toutes les banques ne donnent pas un export exploitable : reporter à la
+    // main ce qu'on lit sur le relevé papier reste parfois le seul moyen.
+    { cle: 'saisie', label: 'Saisie manuelle', icon: Keyboard },
 ];
+
+const LIGNE_VIDE = { date_operation: '', libelle: '', montant: '', sens: 'debit', reference: '' };
 
 export function RelevesPage() {
     const queryClient = useQueryClient();
     const [importOuvert, setImportOuvert] = useState(false);
     const [transactionCiblee, setTransactionCiblee] = useState(null);
+    // Ajout d'une ligne oubliée sur un relevé déjà enregistré.
+    const [ligneSur, setLigneSur] = useState(null);
 
     const { data: releves, isLoading } = useQuery({
         queryKey: ['releves'],
@@ -71,10 +78,22 @@ export function RelevesPage() {
                                 tout rapproché
                             </span>
                         )}
+                        {!r.fichier && (
+                            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive"
+                                title="Le relevé scanné est exigé en enveloppe B">
+                                document manquant
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setLigneSur(r)}
+                            title="Ajouter une ligne saisie à la main"
+                            className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                            <Plus className="h-3 w-3" /> Ajouter une ligne
+                        </button>
                         <button
                             onClick={() => window.confirm(`Supprimer le relevé « ${r.libelle} » et ses rapprochements ?`) && supprimer.mutate(r.id)}
                             title="Supprimer ce relevé"
-                            className="ml-auto text-muted-foreground transition-colors hover:text-destructive"
+                            className="text-muted-foreground transition-colors hover:text-destructive"
                         >
                             <Trash2 className="h-4 w-4" />
                         </button>
@@ -125,6 +144,11 @@ export function RelevesPage() {
                 </div>
             ))}
 
+            <Modal isOpen={Boolean(ligneSur)} onClose={() => setLigneSur(null)}
+                title="Ajouter une ligne au relevé">
+                {ligneSur && <AjoutLigne releve={ligneSur} onClose={() => setLigneSur(null)} />}
+            </Modal>
+
             <Modal isOpen={importOuvert} onClose={() => setImportOuvert(false)} title="Importer un relevé">
                 <ImportReleve onClose={() => setImportOuvert(false)} />
             </Modal>
@@ -170,6 +194,7 @@ function ImportReleve({ onClose }) {
     const [libelle, setLibelle] = useState('');
     const [texte, setTexte] = useState('');
     const [apercu, setApercu] = useState(null);
+    const [lignes, setLignes] = useState([{ ...LIGNE_VIDE }]);
     const [erreur, setErreur] = useState('');
 
     const echoue = (err) => setErreur(err.response?.data?.detail || 'Lecture impossible.');
@@ -201,10 +226,15 @@ function ImportReleve({ onClose }) {
         onError: echoue,
     });
 
+    const saisies = lignes
+        .filter(l => l.date_operation && l.montant !== '')
+        .map(l => ({ ...l, montant: Math.abs(Number(l.montant)) }));
+    const aEnregistrer = voie === 'saisie' ? saisies : apercu;
+
     const enregistrer = useMutation({
         mutationFn: async () => axios.post(`${API_URL}/releves`, {
-            libelle, source: voie === 'texte' ? 'manuel' : voie,
-            fichier: fichierDepose, transactions: apercu,
+            libelle, source: voie === 'csv' || voie === 'ocr' ? voie : 'manuel',
+            fichier: fichierDepose, transactions: aEnregistrer,
         }),
         onSuccess: () => {
             ['releves', 'rapprochement-depenses', 'documents', 'completude']
@@ -218,7 +248,7 @@ function ImportReleve({ onClose }) {
         <div className="space-y-4">
             <div className="flex gap-2">
                 {VOIES.map(({ cle, label, icon: Icon }) => (
-                    <button key={cle} type="button" onClick={() => { setVoie(cle); setApercu(null); }}
+                    <button key={cle} type="button" onClick={() => { setVoie(cle); setApercu(null); setErreur(''); }}
                         className={cn('flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
                             voie === cle ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground')}>
                         <Icon className="h-4 w-4" /> {label}
@@ -229,7 +259,9 @@ function ImportReleve({ onClose }) {
             <Input label="Nom du relevé" placeholder="Ex : Septembre 2026"
                 value={libelle} onChange={e => setLibelle(e.target.value)} />
 
-            {voie === 'texte' ? (
+            {voie === 'saisie' ? (
+                <SaisieLignes lignes={lignes} setLignes={setLignes} />
+            ) : voie === 'texte' ? (
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Lignes du relevé</label>
                     <textarea
@@ -273,7 +305,20 @@ function ImportReleve({ onClose }) {
             {erreur && <p className="text-sm text-destructive">{erreur}</p>}
             {(lireFichier.isPending) && <p className="text-sm text-muted-foreground">Lecture en cours…</p>}
 
-            {apercu && (
+            {voie === 'saisie' && saisies.length > 0 && (
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={onClose}>Annuler</Button>
+                    <Button isLoading={enregistrer.isPending}
+                        onClick={() => libelle.trim() && enregistrer.mutate()}>
+                        Enregistrer {saisies.length} ligne{saisies.length > 1 ? 's' : ''}
+                    </Button>
+                </div>
+            )}
+            {voie === 'saisie' && !libelle.trim() && saisies.length > 0 && (
+                <p className="text-right text-xs text-muted-foreground">Donnez un nom au relevé.</p>
+            )}
+
+            {apercu && voie !== 'saisie' && (
                 <div className="space-y-2">
                     <p className="text-sm font-medium">{apercu.length} transaction(s) lues</p>
                     <div className="max-h-56 overflow-y-auto rounded-md border border-border">
@@ -308,6 +353,97 @@ function ImportReleve({ onClose }) {
  * Pendant du rapprochement côté débit. Une remise de chèques couvre souvent
  * plusieurs dons : on impute plusieurs fois sur la même ligne jusqu'à la solder.
  */
+/** Saisie directe des lignes d'un relevé, quand la banque n'offre pas d'export. */
+function AjoutLigne({ releve, onClose }) {
+    const queryClient = useQueryClient();
+    const [lignes, setLignes] = useState([{ ...LIGNE_VIDE }]);
+    const [erreur, setErreur] = useState('');
+
+    const pretes = lignes.filter(l => l.date_operation && l.montant !== '');
+
+    const ajouter = useMutation({
+        mutationFn: async () => {
+            for (const l of pretes) {
+                await axios.post(`${API_URL}/releves/${releve.id}/transactions`,
+                                 { ...l, montant: Math.abs(Number(l.montant)) });
+            }
+        },
+        onSuccess: () => {
+            ['releves', 'rapprochement-depenses', 'rapprochement-recettes',
+             'main-courante', 'completude'].forEach(k => queryClient.invalidateQueries([k]));
+            onClose();
+        },
+        onError: (err) => setErreur(err.response?.data?.detail || "L'ajout a échoué."),
+    });
+
+    return (
+        <div className="space-y-4">
+            <div className="rounded-md bg-muted/40 p-3 text-sm">
+                <div className="font-medium">{releve.libelle}</div>
+                <div className="text-muted-foreground">{releve.nb_transactions} ligne(s) déjà saisies</div>
+            </div>
+            <SaisieLignes lignes={lignes} setLignes={setLignes} />
+            {erreur && <p className="text-sm text-destructive">{erreur}</p>}
+            <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={onClose}>Annuler</Button>
+                <Button disabled={!pretes.length} isLoading={ajouter.isPending}
+                    onClick={() => ajouter.mutate()}>
+                    Ajouter {pretes.length || ''} ligne{pretes.length > 1 ? 's' : ''}
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+
+function SaisieLignes({ lignes, setLignes }) {
+    const modifier = (i, champ, valeur) =>
+        setLignes(lignes.map((l, j) => (j === i ? { ...l, [champ]: valeur } : l)));
+
+    return (
+        <div className="space-y-2">
+            <label className="text-sm font-medium">Lignes du relevé</label>
+            <p className="text-[11px] text-muted-foreground">
+                Reportez ce que vous lisez sur le relevé. Le montant reste positif :
+                c'est le sens qui dit débit ou crédit.
+            </p>
+            <div className="space-y-2">
+                {lignes.map((l, i) => (
+                    <div key={i} className="grid grid-cols-12 items-center gap-1.5">
+                        <input type="date" value={l.date_operation}
+                            onChange={e => modifier(i, 'date_operation', e.target.value)}
+                            className="col-span-3 h-9 rounded-md border border-input bg-background px-2 text-xs" />
+                        <input placeholder="Libellé" value={l.libelle}
+                            onChange={e => modifier(i, 'libelle', e.target.value)}
+                            className="col-span-3 h-9 rounded-md border border-input bg-background px-2 text-xs" />
+                        <input placeholder="N° chèque / réf." value={l.reference}
+                            onChange={e => modifier(i, 'reference', e.target.value)}
+                            className="col-span-2 h-9 rounded-md border border-input bg-background px-2 text-xs" />
+                        <select value={l.sens} onChange={e => modifier(i, 'sens', e.target.value)}
+                            className="col-span-2 h-9 rounded-md border border-input bg-background px-1 text-xs">
+                            <option value="debit">Débit</option>
+                            <option value="credit">Crédit</option>
+                        </select>
+                        <input type="number" step="0.01" min="0" placeholder="0,00" value={l.montant}
+                            onChange={e => modifier(i, 'montant', e.target.value)}
+                            className="col-span-1 h-9 rounded-md border border-input bg-background px-1 text-xs" />
+                        <button type="button" onClick={() => setLignes(lignes.filter((_, j) => j !== i))}
+                            disabled={lignes.length === 1} title="Retirer la ligne"
+                            className="col-span-1 text-muted-foreground hover:text-destructive disabled:opacity-30">
+                            <X className="mx-auto h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <button type="button" onClick={() => setLignes([...lignes, { ...LIGNE_VIDE }])}
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                <Plus className="h-3 w-3" /> Ajouter une ligne
+            </button>
+        </div>
+    );
+}
+
+
 function RapprochementRecette({ transaction, onClose }) {
     const queryClient = useQueryClient();
     const [recetteId, setRecetteId] = useState('');
