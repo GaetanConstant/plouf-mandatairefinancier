@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.28.0 — 2026-10-03 — Modification d'une recette
+
+### Ajouté
+- Une recette se modifie depuis sa liste, comme une dépense : un crayon ouvre le formulaire prérempli. Un prêt saisi par erreur en don se requalifie sans supprimer la ligne ni la ressaisir, et sa rubrique comptable suit le changement.
+
+### Sécurité
+- Requalifier un don pour lequel un reçu-don a été délivré est refusé : ce reçu porte un numéro de carnet remis au donateur, il doit être annulé avant. Un reçu déjà annulé ne bloque pas.
+- Le suivi « reçu envoyé » est effacé quand une recette cesse d'être un don : il n'y a pas d'attestation fiscale sur un prêt.
+
 ## v0.27.0 — 2026-10-03 — Rapprochement bancaire des recettes, et exigé au dépôt
 
 ### Ajouté

@@ -194,7 +194,23 @@ def update_recette(campaign_id: str, recette_id: int, dto) -> dict:
         r = s.get(Recette, recette_id)
         if not r:
             raise HTTPException(status_code=404, detail="Recette introuvable")
-        r.categorie = _type_to_categorie(dto.type)
+        categorie = _type_to_categorie(dto.type)
+        # Un reçu-don détaché du carnet porte un numéro remis au donateur. Si
+        # l'écriture n'est plus un don, ce reçu n'a plus d'objet : il faut
+        # l'annuler dans le carnet avant de requalifier, pas après.
+        if (r.categorie == enums.CategorieRecette.don
+                and categorie != enums.CategorieRecette.don
+                and r.recu is not None
+                and r.recu.statut == enums.StatutRecuDon.delivre):
+            raise HTTPException(
+                status_code=409,
+                detail="Un reçu-don a été délivré pour cette recette. Annulez-le dans "
+                       "le carnet avant de la requalifier.")
+        if categorie != enums.CategorieRecette.don:
+            # Le suivi d'envoi d'attestation ne veut plus rien dire hors d'un don.
+            r.recu_genere = False
+            r.date_envoi = None
+        r.categorie = categorie
         r.montant = dto.montant
         r.date_versement = dto.date
         r.rubrique_imputation = _RUBRIQUE_RECETTE.get(r.categorie, "7050")

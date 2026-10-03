@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText, Upload } from 'lucide-react';
+import { FileText, Pencil, Upload } from 'lucide-react';
 import { Modal, Button, Select } from './ui/Components';
+import { RevenueForm } from './RevenueForm';
 import { TYPES_PIECE_RECETTE } from '../lib/constants';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
@@ -12,6 +13,9 @@ export function RevenueList({ cible = null, onCibleConsommee }) {
     // Recette dont on verse le justificatif : la pièce est exigée au dossier
     // au même titre qu'une facture de dépense.
     const [depot, setDepot] = useState(null);
+    // Une recette saisie dans la mauvaise catégorie — un prêt pris pour un don —
+    // doit pouvoir se requalifier sans être supprimée puis ressaisie.
+    const [edition, setEdition] = useState(null);
     // Recette désignée par une alerte : on l'amène à l'écran et on la surligne.
     const ligneCible = useRef(null);
     useEffect(() => {
@@ -46,6 +50,7 @@ export function RevenueList({ cible = null, onCibleConsommee }) {
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Recu fiscal</th>
                                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Montant</th>
                                 <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Justificatif</th>
+                                <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Modifier</th>
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
@@ -82,6 +87,13 @@ export function RevenueList({ cible = null, onCibleConsommee }) {
                                             </button>
                                         )}
                                     </td>
+                                    <td className="p-4 align-middle text-center">
+                                        <button onClick={() => setEdition(recette)}
+                                            title="Modifier cette recette"
+                                            className="text-muted-foreground hover:text-primary inline-flex transition-colors">
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -92,6 +104,11 @@ export function RevenueList({ cible = null, onCibleConsommee }) {
             <Modal isOpen={Boolean(depot)} onClose={() => setDepot(null)}
                 title="Déposer un justificatif">
                 {depot && <DepotJustificatifRecette recette={depot} onClose={() => setDepot(null)} />}
+            </Modal>
+
+            <Modal isOpen={Boolean(edition)} onClose={() => setEdition(null)}
+                title="Modifier la recette">
+                {edition && <RevenueForm recette={edition} onClose={() => setEdition(null)} />}
             </Modal>
         </div>
     );
