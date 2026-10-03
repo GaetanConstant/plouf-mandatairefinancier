@@ -11,7 +11,8 @@ réinjectée dans les totaux globaux.
 from __future__ import annotations
 
 import os
-from datetime import date
+import uuid
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import HTTPException
@@ -33,6 +34,68 @@ class EvenementIn(BaseModel):
     date_fin: Optional[str] = None
     lieu: Optional[str] = None
     description: Optional[str] = None
+
+
+class SerieIn(BaseModel):
+    """Événement récurrent : un même intitulé, plusieurs dates.
+
+    La liste de dates fait foi. « Tous les samedis du 1er au 30 » n'est qu'un
+    moyen commode de la remplir côté écran — le serveur ne connaît que
+    l'ensemble des dates retenues, ce qui laisse retirer le samedi où il
+    pleuvait sans inventer une notion d'exception.
+    """
+    titre: str
+    type: Optional[str] = None
+    lieu: Optional[str] = None
+    description: Optional[str] = None
+    dates: list[str]
+
+
+MAX_OCCURRENCES = 120
+
+
+def dates_hebdomadaires(debut: date, fin: date, jour_semaine: int) -> list[date]:
+    """Toutes les dates d'un jour de semaine donné entre deux bornes incluses.
+
+    `jour_semaine` suit la convention Python : 0 = lundi, 5 = samedi.
+    """
+    if fin < debut:
+        raise ValueError("La date de fin précède la date de début.")
+    premier = debut + timedelta(days=(jour_semaine - debut.weekday()) % 7)
+    return [d for d in (premier + timedelta(weeks=n)
+                        for n in range((fin - premier).days // 7 + 1))
+            if d <= fin] if premier <= fin else []
+
+
+def create_serie(campaign_id: str, payload: SerieIn, auteur: str | None = None,
+                 role: str = ROLE_MANDATAIRE) -> dict:
+    """Crée une occurrence par date retenue, toutes liées par une même série."""
+    ensure_campaign_db(campaign_id)
+    dates = sorted({_d(d) for d in payload.dates if d})
+    if not dates:
+        raise HTTPException(status_code=400, detail="Aucune date retenue.")
+    if len(dates) > MAX_OCCURRENCES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{len(dates)} occurrences demandées, maximum {MAX_OCCURRENCES}.")
+
+    serie = uuid.uuid4().hex
+    with campaign_session(campaign_id) as s:
+        eid = _election_id(s)
+        for jour in dates:
+            e = Evenement(
+                election_id=eid,
+                titre=payload.titre,
+                type=enums.TypeEvenement(payload.type) if payload.type else enums.TypeEvenement.autre,
+                date_debut=jour,
+                lieu=payload.lieu,
+                description=payload.description,
+                serie_id=serie,
+            )
+            validation.estampiller(e, auteur, role)
+            s.add(e)
+    return {"message": f"{len(dates)} occurrences créées.",
+            "serie_id": serie, "nb": len(dates)}
 
 
 class LiaisonIn(BaseModel):
@@ -157,6 +220,7 @@ def _evenement_dict(s, e: Evenement) -> dict:
         "date_fin": _fmt(e.date_fin),
         "lieu": e.lieu,
         "description": e.description,
+        "serie_id": e.serie_id,
         "nb_depenses": len(liees),
         "cout": sum(cout_affecte(l, d) for l, d in liees),
     }

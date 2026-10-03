@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CalendarDays, Plus, Pencil, Trash2, Link2, X, FileText } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, Repeat, Trash2, Link2, X, FileText } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -12,6 +12,26 @@ const TYPES_EVT = ['reunion_publique', 'collecte', 'tractage', 'meeting', 'porte
 const eur = (v) => (v || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const FORM_VIDE = { titre: '', type: 'meeting', date_debut: '', date_fin: '', lieu: '', description: '' };
+
+// 0 = lundi, comme la convention Python du serveur.
+const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+    .map((label, value) => ({ value: String(value), label }));
+
+const jourDe = (iso) => (new Date(`${iso}T12:00:00`).getDay() + 6) % 7;
+
+/** Les dates d'un jour de semaine donné entre deux bornes incluses. */
+function datesHebdomadaires(debut, fin, jour) {
+    if (!debut || !fin || fin < debut) return [];
+    const dates = [];
+    for (let d = new Date(`${debut}T12:00:00`); d <= new Date(`${fin}T12:00:00`); d.setDate(d.getDate() + 1)) {
+        if ((d.getDay() + 6) % 7 === Number(jour)) dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+}
+
+const enFrancais = (iso) =>
+    new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', {
+        weekday: 'short', day: '2-digit', month: 'short' });
 
 export function EvenementsPage({ role }) {
     const queryClient = useQueryClient();
@@ -24,9 +44,23 @@ export function EvenementsPage({ role }) {
     const [detailId, setDetailId] = useState(null);
     const [form, setForm] = useState(FORM_VIDE);
 
-    const ouvrirCreation = () => { setEditId(null); setForm(FORM_VIDE); setFormOpen(true); };
+    // Événement récurrent : on ne crée pas une règle, mais une occurrence par
+    // date retenue. Les dates se construisent par un générateur puis se
+    // corrigent à la main — le samedi où il pleuvait se retire.
+    const [recurrent, setRecurrent] = useState(false);
+    const [dates, setDates] = useState([]);
+    const [gen, setGen] = useState({ jour: '5', debut: '', fin: '' });
+    const [erreur, setErreur] = useState('');
+
+    const ajouterDates = (nouvelles) =>
+        setDates(d => [...new Set([...d, ...nouvelles])].sort());
+
+    const ouvrirCreation = () => {
+        setEditId(null); setForm(FORM_VIDE); setRecurrent(false);
+        setDates([]); setErreur(''); setFormOpen(true);
+    };
     const ouvrirEdition = (e) => {
-        setEditId(e.id);
+        setEditId(e.id); setRecurrent(false); setErreur('');
         setForm({
             titre: e.titre || '', type: e.type || 'meeting',
             date_debut: e.date_debut || '', date_fin: e.date_fin || '',
@@ -56,6 +90,16 @@ export function EvenementsPage({ role }) {
             setFormOpen(false); setEditId(null); setForm(FORM_VIDE);
         },
     });
+    const serieMutation = useMutation({
+        mutationFn: async (p) => axios.post(`${API_URL}/evenements/serie`, p),
+        onSuccess: () => {
+            invalidate();
+            queryClient.invalidateQueries(['completude']);
+            setFormOpen(false); setRecurrent(false); setDates([]); setForm(FORM_VIDE);
+        },
+        onError: (err) => setErreur(err.response?.data?.detail || 'La création a échoué.'),
+    });
+
     const deleteMutation = useMutation({
         mutationFn: async (id) => axios.delete(`${API_URL}/evenements/${id}`),
         onSuccess: invalidate,
@@ -122,15 +166,87 @@ export function EvenementsPage({ role }) {
                         <Select label="Type" options={TYPES_EVT} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} />
                         <Input label="Lieu" value={form.lieu} onChange={e => setForm({ ...form, lieu: e.target.value })} />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Input label="Date de début" type="date" value={form.date_debut} onChange={e => setForm({ ...form, date_debut: e.target.value })} />
-                        <Input label="Date de fin" type="date" value={form.date_fin} onChange={e => setForm({ ...form, date_fin: e.target.value })} />
-                    </div>
+                    {editId === null && (
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="checkbox" checked={recurrent}
+                                onChange={e => { setRecurrent(e.target.checked); setErreur(''); }} />
+                            <Repeat className="w-4 h-4 text-primary" />
+                            Événement récurrent (plusieurs dates)
+                        </label>
+                    )}
+
+                    {!recurrent && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <Input label="Date de début" type="date" value={form.date_debut} onChange={e => setForm({ ...form, date_debut: e.target.value })} />
+                            <Input label="Date de fin" type="date" value={form.date_fin} onChange={e => setForm({ ...form, date_fin: e.target.value })} />
+                        </div>
+                    )}
+
+                    {recurrent && (
+                        <div className="space-y-3 rounded-lg border border-border/60 bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">
+                                Chaque date retenue devient un événement à part entière, auquel
+                                une dépense peut se rattacher.
+                            </p>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                                <Select label="Chaque" options={JOURS} value={gen.jour}
+                                    onChange={e => setGen({ ...gen, jour: e.target.value })} />
+                                <Input label="Du" type="date" value={gen.debut}
+                                    onChange={e => setGen({ ...gen, debut: e.target.value })} />
+                                <Input label="Au" type="date" value={gen.fin}
+                                    onChange={e => setGen({ ...gen, fin: e.target.value })} />
+                                <Button type="button" variant="outline"
+                                    onClick={() => ajouterDates(datesHebdomadaires(gen.debut, gen.fin, gen.jour))}>
+                                    Ajouter
+                                </Button>
+                            </div>
+
+                            <div className="flex items-end gap-2">
+                                <div className="flex-1">
+                                    <Input label="Ou une date précise" type="date"
+                                        onChange={e => e.target.value && ajouterDates([e.target.value])} />
+                                </div>
+                            </div>
+
+                            {dates.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {dates.map(d => (
+                                        <button key={d} type="button" onClick={() => setDates(l => l.filter(x => x !== d))}
+                                            title="Retirer cette date"
+                                            className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs hover:border-destructive hover:text-destructive transition-colors">
+                                            {enFrancais(d)} <X className="w-3 h-3" />
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground italic">Aucune date retenue.</p>
+                            )}
+
+                            {dates.length > 0 && (
+                                <p className="text-[11px] text-muted-foreground">
+                                    {dates.length} occurrence{dates.length > 1 ? 's' : ''} seront créées.
+                                </p>
+                            )}
+                        </div>
+                    )}
                     <Input label="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                    {erreur && <p className="text-sm text-destructive">{erreur}</p>}
                     <div className="pt-2 flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setFormOpen(false)}>Annuler</Button>
-                        <Button onClick={() => saveMutation.mutate({ ...form, date_fin: form.date_fin || null })}
-                            isLoading={saveMutation.isPending}>{editId === null ? 'Créer' : 'Enregistrer'}</Button>
+                        {recurrent ? (
+                            <Button disabled={!form.titre || !dates.length}
+                                onClick={() => serieMutation.mutate({
+                                    titre: form.titre, type: form.type, lieu: form.lieu,
+                                    description: form.description, dates,
+                                })}
+                                isLoading={serieMutation.isPending}>
+                                Créer {dates.length || ''} occurrence{dates.length > 1 ? 's' : ''}
+                            </Button>
+                        ) : (
+                            <Button onClick={() => saveMutation.mutate({ ...form, date_fin: form.date_fin || null })}
+                                isLoading={saveMutation.isPending}>{editId === null ? 'Créer' : 'Enregistrer'}</Button>
+                        )}
                     </div>
                 </div>
             </Modal>

@@ -363,6 +363,9 @@ class Evenement(Tracable, Base):
     date_fin: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     lieu: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Occurrences d'un même événement récurrent. Chacune reste un événement
+    # autonome ; cette clé ne sert qu'à les regrouper.
+    serie_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
 
     depenses: Mapped[list["EvenementDepense"]] = relationship(back_populates="evenement")
     concours: Mapped[list["EvenementConcours"]] = relationship(back_populates="evenement")

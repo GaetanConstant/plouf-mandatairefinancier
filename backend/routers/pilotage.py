@@ -27,6 +27,16 @@ def create_evenement(payload: evenements.EvenementIn, current_user: dict = Depen
     return evenements.create_evenement(campaign_id, payload, current_user["username"], role)
 
 
+@router.post("/evenements/serie")
+def create_serie(payload: evenements.SerieIn,
+                 current_user: dict = Depends(get_current_user),
+                 campaign_id: str = Depends(get_campaign_conn),
+                 role: str = Depends(get_role),
+                 _garde: str = Depends(mandataire_requis)):
+    """Crée un événement récurrent : une occurrence par date retenue."""
+    return evenements.create_serie(campaign_id, payload, current_user["username"], role)
+
+
 @router.get("/evenements/{evenement_id}")
 def detail_evenement(evenement_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return evenements.detail_evenement(campaign_id, evenement_id)
