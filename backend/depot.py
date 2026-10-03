@@ -191,6 +191,71 @@ def pieces_sans_fichier(campaign_id: str) -> list[str]:
                   if d["fichier"] and d["fichier"] not in presents)
 
 
+def _colonnes_vers_document() -> list:
+    """Toutes les colonnes du modèle qui pointent vers `document.id`.
+
+    Déduites des métadonnées plutôt qu'énumérées à la main : une colonne
+    ajoutée demain serait sinon oubliée, et laisserait une référence vers une
+    pièce effacée — exactement le genre de trace que le dépôt ne pardonne pas.
+    """
+    from db.models import Base
+    colonnes = []
+    for table in Base.metadata.tables.values():
+        for colonne in table.columns:
+            if any(fk.target_fullname == "document.id" for fk in colonne.foreign_keys):
+                colonnes.append(colonne)
+    return colonnes
+
+
+def supprimer_piece(campaign_id: str, fichier: str, autres_campagnes: list[str]) -> dict:
+    """Supprime une pièce : ses rattachements, sa ligne, puis son fichier.
+
+    Effacer le seul fichier laissait la pièce rattachée à son événement et à sa
+    dépense, toujours annoncée au bordereau : un fantôme que plus rien ne
+    permettait de retirer, et qui bloquait le dépôt sans issue.
+
+    Le fichier n'est retiré du disque que si aucune autre campagne ne s'en sert
+    — `uploads` leur est commun, et un testeur ne doit pas pouvoir trouer le
+    dossier d'un autre.
+    """
+    ensure_campaign_db(campaign_id)
+    detaches = 0
+    with campaign_session(campaign_id) as s:
+        doc_ids = list(s.scalars(select(Document.id).where(Document.fichier == fichier)).all())
+        for colonne in _colonnes_vers_document():
+            if not doc_ids:
+                break
+            resultat = s.execute(
+                colonne.table.update()
+                .where(colonne.in_(doc_ids))
+                .values({colonne.name: None}))
+            detaches += resultat.rowcount or 0
+        for doc_id in doc_ids:
+            doc = s.get(Document, doc_id)
+            if doc:
+                s.delete(doc)
+
+    encore_utilise = fichier in fichiers_rattaches(
+        [c for c in autres_campagnes if c != campaign_id])
+
+    chemin = Path(UPLOADS_DIR) / fichier
+    efface = False
+    if not encore_utilise and chemin.is_file():
+        try:
+            chemin.unlink()
+            efface = True
+        except OSError as e:
+            logger.warning("Suppression de %s impossible : %s", chemin, e)
+
+    return {
+        "message": "Pièce supprimée.",
+        "pieces_retirees": len(doc_ids),
+        "rattachements_retires": detaches,
+        "fichier_efface": efface,
+        "conserve_pour_autre_campagne": encore_utilise,
+    }
+
+
 def _nom_dans_archive(enveloppe: str, rang: int, fichier: str,
                       num_piece: str | None = None) -> str:
     """Nom du fichier dans l'archive, préfixé de quoi le retrouver.

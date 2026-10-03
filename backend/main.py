@@ -433,6 +433,7 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
 
 @app.get("/justificatifs")
 def list_justificatifs(current_user: dict = Depends(get_current_user),
+                       campaign_id: str = Depends(get_campaign_conn),
                        _garde: str = Depends(tout_role)):
     """Fichiers présents dans `uploads`, en signalant ceux rattachés à rien.
 
@@ -457,20 +458,41 @@ def list_justificatifs(current_user: dict = Depends(get_current_user),
                     "mtime": datetime.fromtimestamp(stats.st_mtime).isoformat(),
                     "url": f"/docs/{filename}",
                     "rattache": filename in rattaches,
+                    "fichier_absent": False,
                 })
+
+    # Pièces annoncées en base dont le fichier a disparu. Elles n'apparaissaient
+    # nulle part — la liste ne montre que le disque — et bloquaient donc le
+    # dépôt sans qu'on puisse les retirer.
+    presents = {f["name"] for f in files}
+    for manquant in depot.pieces_sans_fichier(campaign_id):
+        if manquant not in presents:
+            files.append({
+                "name": manquant,
+                "size": 0,
+                "mtime": "",
+                "url": None,
+                "rattache": True,
+                "fichier_absent": True,
+            })
     return sorted(files, key=lambda x: x["mtime"], reverse=True)
 
 @app.delete("/justificatifs/{filename}")
 def delete_justificatif(filename: str, current_user: dict = Depends(get_current_user),
+                        campaign_id: str = Depends(get_campaign_conn),
                         _garde: str = Depends(mandataire_requis)):
+    """Supprime une pièce : ses rattachements, sa ligne en base, puis son fichier.
+
+    Effacer le seul fichier laissait la pièce rattachée à son événement et à sa
+    dépense, toujours annoncée au bordereau. Une pièce dont le fichier a déjà
+    disparu reste donc supprimable : c'est le seul moyen de retirer un fantôme.
     """
-    Supprime un fichier justificatif.
-    """
-    file_path = os.path.join(UPLOADS_DIR, filename)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        return {"message": "Fichier supprimé"}
-    raise HTTPException(status_code=404, detail="Fichier introuvable")
+    with get_central_db_connection() as conn:
+        campaign_ids = [row[0] for row in conn.execute("SELECT id FROM campaigns").fetchall()]
+    resultat = depot.supprimer_piece(campaign_id, filename, campaign_ids)
+    if not resultat["pieces_retirees"] and not resultat["fichier_efface"]:
+        raise HTTPException(status_code=404, detail="Pièce introuvable")
+    return resultat
 
 @app.get("/export")
 def export_data(campaign_id: str = Depends(get_campaign_conn)):
