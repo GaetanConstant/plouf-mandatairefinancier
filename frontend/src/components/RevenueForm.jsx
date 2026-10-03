@@ -6,25 +6,29 @@ import { Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
 
-export function RevenueForm({ onClose }) {
+export function RevenueForm({ onClose, recette }) {
     const queryClient = useQueryClient();
+    const isEdit = Boolean(recette?.id);
     const [formData, setFormData] = useState({
-        date: new Date().toISOString().split('T')[0],
-        nom_donateur: '',
-        adresse: '',
-        montant: '',
-        type: TYPES_RECETTE[0].value,
-        recu_genere: false
+        date: recette?.date || new Date().toISOString().split('T')[0],
+        nom_donateur: recette?.nom_donateur || '',
+        adresse: recette?.adresse || '',
+        montant: recette?.montant ?? '',
+        type: recette?.type || TYPES_RECETTE[0].value,
+        recu_genere: recette?.recu_genere || false
     });
     const [error, setError] = useState(null);
 
     const createMutation = useMutation({
-        mutationFn: async (newRevenue) => {
-            await axios.post(`${API_URL}/recettes`, newRevenue);
+        mutationFn: async (revenue) => {
+            if (isEdit) await axios.put(`${API_URL}/recettes/${recette.id}`, revenue);
+            else await axios.post(`${API_URL}/recettes`, revenue);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['recettes']);
-            queryClient.invalidateQueries(['stats']);
+            // Le type d'une recette change sa rubrique comptable : la main
+            // courante, la conformité et le reste à faire en dépendent.
+            ['recettes', 'stats', 'main-courante', 'conformite', 'completude',
+             'rapprochement-recettes'].forEach(k => queryClient.invalidateQueries([k]));
             onClose();
         },
         onError: (err) => {
@@ -113,7 +117,7 @@ export function RevenueForm({ onClose }) {
             <div className="pt-4 flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>Annuler</Button>
                 <Button type="submit" isLoading={createMutation.isPending}>
-                    Enregistrer la recette
+                    {isEdit ? 'Mettre à jour la recette' : 'Enregistrer la recette'}
                 </Button>
             </div>
         </form>
