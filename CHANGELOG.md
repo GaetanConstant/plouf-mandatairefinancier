@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.27.0 — 2026-10-03 — Rapprochement bancaire des recettes, et exigé au dépôt
+
+### Ajouté
+- Les recettes se rapprochent du relevé bancaire, comme les dépenses le faisaient déjà. Une ligne au crédit s'affecte à une ou plusieurs recettes : une remise de chèques couvre souvent plusieurs dons, qui s'imputent un à un jusqu'à solder la ligne. Rien de tout cela n'existait côté encaissement.
+- Le « Reste à faire » signale les dépenses et les recettes qu'aucun mouvement bancaire ne justifie encore. Une écriture que le relevé ne porte pas est précisément ce que la commission cherche. Les concours en nature en sont exclus : ils ne passent pas par le compte.
+
+### Corrigé
+- Supprimer un relevé remet les recettes qu'il justifiait à l'état non rapproché, au lieu de les laisser pointer un relevé disparu. Les dépenses l'étaient déjà.
+
 ## v0.26.0 — 2026-10-03 — Événements récurrents
 
 ### Ajouté

@@ -90,17 +90,15 @@ export function RelevesPage() {
                                         t.sens === 'debit' ? 'text-foreground' : 'text-emerald-600')}>
                                         {t.sens === 'debit' ? '−' : '+'}{eur(t.montant)}
                                     </span>
-                                    {t.sens === 'credit' ? (
-                                        // Un encaissement est une recette : il ne règle pas une dépense.
-                                        <span className="text-xs text-muted-foreground">encaissement</span>
-                                    ) : t.rapprochee ? (
+                                    {t.rapprochee ? (
                                         <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
                                             <Check className="h-3.5 w-3.5" /> rapprochée
                                         </span>
                                     ) : (
                                         <Button variant="outline" className="gap-1"
                                             onClick={() => setTransactionCiblee(t)}>
-                                            <Link2 className="h-3.5 w-3.5" /> Rapprocher
+                                            <Link2 className="h-3.5 w-3.5" />
+                                            {t.sens === 'credit' ? 'Affecter' : 'Rapprocher'}
                                             <span className="text-xs text-muted-foreground">reste {eur(t.reste)}</span>
                                         </Button>
                                     )}
@@ -111,11 +109,12 @@ export function RelevesPage() {
                                         {t.imputations.map(i => (
                                             <li key={i.id} className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <span className="flex-1">
-                                                    {i.libelle_depense}
+                                                    {i.num_piece && <span className="font-mono opacity-70">{i.num_piece} · </span>}
+                                                    {i.libelle_depense ?? i.libelle_recette}
                                                     {i.fournisseur && <span className="opacity-70"> · {i.fournisseur}</span>}
                                                 </span>
                                                 <span className="font-mono">{eur(i.montant)}</span>
-                                                <DesimputerBouton imputationId={i.id} />
+                                                <DesimputerBouton imputationId={i.id} recette={t.sens === 'credit'} />
                                             </li>
                                         ))}
                                     </ul>
@@ -131,9 +130,12 @@ export function RelevesPage() {
             </Modal>
 
             <Modal isOpen={Boolean(transactionCiblee)} onClose={() => setTransactionCiblee(null)}
-                title="Rapprocher une transaction">
+                title={transactionCiblee?.sens === 'credit'
+                    ? 'Affecter un encaissement' : 'Rapprocher une transaction'}>
                 {transactionCiblee && (
-                    <Rapprochement transaction={transactionCiblee} onClose={() => setTransactionCiblee(null)} />
+                    transactionCiblee.sens === 'credit'
+                        ? <RapprochementRecette transaction={transactionCiblee} onClose={() => setTransactionCiblee(null)} />
+                        : <Rapprochement transaction={transactionCiblee} onClose={() => setTransactionCiblee(null)} />
                 )}
             </Modal>
         </div>
@@ -141,15 +143,15 @@ export function RelevesPage() {
 }
 
 
-function DesimputerBouton({ imputationId }) {
+function DesimputerBouton({ imputationId, recette = false }) {
     const queryClient = useQueryClient();
     const retirer = useMutation({
-        mutationFn: async () => axios.delete(`${API_URL}/imputations/${imputationId}`),
+        mutationFn: async () => axios.delete(
+            `${API_URL}/${recette ? 'imputations-recettes' : 'imputations'}/${imputationId}`),
         onSuccess: () => {
-            queryClient.invalidateQueries(['releves']);
-            queryClient.invalidateQueries(['rapprochement-depenses']);
-            queryClient.invalidateQueries(['main-courante']);
-            queryClient.invalidateQueries(['depenses']);
+            ['releves', 'rapprochement-depenses', 'rapprochement-recettes',
+             'main-courante', 'depenses', 'recettes', 'completude']
+                .forEach(k => queryClient.invalidateQueries([k]));
         },
     });
     return (
@@ -295,6 +297,89 @@ function ImportReleve({ onClose }) {
                     {!libelle.trim() && <p className="text-right text-xs text-muted-foreground">Donnez un nom au relevé.</p>}
                 </div>
             )}
+        </div>
+    );
+}
+
+
+/**
+ * Affectation d'un encaissement à une recette.
+ *
+ * Pendant du rapprochement côté débit. Une remise de chèques couvre souvent
+ * plusieurs dons : on impute plusieurs fois sur la même ligne jusqu'à la solder.
+ */
+function RapprochementRecette({ transaction, onClose }) {
+    const queryClient = useQueryClient();
+    const [recetteId, setRecetteId] = useState('');
+    const [montant, setMontant] = useState('');
+    const [erreur, setErreur] = useState('');
+
+    const { data: candidates } = useQuery({
+        queryKey: ['rapprochement-recettes'],
+        queryFn: async () => (await axios.get(`${API_URL}/rapprochement/recettes`)).data,
+    });
+
+    const imputer = useMutation({
+        mutationFn: async () => axios.post(
+            `${API_URL}/transactions/${transaction.id}/imputations-recettes`, {
+                recette_id: Number(recetteId),
+                montant: montant === '' ? null : Number(montant),
+            }),
+        onSuccess: () => {
+            ['releves', 'rapprochement-recettes', 'main-courante', 'recettes',
+             'stats', 'conformite', 'completude'].forEach(k => queryClient.invalidateQueries([k]));
+            setRecetteId(''); setMontant(''); setErreur('');
+            onClose();
+        },
+        onError: (err) => setErreur(err.response?.data?.detail || 'Affectation impossible.'),
+    });
+
+    const choisie = (candidates || []).find(c => String(c.id) === recetteId);
+
+    return (
+        <div className="space-y-4">
+            <div className="rounded-md bg-muted/40 p-3 text-sm">
+                <div className="font-medium">{transaction.libelle}</div>
+                <div className="text-muted-foreground">
+                    {transaction.date_operation} · {eur(transaction.montant)} ·
+                    reste à affecter <strong>{eur(transaction.reste)}</strong>
+                </div>
+            </div>
+
+            <Select
+                label="Recette encaissée"
+                value={recetteId}
+                onChange={e => { setRecetteId(e.target.value); setMontant(''); setErreur(''); }}
+                options={[
+                    { value: '', label: '— choisir une recette —' },
+                    ...(candidates || []).map(c => ({
+                        value: String(c.id),
+                        label: `${c.num_piece || ''} ${c.libelle} — reste ${c.reste.toFixed(2)} €`.trim(),
+                    })),
+                ]}
+            />
+
+            {choisie && (
+                <Input
+                    label={`Montant affecté (laisser vide pour ${Math.min(choisie.reste, transaction.reste).toFixed(2)} €)`}
+                    type="number" step="0.01" placeholder={Math.min(choisie.reste, transaction.reste).toFixed(2)}
+                    value={montant} onChange={e => setMontant(e.target.value)}
+                />
+            )}
+
+            <p className="text-xs text-muted-foreground">
+                Une remise de chèques couvre souvent plusieurs dons : affectez-les un à un
+                jusqu'à solder la ligne.
+            </p>
+
+            {erreur && <p className="text-sm text-destructive">{erreur}</p>}
+
+            <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={onClose}>Fermer</Button>
+                <Button isLoading={imputer.isPending} onClick={() => recetteId && imputer.mutate()}>
+                    Affecter
+                </Button>
+            </div>
         </div>
     );
 }

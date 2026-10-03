@@ -81,6 +81,25 @@ def imputer(transaction_id: int, payload: releves.ImputationIn,
     return releves.imputer(campaign_id, transaction_id, payload)
 
 
+@router.get("/rapprochement/recettes")
+def recettes_a_rapprocher(campaign_id: str = Depends(get_campaign_conn)):
+    """Recettes dont le compte ne porte pas encore la trace complète."""
+    return releves.recettes_a_rapprocher(campaign_id)
+
+
+@router.post("/transactions/{transaction_id}/imputations-recettes")
+def imputer_recette(transaction_id: int, payload: releves.ImputationRecetteIn,
+                    campaign_id: str = Depends(get_campaign_conn),
+                    _garde: str = Depends(mandataire_requis)):
+    return releves.imputer_recette(campaign_id, transaction_id, payload)
+
+
+@router.delete("/imputations-recettes/{imputation_id}")
+def desimputer_recette(imputation_id: int, campaign_id: str = Depends(get_campaign_conn),
+                       _garde: str = Depends(mandataire_requis)):
+    return releves.desimputer_recette(campaign_id, imputation_id)
+
+
 @router.delete("/imputations/{imputation_id}")
 def desimputer(imputation_id: int, campaign_id: str = Depends(get_campaign_conn),
                _garde: str = Depends(mandataire_requis)):

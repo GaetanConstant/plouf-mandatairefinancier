@@ -581,6 +581,8 @@ class TransactionBancaire(Base):
     releve: Mapped["Releve"] = relationship(back_populates="transactions")
     imputations: Mapped[list["ImputationBancaire"]] = relationship(
         back_populates="transaction", cascade="all, delete-orphan")
+    imputations_recettes: Mapped[list["ImputationRecette"]] = relationship(
+        back_populates="transaction", cascade="all, delete-orphan")
 
 
 class ImputationBancaire(Base):
@@ -598,6 +600,23 @@ class ImputationBancaire(Base):
     montant: Mapped[float] = mapped_column(Float)
 
     transaction: Mapped["TransactionBancaire"] = relationship(back_populates="imputations")
+
+
+class ImputationRecette(Base):
+    """Part d'un encaissement affectée à une recette.
+
+    Pendant d'`ImputationBancaire` côté crédit : une remise de chèques couvre
+    plusieurs dons, et un apport peut arriver en deux virements.
+    """
+
+    __tablename__ = "imputation_recette"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    transaction_id: Mapped[int] = mapped_column(ForeignKey("transaction_bancaire.id"))
+    recette_id: Mapped[int] = mapped_column(ForeignKey("recette.id"), index=True)
+    montant: Mapped[float] = mapped_column(Float)
+
+    transaction: Mapped["TransactionBancaire"] = relationship(back_populates="imputations_recettes")
 
 
 class Devolution(Base):
