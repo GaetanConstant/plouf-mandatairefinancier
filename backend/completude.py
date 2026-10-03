@@ -21,6 +21,7 @@ from db.models import (
     CompteBancaire,
     Depense,
     Election,
+    Emprunt,
     EvenementDepense,
     ExpertComptable,
     Mandataire,
@@ -202,6 +203,37 @@ def _section_justificatifs_depenses(s) -> dict:
     )
 
 
+def _section_contrats_pret(s) -> dict:
+    """Prêts sans contrat écrit au dossier.
+
+    Un prêt se prouve par un contrat : c'est une pièce exigée, et sans elle la
+    recette ne se distingue pas d'un don déguisé. L'emprunt se crée au dépôt du
+    contrat, le reste — taux, durée — se complète dans l'onglet Emprunts.
+    """
+    prets = list(s.scalars(_valides(select(Recette), Recette)
+                           .where(Recette.categorie == enums.CategorieRecette.pret)
+                           .order_by(Recette.num_piece)).all())
+    if not prets:
+        return _section("contrats_pret", "Contrats de prêt", 0, 0, [],
+                        note="Aucun prêt enregistré")
+    emprunts = {e.id: e for e in s.scalars(select(Emprunt)).all()}
+    sans_contrat = [r for r in prets
+                    if not (r.emprunt_id and emprunts.get(r.emprunt_id)
+                            and emprunts[r.emprunt_id].contrat_doc_id)]
+    manquants = [_libelle_ecriture(r.num_piece,
+                                   r.donateur.nom if r.donateur else "Prêt",
+                                   r.montant, "prêt") for r in sans_contrat]
+    actions = [{"type": "contrat_pret", "id": r.id, "num_piece": r.num_piece,
+                "libelle": r.donateur.nom if r.donateur else "Prêt",
+                "tiers": None, "montant": r.montant} for r in sans_contrat]
+    total = len(prets)
+    return _section(
+        "contrats_pret", "Contrats de prêt", total, total - len(manquants),
+        manquants, actions=actions,
+        note=f"{total - len(manquants)}/{total} prêts sous contrat",
+    )
+
+
 def _section_evenements(s) -> dict:
     """Dépenses validées ni rattachées à un événement, ni déclarées hors événement.
 
@@ -343,6 +375,7 @@ def evaluer(campaign_id: str) -> dict:
         sections.append(_section_justificatifs_depenses(s))
         sections.append(_section_justificatifs_recettes(s))
         sections.append(_section_evenements(s))
+        sections.append(_section_contrats_pret(s))
 
     # Récépissés de candidature et de déclaration du mandataire : exigés en
     # enveloppe B, et jusqu'ici ni demandés ni contrôlés par l'application.
