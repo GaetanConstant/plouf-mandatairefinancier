@@ -52,7 +52,7 @@ export function EmpruntsPage() {
                 <table className="w-full text-sm">
                     <thead className="[&_tr]:border-b"><tr className="text-left text-muted-foreground">
                         <th className="h-11 px-3 font-medium">Type</th><th className="h-11 px-3 font-medium">Prêteur</th><th className="h-11 px-3 font-medium">Pays</th>
-                        <th className="h-11 px-3 font-medium">Date contrat</th><th className="h-11 px-3 font-medium">Durée</th><th className="h-11 px-3 font-medium">Taux</th>
+                        <th className="h-11 px-3 font-medium">Contrat</th><th className="h-11 px-3 font-medium">Date contrat</th><th className="h-11 px-3 font-medium">Durée</th><th className="h-11 px-3 font-medium">Taux</th>
                         <th className="h-11 px-3 font-medium text-right">Montant</th><th></th>
                     </tr></thead>
                     <tbody className="[&_tr:last-child]:border-0">
@@ -61,7 +61,17 @@ export function EmpruntsPage() {
                                 <td className="px-3 py-2"><span className="text-xs bg-muted rounded-full px-2 py-0.5">{TYPE_LABEL[e.type]}</span></td>
                                 <td className="px-3 py-2 font-medium">{[e.preteur_civilite, e.preteur_prenom, e.preteur_nom].filter(Boolean).join(' ')}</td>
                                 <td className="px-3 py-2">{e.preteur_pays || '—'}</td>
-                                <td className="px-3 py-2">{e.date_contrat || '—'}</td>
+                                <td className="px-3 py-2">
+                                {e.contrat_fichier ? (
+                                    <a href={`${API_URL}/docs/${e.contrat_fichier}`} target="_blank"
+                                        rel="noopener noreferrer" className="text-primary hover:underline">
+                                        présent
+                                    </a>
+                                ) : (
+                                    <span className="text-destructive">manquant</span>
+                                )}
+                            </td>
+                            <td className="px-3 py-2">{e.date_contrat || '—'}</td>
                                 <td className="px-3 py-2">{e.duree_mois ? `${e.duree_mois} mois` : '—'}</td>
                                 <td className="px-3 py-2">{e.taux != null ? `${e.taux} %` : '—'}</td>
                                 <td className="px-3 py-2 text-right font-medium">{eur(e.montant)}</td>

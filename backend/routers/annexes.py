@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
 
 import annexes
+import comptes
 import concours
 from auth import get_current_user
-from deps import get_campaign_conn, mandataire_requis
+from deps import get_campaign_conn, get_role, mandataire_requis
 
 router = APIRouter(tags=["annexes-cnccfp"], dependencies=[Depends(mandataire_requis)])
 
@@ -36,6 +37,16 @@ def create_membre(payload: annexes.MembreEquipeIn, current_user: dict = Depends(
 @router.delete("/equipe/{membre_id}")
 def delete_membre(membre_id: int, current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn)):
     return annexes.delete_membre(campaign_id, membre_id)
+
+
+@router.post("/recettes/{recette_id}/contrat-pret")
+def contrat_pret(recette_id: int, payload: comptes.PieceIn,
+                 current_user: dict = Depends(get_current_user),
+                 campaign_id: str = Depends(get_campaign_conn),
+                 role: str = Depends(get_role)):
+    """Dépose le contrat d'un prêt, en créant l'emprunt correspondant."""
+    return annexes.emprunt_de_recette(campaign_id, recette_id, payload.fichier,
+                                      payload.type_piece, current_user["username"], role)
 
 
 @router.get("/emprunts")

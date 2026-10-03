@@ -10,6 +10,13 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.31.0 — 2026-10-03 — Contrat de prêt exigé
+
+### Ajouté
+- Une recette enregistrée comme prêt doit porter son contrat écrit : le « Reste à faire » le signale et bloque le dépôt tant qu'il manque. Un prêt sans contrat ne se distingue pas d'un don déguisé.
+- Déposer le contrat depuis cette ligne **crée l'emprunt** correspondant, en reprenant le prêteur, le montant et la date de la recette. Les deux vivaient jusqu'ici séparément : enregistrer un prêt en recette ne créait aucun emprunt, et l'onglet Emprunts était une saisie parallèle sans lien avec la comptabilité. Taux et durée restent facultatifs, à compléter dans cet onglet.
+- L'onglet Emprunts indique si le contrat est présent, et permet de l'ouvrir. L'information existait en base sans jamais être affichée.
+
 ## v0.30.0 — 2026-10-03 — Les pièces ne sont plus accessibles sans session
 
 ### Sécurité

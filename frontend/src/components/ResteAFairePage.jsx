@@ -14,6 +14,11 @@ const DEPOTS = {
         axios.post(`${API_URL}/recettes/${a.id}/piece`, { fichier: chemin, type_piece: 'recu' }),
     piece_declarative: (a, chemin) =>
         axios.put(`${API_URL}/identite/pieces-declaratives/${a.cle}`, { fichier: chemin }),
+    // Déposer le contrat crée l'emprunt : une recette de type prêt n'en avait
+    // aucun, et c'est la pièce exigée qui le fait naître.
+    contrat_pret: (a, chemin) =>
+        axios.post(`${API_URL}/recettes/${a.id}/contrat-pret`,
+                   { fichier: chemin, type_piece: 'contrat' }),
 };
 
 const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -210,7 +215,8 @@ function LigneFichier({ action }) {
             });
             await DEPOTS[action.type](action, data.path);
         },
-        onSuccess: () => ['completude', 'depenses', 'recettes', 'pieces-declaratives', 'documents']
+        onSuccess: () => ['completude', 'depenses', 'recettes', 'pieces-declaratives',
+                          'documents', 'emprunts']
             .forEach(k => queryClient.invalidateQueries([k])),
         onError: (err) => setErreur(err.response?.data?.detail || 'Le dépôt a échoué.'),
     });
