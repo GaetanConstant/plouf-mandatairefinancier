@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.30.0 — 2026-10-03 — Les pièces ne sont plus accessibles sans session
+
+### Sécurité
+- Les justificatifs étaient servis comme des fichiers statiques : toute personne connaissant l'adresse d'une pièce pouvait l'ouvrir sans être connectée. Ces documents portent des noms et adresses de donateurs, des factures et des relevés bancaires. Ils passent désormais par un accès authentifié.
+- Une pièce n'est servie qu'aux membres de la campagne à laquelle elle appartient. Le dossier des justificatifs étant commun à toutes les campagnes, une pièce d'un autre dossier était jusqu'ici lisible.
+
+### Corrigé
+- Le rapprochement bancaire compte dans le score même lorsqu'aucun relevé n'a été importé. Un dossier dont aucune écriture n'est rapprochée s'affichait à 95 % alors qu'il est loin d'être déposable. Sans relevé, le manque est énoncé en une ligne plutôt qu'écriture par écriture.
+
 ## v0.29.0 — 2026-10-03 — Supprimer une pièce la détache vraiment
 
 ### Corrigé

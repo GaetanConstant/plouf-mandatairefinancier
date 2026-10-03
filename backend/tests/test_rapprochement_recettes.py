@@ -113,12 +113,28 @@ def test_recette_non_rapprochee_bloque_le_depot():
         teardown(cid)
 
 
-def test_section_absente_tant_qu_aucun_releve():
-    """Sans relevé importé, la section « Relevés bancaires » le dit déjà."""
+def test_sans_releve_tout_reste_a_rapprocher():
+    """Un dossier sans aucun relevé ne doit pas s'afficher presque complet.
+
+    La section comptait autrefois seulement une fois un relevé importé : le
+    score annonçait alors 95 % avec zéro écriture rapprochée.
+    """
     cid = fresh_campaign()
     try:
-        _recette(cid)
-        assert _section(cid) is None
+        _recette(cid, 500.0)
+        sec = _section(cid)
+        assert sec is not None and sec["requis"] == 1 and sec["remplis"] == 0, sec
+        # Un seul manque énoncé, pas une écriture par ligne : il n'y a rien en face.
+        assert sec["manquants"] == ["Aucun relevé importé — 1 écriture à rapprocher"], sec
+        assert sec["actions"][0]["onglet"] == "releves", sec["actions"]
+    finally:
+        teardown(cid)
+
+
+def test_sans_ecriture_rien_a_rapprocher():
+    cid = fresh_campaign()
+    try:
+        assert _section(cid)["complet"]
     finally:
         teardown(cid)
 

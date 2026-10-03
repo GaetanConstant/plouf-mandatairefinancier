@@ -251,7 +251,7 @@ def _section_justificatifs_recettes(s) -> dict:
     )
 
 
-def _section_rapprochement(campaign_id: str) -> dict:
+def _section_rapprochement(campaign_id: str, aucun_releve: bool = False) -> dict:
     """Écritures que le relevé bancaire ne justifie pas encore.
 
     Le compte de campagne doit se lire ligne à ligne sur le relevé : une
@@ -260,6 +260,18 @@ def _section_rapprochement(campaign_id: str) -> dict:
     ne passent pas par le compte, c'est leur définition.
     """
     import releves
+    total_ecritures = _nb_ecritures_rapprochables(campaign_id)
+    if aucun_releve:
+        # Énumérer les écritures n'apprendrait rien : il n'y a pas de relevé en
+        # face. Un seul manque, une seule action.
+        return _section(
+            "rapprochement", "Rapprochement bancaire", total_ecritures, 0,
+            [f"Aucun relevé importé — {total_ecritures} écriture"
+             f"{'s' if total_ecritures > 1 else ''} à rapprocher"] if total_ecritures else [],
+            actions=[_vers_ecran("releves", "Importer un relevé")] if total_ecritures else [],
+            note="Aucune écriture à rapprocher" if not total_ecritures else None,
+        )
+
     depenses = [d for d in releves.depenses_a_rapprocher(campaign_id)]
     recettes = releves.recettes_a_rapprocher(campaign_id)
     manquants = (
@@ -268,7 +280,7 @@ def _section_rapprochement(campaign_id: str) -> dict:
         + [f"Recette {r['num_piece'] or ''} — {r['libelle']} ({r['reste']:.0f} € non rapprochés)".replace("  ", " ")
            for r in recettes]
     )
-    total = _nb_ecritures_rapprochables(campaign_id)
+    total = total_ecritures
     return _section(
         "rapprochement", "Rapprochement bancaire", total,
         max(total - len(manquants), 0), manquants,
@@ -359,10 +371,11 @@ def evaluer(campaign_id: str) -> dict:
         actions=[] if nb_releves else [_vers_ecran("releves", "Importer un relevé")],
     ))
 
-    # Exigé seulement une fois qu'un relevé existe : sans relevé importé, la
-    # section précédente le dit déjà, et tout afficher deux fois serait du bruit.
-    if nb_releves:
-        sections.append(_section_rapprochement(campaign_id))
+    # Compte toujours, relevé importé ou non : sans ce décompte, un dossier
+    # dont aucune écriture n'est rapprochée s'affichait à 95 %, alors qu'il est
+    # très loin d'être déposable. Sans relevé, la section se résume à une ligne
+    # plutôt que d'énumérer toutes les écritures — le manque est unique.
+    sections.append(_section_rapprochement(campaign_id, aucun_releve=not nb_releves))
 
     # Pièces annoncées au bordereau mais absentes du disque : l'enveloppe
     # partirait avec un trou que rien ne signale au dépôt.

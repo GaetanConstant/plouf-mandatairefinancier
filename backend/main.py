@@ -36,6 +36,7 @@ from routers import (
     releves as releves_routes,
 )
 import os
+from pathlib import Path
 import re
 import uuid
 import shutil
@@ -106,8 +107,9 @@ app.add_middleware(
 # Configuration du dossier des justificatifs
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Monter le dossier static pour l'accès direct aux fichiers
-app.mount("/docs", StaticFiles(directory=UPLOADS_DIR), name="justificatifs")
+# Les justificatifs ne sont PAS montés en statique : ils portent des noms et
+# adresses de donateurs, des factures, des relevés. Ils passent par une route
+# authentifiée, cloisonnée par campagne — voir `servir_piece` plus bas.
 
 # Signature scannée du mandataire : hors git (donnée personnelle), déposée à
 # côté des données en production. Surchargeable par SIGNATURE_PATH.
@@ -430,6 +432,40 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
     return {"filename": filename, "path": file_location}
+
+@app.get("/docs/{filename}")
+def servir_piece(filename: str, current_user: dict = Depends(get_current_user),
+                 campaign_id: str = Depends(get_campaign_conn),
+                 _garde: str = Depends(tout_role)):
+    """Sert une pièce justificative, à qui a le droit de la lire.
+
+    Ces fichiers étaient montés en statique, donc accessibles à toute personne
+    connaissant l'URL — sans session. Ils portent des noms et adresses de
+    donateurs, des factures, des relevés bancaires. Le suffixe aléatoire des
+    noms rendait l'URL difficile à deviner, pas la pièce protégée.
+
+    `uploads` étant commun à toutes les campagnes, la pièce n'est servie que si
+    la campagne en cours la référence. Un fichier qu'aucune campagne ne
+    référence reste lisible : c'est un orphelin, que l'écran des justificatifs
+    doit permettre de regarder avant de le supprimer.
+    """
+    # Un nom de fichier n'est jamais un chemin : « ../../ » ne doit pas sortir
+    # du dossier des pièces.
+    nom = os.path.basename(filename)
+    chemin = (Path(UPLOADS_DIR) / nom).resolve()
+    if not chemin.is_file() or Path(UPLOADS_DIR).resolve() not in chemin.parents:
+        raise HTTPException(status_code=404, detail="Pièce introuvable")
+
+    if nom not in depot.fichiers_rattaches([campaign_id]):
+        with get_central_db_connection() as conn:
+            toutes = [row[0] for row in conn.execute("SELECT id FROM campaigns").fetchall()]
+        if nom in depot.fichiers_rattaches([c for c in toutes if c != campaign_id]):
+            raise HTTPException(
+                status_code=403,
+                detail="Cette pièce appartient à une autre campagne.")
+
+    return FileResponse(chemin)
+
 
 @app.get("/justificatifs")
 def list_justificatifs(current_user: dict = Depends(get_current_user),
