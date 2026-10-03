@@ -126,7 +126,9 @@ def test_sans_releve_tout_reste_a_rapprocher():
         assert sec is not None and sec["requis"] == 1 and sec["remplis"] == 0, sec
         # Un seul manque énoncé, pas une écriture par ligne : il n'y a rien en face.
         assert sec["manquants"] == ["Aucun relevé importé — 1 écriture à rapprocher"], sec
-        assert sec["actions"][0]["onglet"] == "releves", sec["actions"]
+        # Deux sorties : saisir les lignes ici même, ou importer un fichier.
+        types = [a["type"] for a in sec["actions"]]
+        assert "saisie_releve" in types and "ecran" in types, sec["actions"]
     finally:
         teardown(cid)
 

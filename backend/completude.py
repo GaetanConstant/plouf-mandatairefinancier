@@ -300,7 +300,10 @@ def _section_rapprochement(campaign_id: str, aucun_releve: bool = False) -> dict
             "rapprochement", "Rapprochement bancaire", total_ecritures, 0,
             [f"Aucun relevé importé — {total_ecritures} écriture"
              f"{'s' if total_ecritures > 1 else ''} à rapprocher"] if total_ecritures else [],
-            actions=[_vers_ecran("releves", "Importer un relevé")] if total_ecritures else [],
+            actions=([{"type": "saisie_releve", "libelle": "Saisir les lignes à la main",
+                      "id": None, "num_piece": None, "tiers": None, "montant": None},
+                      _vers_ecran("releves", "Importer un fichier")]
+                     if total_ecritures else []),
             note="Aucune écriture à rapprocher" if not total_ecritures else None,
         )
 
@@ -401,7 +404,9 @@ def evaluer(campaign_id: str) -> dict:
     if not nb_releves:
         sections.append(_section(
             "releves", "Relevés bancaires", 1, 0, ["Aucun relevé bancaire importé"],
-            actions=[_vers_ecran("releves", "Importer ou saisir un relevé")],
+            actions=[{"type": "saisie_releve", "libelle": "Saisir les lignes à la main",
+                      "id": None, "num_piece": None, "tiers": None, "montant": None},
+                     _vers_ecran("releves", "Importer un fichier")],
         ))
     else:
         # Le relevé compte deux fois : comme source des transactions, et comme

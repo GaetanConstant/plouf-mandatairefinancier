@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.33.0 — 2026-10-03 — Saisir un relevé depuis le « Reste à faire »
+
+### Ajouté
+- Les sections « Relevés bancaires » et « Rapprochement bancaire » permettent de saisir les lignes directement, sans quitter l'écran. Les autres manques se réglaient déjà sur place ; ceux-là renvoyaient vers un autre écran.
+
 ## v0.32.0 — 2026-10-03 — Saisie manuelle des transactions bancaires
 
 ### Ajouté

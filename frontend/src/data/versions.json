@@ -1,5 +1,15 @@
 [
   {
+    "version": "v0.33.0",
+    "date": "2026-10-03",
+    "dateAffichee": "3 octobre 2026",
+    "titre": "Saisir un relevé depuis le « Reste à faire »",
+    "details": [
+      "Les sections « Relevés bancaires » et « Rapprochement bancaire » permettent de saisir les lignes directement, sans quitter l'écran. Les autres manques se réglaient déjà sur place ; ceux-là renvoyaient vers un autre écran."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.32.0",
     "date": "2026-10-03",
     "dateAffichee": "3 octobre 2026",

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CalendarDays, CheckCircle2, ChevronRight, ListChecks, Upload } from 'lucide-react';
-import { Button } from './ui/Components';
+import { CalendarDays, CheckCircle2, ChevronRight, Keyboard, ListChecks, Upload } from 'lucide-react';
+import { Button, Input } from './ui/Components';
+import { LIGNE_VIDE, SaisieLignes, lignesPretes } from './SaisieTransactions';
 import { API_URL } from '../lib/api';
 
 // Où déposer le fichier, selon la nature de ce qui manque. Le reste des
@@ -101,6 +102,7 @@ function Bandeau({ etat }) {
 function Section({ section, onNavigate }) {
     const fichiers = section.actions.filter(a => DEPOTS[a.type]);
     const rattachements = section.actions.filter(a => a.type === 'evenement');
+    const saisie = section.actions.find(a => a.type === 'saisie_releve');
     const ecrans = section.actions.filter(a => a.type === 'ecran');
 
     return (
@@ -128,12 +130,15 @@ function Section({ section, onNavigate }) {
                 </ul>
             )}
 
-            {ecrans.map(action => (
-                <Button key={action.onglet} variant="outline" className="gap-1"
-                    onClick={() => onNavigate(action.onglet, action.cible ? { entite: action.cible } : null)}>
-                    {action.libelle} <ChevronRight className="h-4 w-4" />
-                </Button>
-            ))}
+            <div className="flex flex-wrap items-center gap-2">
+                {saisie && <SaisieReleve />}
+                {ecrans.map(action => (
+                    <Button key={action.onglet} variant="outline" className="gap-1"
+                        onClick={() => onNavigate(action.onglet, action.cible ? { entite: action.cible } : null)}>
+                        {action.libelle} <ChevronRight className="h-4 w-4" />
+                    </Button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -200,6 +205,63 @@ function LigneEvenement({ action }) {
                     <CalendarDays className="h-3.5 w-3.5" />
                     {rattacher.isPending ? 'En cours...' : 'Rattacher'}
                 </button>
+            </div>
+        </div>
+    );
+}
+
+
+/**
+ * Saisie d'un relevé sans quitter le reste à faire.
+ *
+ * Les autres manques se règlent sur place ; celui-ci renvoyait vers un autre
+ * écran. Toutes les banques ne donnent pas un export exploitable : reporter à
+ * la main ce qu'on lit sur le relevé papier doit se faire ici aussi.
+ */
+function SaisieReleve() {
+    const queryClient = useQueryClient();
+    const [ouvert, setOuvert] = useState(false);
+    const [libelle, setLibelle] = useState('');
+    const [lignes, setLignes] = useState([{ ...LIGNE_VIDE }]);
+    const [erreur, setErreur] = useState('');
+
+    const pretes = lignesPretes(lignes);
+
+    const enregistrer = useMutation({
+        mutationFn: async () => axios.post(`${API_URL}/releves`, {
+            libelle, source: 'manuel', transactions: pretes,
+        }),
+        onSuccess: () => {
+            ['completude', 'releves', 'rapprochement-depenses',
+             'rapprochement-recettes', 'main-courante'].forEach(k => queryClient.invalidateQueries([k]));
+            setOuvert(false); setLibelle(''); setLignes([{ ...LIGNE_VIDE }]); setErreur('');
+        },
+        onError: (err) => setErreur(err.response?.data?.detail || "L'enregistrement a échoué."),
+    });
+
+    if (!ouvert) {
+        return (
+            <Button variant="outline" className="gap-1.5" onClick={() => setOuvert(true)}>
+                <Keyboard className="h-4 w-4" /> Saisir les lignes à la main
+            </Button>
+        );
+    }
+
+    return (
+        <div className="w-full space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+            <Input label="Nom du relevé" placeholder="Ex : Septembre 2026"
+                value={libelle} onChange={e => setLibelle(e.target.value)} />
+            <SaisieLignes lignes={lignes} setLignes={setLignes} />
+            <p className="text-[11px] text-muted-foreground">
+                Le relevé scanné reste exigé en enveloppe B : il se dépose ensuite, ici même.
+            </p>
+            {erreur && <p className="text-sm text-destructive">{erreur}</p>}
+            <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOuvert(false)}>Annuler</Button>
+                <Button disabled={!libelle.trim() || !pretes.length}
+                    isLoading={enregistrer.isPending} onClick={() => enregistrer.mutate()}>
+                    Enregistrer {pretes.length || ''} ligne{pretes.length > 1 ? 's' : ''}
+                </Button>
             </div>
         </div>
     );
