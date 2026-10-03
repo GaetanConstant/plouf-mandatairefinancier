@@ -1,9 +1,9 @@
-"""Accès aux pièces justificatives : cloisonnement par campagne et chemins.
+"""Accès aux pièces justificatives : session exigée et cloisonnement par campagne.
 
 Les pièces étaient montées en statique, donc lisibles sans session par qui
-connaissait l'URL. Ces tests couvrent la logique d'autorisation de la route qui
-les remplace ; l'exigence de session elle-même tient aux dépendances déclarées
-sur la route, vérifiées structurellement ci-dessous.
+connaissait l'URL. Ces tests passent par de vraies requêtes HTTP : c'est le
+seul moyen de prouver que la session est bien exigée, une vérification du code
+ne disant rien du comportement réel de la route.
 """
 
 import os
@@ -13,19 +13,21 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 import comptes
 import main
-from database import UPLOADS_DIR, get_central_db_connection, init_central_db
+from auth import get_password_hash
+from database import (UPLOADS_DIR, ROLE_MANDATAIRE, get_central_db_connection,
+                      init_central_db)
 from models import Depense
 from _fixture import fresh_campaign, teardown, run_tests
 
-
 # Sur un dépôt fraîchement cloné, la base centrale n'existe pas : ces tests
-# écrivent dans `campaigns`, que seule cette initialisation crée. En local la
-# table existait déjà, ce qui masquait l'échec jusqu'à l'intégration continue.
+# écrivent dans `campaigns`, que seule cette initialisation crée.
 init_central_db()
+
+MOT_DE_PASSE = "motdepasse-de-test"
 
 
 def _fichier(nom: str) -> str:
@@ -33,16 +35,30 @@ def _fichier(nom: str) -> str:
     return nom
 
 
-def _declarer(cid: str):
-    """Inscrit la campagne au registre central, que la route interroge."""
+def _compte(user: str, cid: str):
     with get_central_db_connection() as conn:
+        conn.execute("INSERT OR REPLACE INTO users (username, full_name, hashed_password, role) "
+                     "VALUES (?,?,?,?)", [user, user, get_password_hash(MOT_DE_PASSE), "user"])
         conn.execute("INSERT OR REPLACE INTO campaigns (id, name, db_path) VALUES (?,?,?)",
                      [cid, cid, f"{cid}.sqlite"])
+        conn.execute("INSERT OR REPLACE INTO user_campaigns (username, campaign_id, role) "
+                     "VALUES (?,?,?)", [user, cid, ROLE_MANDATAIRE])
 
 
-def _oublier(cid: str):
+def _oublier(user: str, cid: str):
     with get_central_db_connection() as conn:
+        conn.execute("DELETE FROM user_campaigns WHERE campaign_id = ?", [cid])
         conn.execute("DELETE FROM campaigns WHERE id = ?", [cid])
+        conn.execute("DELETE FROM users WHERE username = ?", [user])
+
+
+def _connecte(user: str, cid: str) -> TestClient:
+    client = TestClient(main.app)
+    r = client.post("/login", json={"username": user, "password": MOT_DE_PASSE})
+    assert r.status_code == 200, r.text
+    r = client.post(f"/select-campaign/{cid}")
+    assert r.status_code == 200, r.text
+    return client
 
 
 def _depense_avec_piece(cid, fichier):
@@ -52,32 +68,31 @@ def _depense_avec_piece(cid, fichier):
         justificatif_path=fichier))
 
 
-def _servir(nom, cid):
-    return main.servir_piece(nom, current_user={"username": "x"}, campaign_id=cid, _garde="mandataire")
-
-
-def test_la_route_exige_une_session_et_une_campagne():
-    """Garde structurelle : retirer une dépendance rouvrirait l'accès public."""
-    import inspect
-    from auth import get_current_user
-    from deps import get_campaign_conn
-    defauts = [p.default for p in inspect.signature(main.servir_piece).parameters.values()]
-    dependances = [d.dependency for d in defauts if hasattr(d, "dependency")]
-    assert get_current_user in dependances, "la route ne vérifie plus la session"
-    assert get_campaign_conn in dependances, "la route n'est plus cloisonnée par campagne"
+def test_une_piece_n_est_pas_publique():
+    """Le défaut corrigé : le dossier était monté en statique, sans session."""
+    cid = fresh_campaign()
+    nom = _fichier("test_acces_public.pdf")
+    try:
+        _compte("u_acces1", cid)
+        _depense_avec_piece(cid, nom)
+        r = TestClient(main.app).get(f"/docs/{nom}")
+        assert r.status_code == 401, (r.status_code, r.text)
+    finally:
+        (Path(UPLOADS_DIR) / nom).unlink(missing_ok=True)
+        _oublier("u_acces1", cid); teardown(cid)
 
 
 def test_le_mandataire_lit_la_piece_de_sa_campagne():
     cid = fresh_campaign()
     nom = _fichier("test_acces_mien.pdf")
     try:
-        _declarer(cid)
+        _compte("u_acces2", cid)
         _depense_avec_piece(cid, nom)
-        reponse = _servir(nom, cid)
-        assert Path(reponse.path).name == nom
+        r = _connecte("u_acces2", cid).get(f"/docs/{nom}")
+        assert r.status_code == 200 and b"confidentielle" in r.content, r.status_code
     finally:
         (Path(UPLOADS_DIR) / nom).unlink(missing_ok=True)
-        _oublier(cid); teardown(cid)
+        _oublier("u_acces2", cid); teardown(cid)
 
 
 def test_la_piece_d_une_autre_campagne_est_refusee():
@@ -85,18 +100,14 @@ def test_la_piece_d_une_autre_campagne_est_refusee():
     cid_a, cid_b = fresh_campaign(), fresh_campaign()
     nom = _fichier("test_acces_voisin.pdf")
     try:
-        _declarer(cid_a); _declarer(cid_b)
+        _compte("u_acces3", cid_a); _compte("u_acces4", cid_b)
         _depense_avec_piece(cid_b, nom)            # la pièce appartient à B
-        raised = False
-        try:
-            _servir(nom, cid_a)
-        except HTTPException as e:
-            raised = True
-            assert e.status_code == 403, e.status_code
-        assert raised, "la pièce du voisin aurait dû être refusée"
+        r = _connecte("u_acces3", cid_a).get(f"/docs/{nom}")
+        assert r.status_code == 403, (r.status_code, r.text)
     finally:
         (Path(UPLOADS_DIR) / nom).unlink(missing_ok=True)
-        _oublier(cid_a); _oublier(cid_b); teardown(cid_a); teardown(cid_b)
+        _oublier("u_acces3", cid_a); _oublier("u_acces4", cid_b)
+        teardown(cid_a); teardown(cid_b)
 
 
 def test_un_orphelin_reste_lisible():
@@ -104,43 +115,41 @@ def test_un_orphelin_reste_lisible():
     cid = fresh_campaign()
     nom = _fichier("test_acces_orphelin.pdf")
     try:
-        _declarer(cid)
-        assert Path(_servir(nom, cid).path).name == nom
+        _compte("u_acces5", cid)
+        r = _connecte("u_acces5", cid).get(f"/docs/{nom}")
+        assert r.status_code == 200, r.status_code
     finally:
         (Path(UPLOADS_DIR) / nom).unlink(missing_ok=True)
-        _oublier(cid); teardown(cid)
+        _oublier("u_acces5", cid); teardown(cid)
 
 
 def test_pas_de_remontee_hors_du_dossier():
     """Un nom de fichier n'est pas un chemin."""
     cid = fresh_campaign()
+    secret = _fichier("test_acces_secret.pdf")
     try:
-        _declarer(cid)
-        for piege in ["../config.py", "../../etc/passwd", "....//config.py"]:
-            raised = False
-            try:
-                _servir(piege, cid)
-            except HTTPException as e:
-                raised = True
-                assert e.status_code == 404, (piege, e.status_code)
-            assert raised, piege
+        _compte("u_acces6", cid)
+        client = _connecte("u_acces6", cid)
+        for piege in ["..%2F..%2Fconfig.py", "....//config.py",
+                      f"..%2Fuploads%2F{secret}"]:
+            r = client.get(f"/docs/{piege}")
+            assert r.status_code in (404, 200) and b"SECRET_KEY" not in r.content, piege
+            if r.status_code == 200:
+                # Seul un nom réduit à son basename peut passer, jamais un chemin.
+                assert b"confidentielle" in r.content, piege
     finally:
-        _oublier(cid); teardown(cid)
+        (Path(UPLOADS_DIR) / secret).unlink(missing_ok=True)
+        _oublier("u_acces6", cid); teardown(cid)
 
 
 def test_un_fichier_absent_donne_404():
     cid = fresh_campaign()
     try:
-        _declarer(cid)
-        raised = False
-        try:
-            _servir("jamais_depose.pdf", cid)
-        except HTTPException as e:
-            raised = True
-            assert e.status_code == 404
-        assert raised
+        _compte("u_acces7", cid)
+        r = _connecte("u_acces7", cid).get("/docs/jamais_depose.pdf")
+        assert r.status_code == 404, r.status_code
     finally:
-        _oublier(cid); teardown(cid)
+        _oublier("u_acces7", cid); teardown(cid)
 
 
 if __name__ == "__main__":
