@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CheckCircle2, ChevronRight, ListChecks, Upload } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronRight, ListChecks, Upload } from 'lucide-react';
 import { Button } from './ui/Components';
 import { API_URL } from '../lib/api';
 
@@ -91,6 +91,7 @@ function Bandeau({ etat }) {
 
 function Section({ section, onNavigate }) {
     const fichiers = section.actions.filter(a => DEPOTS[a.type]);
+    const rattachements = section.actions.filter(a => a.type === 'evenement');
     const ecrans = section.actions.filter(a => a.type === 'ecran');
 
     return (
@@ -106,9 +107,13 @@ function Section({ section, onNavigate }) {
                 <LigneFichier key={`${action.type}-${action.id ?? action.cle}`} action={action} />
             ))}
 
-            {/* Manques qui ne se règlent pas par un fichier : champs de saisie,
-                rangs de la liste, relevé à importer. */}
-            {!fichiers.length && (
+            {rattachements.map(action => (
+                <LigneEvenement key={`evenement-${action.id}`} action={action} />
+            ))}
+
+            {/* Manques qui ne se règlent ni par un fichier ni par un rattachement :
+                champs de saisie, rangs de la liste, relevé à importer. */}
+            {!fichiers.length && !rattachements.length && (
                 <ul className="mb-3 ml-5 list-disc space-y-0.5 text-sm text-muted-foreground">
                     {section.manquants.map((m, i) => <li key={i}>{m}</li>)}
                 </ul>
@@ -123,6 +128,74 @@ function Section({ section, onNavigate }) {
         </div>
     );
 }
+
+/**
+ * Rattachement d'une dépense à un événement, depuis le reste à faire.
+ *
+ * « Aucun événement » est une valeur à part entière, pas une absence de choix :
+ * c'est l'arbitrage qui sort la dépense du reste à faire. Rare, mais nécessaire
+ * — un frais bancaire ne relève d'aucun moment de campagne.
+ */
+function LigneEvenement({ action }) {
+    const queryClient = useQueryClient();
+    const [choix, setChoix] = useState('');
+    const [erreur, setErreur] = useState('');
+
+    const { data: evenements } = useQuery({
+        queryKey: ['evenements'],
+        queryFn: async () => (await axios.get(`${API_URL}/evenements`)).data,
+    });
+
+    const rattacher = useMutation({
+        mutationFn: async () => axios.post(`${API_URL}/depenses/${action.id}/rattachement`,
+            { evenement_id: choix === 'aucun' ? null : Number(choix) }),
+        onSuccess: () => ['completude', 'depenses', 'evenements', 'frise']
+            .forEach(k => queryClient.invalidateQueries([k])),
+        onError: (err) => setErreur(err.response?.data?.detail || 'Le rattachement a échoué.'),
+    });
+
+    const detail = [action.tiers, action.montant != null ? eur(action.montant) : null]
+        .filter(Boolean).join(' · ');
+
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 py-3 last:border-0">
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                    {action.num_piece && (
+                        <span className="mr-2 font-mono text-xs text-muted-foreground">{action.num_piece}</span>
+                    )}
+                    {action.libelle}
+                </p>
+                {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
+                {erreur && <p className="text-xs text-destructive">{erreur}</p>}
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+                <select
+                    value={choix}
+                    onChange={e => { setErreur(''); setChoix(e.target.value); }}
+                    className="h-9 max-w-[220px] rounded-md border border-input bg-background px-2 text-xs"
+                >
+                    <option value="">Choisir un événement…</option>
+                    {evenements?.map(e => (
+                        <option key={e.id} value={e.id}>{e.titre}</option>
+                    ))}
+                    <option value="aucun">Aucun événement</option>
+                </select>
+                <button
+                    type="button"
+                    disabled={!choix || rattacher.isPending}
+                    onClick={() => rattacher.mutate()}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:hover:border-input disabled:hover:text-inherit"
+                >
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {rattacher.isPending ? 'En cours...' : 'Rattacher'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 
 function LigneFichier({ action }) {
     const queryClient = useQueryClient();

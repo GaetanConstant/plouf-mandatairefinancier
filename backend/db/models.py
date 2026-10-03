@@ -326,6 +326,9 @@ class Depense(Tracable, Base):
     statut: Mapped[enums.StatutDepense] = mapped_column(_enum(enums.StatutDepense), default=enums.StatutDepense.engage)
     reglee: Mapped[bool] = mapped_column(Boolean, default=False)
     cheque_encaisse: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Arbitrage explicite : cette dépense ne se rattache à aucun événement.
+    # Distinct de « pas encore rattachée », que rien ne distinguerait sinon.
+    hors_evenement: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     evenements: Mapped[list["EvenementDepense"]] = relationship(back_populates="depense")
 

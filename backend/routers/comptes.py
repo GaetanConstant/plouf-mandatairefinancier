@@ -41,6 +41,14 @@ def update_depense(depense_id: int, update: Depense, current_user: dict = Depend
     return comptes.update_depense(campaign_id, depense_id, update)
 
 
+@router.post("/depenses/{depense_id}/rattachement")
+def rattacher_evenement(depense_id: int, payload: comptes.RattachementIn,
+                        campaign_id: str = Depends(get_campaign_conn),
+                        _garde: str = Depends(mandataire_requis)):
+    """Rattache une dépense à un événement, ou la déclare hors événement."""
+    return comptes.rattacher_evenement(campaign_id, depense_id, payload)
+
+
 @router.post("/recettes/{recette_id}/piece")
 def ajouter_piece_recette(recette_id: int, payload: comptes.PieceIn,
                           campaign_id: str = Depends(get_campaign_conn),

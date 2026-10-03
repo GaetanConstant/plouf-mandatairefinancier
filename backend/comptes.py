@@ -6,6 +6,8 @@ les données sont désormais lues/écrites dans la base SQLite ORM d'une campagn
 
 from __future__ import annotations
 
+from typing import Optional
+
 import logging
 import os
 import unicodedata
@@ -318,6 +320,7 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None
                        liaisons: list[dict] | None = None) -> dict:
     return {
         "evenements": liaisons or [],
+        "hors_evenement": d.hors_evenement,
         "id": d.id,
         "num_piece": d.num_piece,
         "date": _fmt_date(d.date_facture),
@@ -389,6 +392,8 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
         liaisons = _liaisons_dto(dto)
         if liaisons is not None:
             evenements.appliquer_liaisons(s, depense.id, liaisons)
+        if getattr(dto, "hors_evenement", None) is not None:
+            depense.hors_evenement = bool(dto.hors_evenement)
         return {"message": "Dépense ajoutée", "id": depense.id,
                 "num_piece": depense.num_piece}
 
@@ -481,6 +486,31 @@ def ajouter_piece_recette(campaign_id: str, recette_id: int, payload, auteur: st
                        if role != ROLE_MANDATAIRE else "Justificatif rattaché."}
 
 
+class RattachementIn(BaseModel):
+    """Rattachement décidé depuis l'écran « Reste à faire ».
+
+    `evenement_id` à None signifie « cette dépense ne relève d'aucun
+    événement » — un arbitrage, pas une absence de saisie.
+    """
+    evenement_id: Optional[int] = None
+
+
+def rattacher_evenement(campaign_id: str, depense_id: int, payload) -> dict:
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        d = s.get(Depense, depense_id)
+        if not d:
+            raise HTTPException(status_code=404, detail="Dépense introuvable")
+        if payload.evenement_id is None:
+            d.hors_evenement = True
+            return {"message": "Dépense marquée hors événement."}
+        evenements.appliquer_liaisons(
+            s, d.id,
+            [evenements.LiaisonEvenementIn(evenement_id=payload.evenement_id)])
+        d.hors_evenement = False
+    return {"message": "Dépense rattachée à l'événement."}
+
+
 def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
     """Met à jour une dépense existante (date, fournisseur, montant, pièce…).
 
@@ -533,6 +563,12 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
         liaisons = _liaisons_dto(dto)
         if liaisons is not None:
             evenements.appliquer_liaisons(s, d.id, liaisons)
+            # Rattacher à un événement lève l'arbitrage « hors événement » :
+            # les deux ne peuvent pas être vrais en même temps.
+            if liaisons:
+                d.hors_evenement = False
+        if getattr(dto, "hors_evenement", None) is not None:
+            d.hors_evenement = bool(dto.hors_evenement)
     return {"message": "Dépense mise à jour"}
 
 

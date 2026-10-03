@@ -33,6 +33,8 @@ class Depense(BaseModel):
     # chacun. `None` laisse les liaisons existantes intactes (les appelants qui
     # ignorent ce champ ne doivent rien détacher) ; `[]` détache tout.
     evenements: Optional[List["LiaisonEvenement"]] = None
+    # Arbitrage explicite : aucune liaison à faire. `None` laisse en l'état.
+    hors_evenement: Optional[bool] = None
 
 
 class LiaisonEvenement(BaseModel):

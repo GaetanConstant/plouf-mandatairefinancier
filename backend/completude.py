@@ -21,6 +21,7 @@ from db.models import (
     CompteBancaire,
     Depense,
     Election,
+    EvenementDepense,
     ExpertComptable,
     Mandataire,
     Recette,
@@ -201,6 +202,35 @@ def _section_justificatifs_depenses(s) -> dict:
     )
 
 
+def _section_evenements(s) -> dict:
+    """Dépenses validées ni rattachées à un événement, ni déclarées hors événement.
+
+    Presque toute dépense relève d'un moment de campagne — même la colle d'un
+    collage. Le drapeau `hors_evenement` existe pour les rares exceptions : sans
+    lui, on ne distinguerait pas « pas encore arbitré » de « rien à rattacher »,
+    et la section ne tomberait jamais à zéro.
+    """
+    depenses = list(s.scalars(_valides(select(Depense), Depense)
+                              .order_by(Depense.num_piece)).all())
+    if not depenses:
+        return _section("evenements", "Rattachement aux événements", 0, 0, [],
+                        note="Aucune dépense enregistrée")
+    rattachees = {l.depense_id for l in s.scalars(select(EvenementDepense)).all()}
+    orphelines = [d for d in depenses
+                  if d.id not in rattachees and not d.hors_evenement]
+    manquants = [_libelle_ecriture(d.num_piece, d.nature, d.montant_ttc, "dépense")
+                 for d in orphelines]
+    actions = [{"type": "evenement", "id": d.id, "num_piece": d.num_piece,
+                "libelle": d.nature or "dépense", "tiers": d.fournisseur,
+                "montant": d.montant_ttc} for d in orphelines]
+    total = len(depenses)
+    return _section(
+        "evenements", "Rattachement aux événements", total,
+        total - len(manquants), manquants, actions=actions,
+        note=f"{total - len(manquants)}/{total} dépenses situées",
+    )
+
+
 def _section_justificatifs_recettes(s) -> dict:
     """Recettes validées sans pièce au dossier (reçu, bordereau de remise…)."""
     recettes = list(s.scalars(_valides(select(Recette), Recette)
@@ -264,6 +294,7 @@ def evaluer(campaign_id: str) -> dict:
         # réunir quand tout le reste est saisi, et leur absence empêche le dépôt.
         sections.append(_section_justificatifs_depenses(s))
         sections.append(_section_justificatifs_recettes(s))
+        sections.append(_section_evenements(s))
 
     # Récépissés de candidature et de déclaration du mandataire : exigés en
     # enveloppe B, et jusqu'ici ni demandés ni contrôlés par l'application.

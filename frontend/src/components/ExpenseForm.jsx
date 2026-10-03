@@ -42,6 +42,9 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
             evenement_id: l.evenement_id,
             quote_part: l.quote_part ?? '',
         })));
+    // Arbitrage explicite : cette dépense ne relève d'aucun événement. Sans
+    // lui, elle resterait indéfiniment dans le reste à faire.
+    const [horsEvenement, setHorsEvenement] = useState(Boolean(expense?.hors_evenement));
 
     const { data: evenements } = useQuery({
         queryKey: ['evenements'],
@@ -157,6 +160,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                 evenement_id: Number(l.evenement_id),
                 quote_part: l.quote_part === '' ? null : Number(l.quote_part),
             })),
+            hors_evenement: liaisons.length ? false : horsEvenement,
         });
     };
 
@@ -279,7 +283,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                         Rattachement à un événement
                     </label>
                     {Boolean(evenements?.length) && (
-                        <button type="button" onClick={ajouterLiaison}
+                        <button type="button" onClick={() => { setHorsEvenement(false); ajouterLiaison(); }}
                             disabled={liaisons.length >= evenements.length}
                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-40 disabled:no-underline">
                             <Plus className="w-3 h-3" /> Rattacher un événement
@@ -292,10 +296,21 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                         Aucun événement enregistré — créez-en un depuis l'onglet Événements.
                     </p>
                 )}
-                {Boolean(evenements?.length) && !liaisons.length && (
-                    <p className="text-xs text-muted-foreground italic">
-                        Cette dépense n'est rattachée à aucun événement.
-                    </p>
+                {!liaisons.length && (
+                    <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={horsEvenement}
+                            onChange={e => setHorsEvenement(e.target.checked)}
+                            className="mt-0.5"
+                        />
+                        <span>
+                            Cette dépense ne relève d'aucun événement.
+                            <span className="block text-[11px] opacity-80">
+                                Sans ce choix, elle restera signalée dans « Reste à faire ».
+                            </span>
+                        </span>
+                    </label>
                 )}
 
                 {liaisons.map((liaison, i) => (
