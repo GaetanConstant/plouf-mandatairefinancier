@@ -34,13 +34,20 @@ export function JustificatifsList() {
             await axios.delete(`${API_URL}/justificatifs/${filename}`, { withCredentials: true });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['justificatifs'] });
+            // La pièce quitte aussi une dépense, une recette, un événement
+            // et le dossier : tout ce qui l'affichait doit se rafraîchir.
+            ['justificatifs', 'depenses', 'recettes', 'evenements', 'depot',
+             'completude', 'conformite'].forEach(k => queryClient.invalidateQueries({ queryKey: [k] }));
         }
     });
 
     const handleDelete = (e, filename) => {
         e.stopPropagation();
-        if (window.confirm(`Êtes-vous sûr de vouloir supprimer le fichier ${filename} ?`)) {
+        if (window.confirm(
+            `Supprimer ${filename} ?\n\n` +
+            `La pièce sera détachée de sa dépense, de sa recette et de son événement, ` +
+            `puis retirée du dossier de dépôt.`
+        )) {
             deleteMutation.mutate(filename);
         }
     };
@@ -119,17 +126,20 @@ export function JustificatifsList() {
                         <div
                             key={file.name}
                             className={`bg-card group border rounded-xl p-4 hover:shadow-md transition-all duration-300 relative flex flex-col ${
-                                file.rattache
-                                    ? 'border-border hover:border-primary/20'
-                                    : 'border-amber-300 bg-amber-50/40 hover:border-amber-400'
+                                file.fichier_absent
+                                    ? 'border-destructive/40 bg-destructive/5 hover:border-destructive'
+                                    : file.rattache
+                                        ? 'border-border hover:border-primary/20'
+                                        : 'border-amber-300 bg-amber-50/40 hover:border-amber-400'
                             }`}
                         >
                             <div className="flex items-start justify-between mb-3">
                                 <div className="p-3 bg-muted rounded-lg group-hover:bg-primary/5 transition-colors">
                                     {getFileIcon(file.name)}
                                 </div>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                    <a
+                                <div className={`flex gap-1 transition-opacity z-10 ${
+                                    file.fichier_absent ? '' : 'opacity-0 group-hover:opacity-100'}`}>
+                                    {!file.fichier_absent && <a
                                         href={`${API_URL}${file.url}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
@@ -138,7 +148,7 @@ export function JustificatifsList() {
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         <ExternalLink className="w-4 h-4" />
-                                    </a>
+                                    </a>}
                                     <button
                                         onClick={(e) => handleDelete(e, file.name)}
                                         className="p-1.5 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive transition-colors"
@@ -154,14 +164,23 @@ export function JustificatifsList() {
                                     {file.name}
                                 </h3>
                                 <p className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${
-                                    file.rattache ? 'text-muted-foreground/60' : 'text-amber-600'
+                                    file.fichier_absent ? 'text-destructive'
+                                        : file.rattache ? 'text-muted-foreground/60' : 'text-amber-600'
                                 }`}>
-                                    {file.rattache ? 'Rattaché' : 'Orphelin'}
+                                    {file.fichier_absent ? 'Fichier introuvable'
+                                        : file.rattache ? 'Rattaché' : 'Orphelin'}
                                 </p>
-                                <div className="flex items-center justify-between text-[11px] text-muted-foreground/70">
-                                    <span>{formatSize(file.size)}</span>
-                                    <span>{new Date(file.mtime).toLocaleDateString('fr-FR')}</span>
-                                </div>
+                                {file.fichier_absent ? (
+                                    <p className="text-[11px] text-destructive/80">
+                                        Annoncée au bordereau, absente du disque. Redéposez-la, ou
+                                        supprimez la pièce pour débloquer le dépôt.
+                                    </p>
+                                ) : (
+                                    <div className="flex items-center justify-between text-[11px] text-muted-foreground/70">
+                                        <span>{formatSize(file.size)}</span>
+                                        <span>{new Date(file.mtime).toLocaleDateString('fr-FR')}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <a

@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.29.0 — 2026-10-03 — Supprimer une pièce la détache vraiment
+
+### Corrigé
+- Supprimer un justificatif n'effaçait que le fichier sur le disque. La pièce restait rattachée à son événement, à sa dépense ou à sa recette, et restait annoncée au bordereau : elle devenait une pièce fantôme que plus rien ne permettait de retirer, et qui bloquait le dépôt sans issue. La suppression retire désormais la pièce, tous ses rattachements, puis le fichier.
+- Le fichier n'est effacé du disque que si aucune autre campagne ne s'en sert. Le dossier des justificatifs est commun à toutes les campagnes : un testeur ne doit pas pouvoir trouer celui d'un autre.
+
+### Ajouté
+- Une pièce dont le fichier a disparu apparaît désormais dans l'écran Justificatifs, signalée « Fichier introuvable ». Elle n'y figurait nulle part — l'écran ne listait que le disque — et restait donc impossible à corriger. Elle peut maintenant être redéposée ou supprimée.
+
 ## v0.28.0 — 2026-10-03 — Modification d'une recette
 
 ### Ajouté
