@@ -17,9 +17,15 @@ from fastapi import HTTPException
 
 import comptes
 import main
-from database import UPLOADS_DIR, get_central_db_connection
+from database import UPLOADS_DIR, get_central_db_connection, init_central_db
 from models import Depense
 from _fixture import fresh_campaign, teardown, run_tests
+
+
+# Sur un dépôt fraîchement cloné, la base centrale n'existe pas : ces tests
+# écrivent dans `campaigns`, que seule cette initialisation crée. En local la
+# table existait déjà, ce qui masquait l'échec jusqu'à l'intégration continue.
+init_central_db()
 
 
 def _fichier(nom: str) -> str:
