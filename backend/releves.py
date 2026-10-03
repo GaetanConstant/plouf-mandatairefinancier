@@ -48,6 +48,10 @@ class TransactionIn(BaseModel):
     montant: float
     sens: str = "debit"
     reference: Optional[str] = None
+    # Écriture que cette ligne règle, désignée à la saisie. Imputer tout de
+    # suite évite d'avoir à retrouver la ligne ensuite dans un autre écran.
+    depense_id: Optional[int] = None
+    recette_id: Optional[int] = None
 
 
 class ReleveIn(BaseModel):
@@ -97,6 +101,7 @@ def ajouter_transaction(campaign_id: str, releve_id: int, payload: TransactionIn
             sens=sens, reference=payload.reference)
         s.add(t)
         s.flush()
+        _imputer_a_la_saisie(s, t, payload.depense_id, payload.recette_id)
         s.refresh(releve)
         _bornes(s, releve)
         return _transaction_dict(s, t)
@@ -319,6 +324,48 @@ def _impute_sur_recette(s, recette_id: int) -> float:
                     .where(ImputationRecette.recette_id == recette_id)) or 0.0
 
 
+def _imputer_a_la_saisie(s, t: TransactionBancaire, depense_id: Optional[int],
+                         recette_id: Optional[int]) -> None:
+    """Affecte la ligne à l'écriture désignée au moment de la saisie.
+
+    Le montant imputé est le minimum entre ce qui reste sur la ligne et ce qui
+    reste à régler : une ligne plus grosse que la facture couvre le solde, une
+    plus petite laisse la dépense ouverte pour un second versement.
+    """
+    if depense_id is None and recette_id is None:
+        return
+    credit = t.sens == enums.SensTransaction.credit
+    if depense_id is not None and credit:
+        raise HTTPException(status_code=400,
+            detail="Un encaissement ne peut pas régler une dépense.")
+    if recette_id is not None and not credit:
+        raise HTTPException(status_code=400,
+            detail="Un décaissement ne peut pas alimenter une recette.")
+
+    if depense_id is not None:
+        d = s.get(Depense, depense_id)
+        if not d:
+            raise HTTPException(status_code=404, detail="Dépense introuvable")
+        reste = round(min(t.montant - _impute_sur_transaction(s, t.id),
+                          (d.montant_ttc or 0.0) - _impute_sur_depense(s, d.id)), 2)
+        if reste <= 0:
+            return
+        s.add(ImputationBancaire(transaction_id=t.id, depense_id=d.id, montant=reste))
+        s.flush()
+        _actualiser_depense(s, d, t)
+    else:
+        r = s.get(Recette, recette_id)
+        if not r:
+            raise HTTPException(status_code=404, detail="Recette introuvable")
+        reste = round(min(t.montant - _impute_recette_sur_transaction(s, t.id),
+                          (r.montant or 0.0) - _impute_sur_recette(s, r.id)), 2)
+        if reste <= 0:
+            return
+        s.add(ImputationRecette(transaction_id=t.id, recette_id=r.id, montant=reste))
+        s.flush()
+        _actualiser_recette(s, r, t)
+
+
 def _transaction_dict(s, t: TransactionBancaire) -> dict:
     # Un débit s'impute sur des dépenses, un crédit sur des recettes : une
     # seule des deux tables porte quelque chose pour une ligne donnée.
@@ -454,12 +501,15 @@ def create_releve(campaign_id: str, payload: ReleveIn, auteur: str) -> dict:
         s.add(releve)
         s.flush()
         for t, jour in zip(payload.transactions, jours):
-            s.add(TransactionBancaire(
+            ligne = TransactionBancaire(
                 releve_id=releve.id, date_operation=jour, libelle=t.libelle.strip()[:255],
                 montant=abs(t.montant),
                 sens=enums.SensTransaction(t.sens if t.sens in ("debit", "credit") else "debit"),
                 reference=t.reference,
-            ))
+            )
+            s.add(ligne)
+            s.flush()
+            _imputer_a_la_saisie(s, ligne, t.depense_id, t.recette_id)
         s.flush()
         return _releve_dict(s, releve)
 
