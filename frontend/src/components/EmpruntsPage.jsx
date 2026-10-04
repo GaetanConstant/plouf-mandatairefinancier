@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Landmark, Plus, Trash2 } from 'lucide-react';
 import { Modal, Button, Input, Select } from './ui/Components';
-import { API_URL } from '../lib/api';
+import { API_URL, messageErreur } from '../lib/api';
 
 const eur = (v) => (v || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
@@ -20,9 +20,11 @@ export function EmpruntsPage() {
     const [f, setF] = useState({ type: 'banque', preteur_nom: '', preteur_civilite: '', preteur_prenom: '', preteur_pays: 'France', date_contrat: '', duree_mois: '', date_fin: '', taux: '', montant: '' });
 
     const { data: emprunts, isLoading } = useQuery({ queryKey: ['emprunts'], queryFn: async () => (await axios.get(`${API_URL}/emprunts`)).data });
+    const [erreur, setErreur] = useState('');
     const add = useMutation({
         mutationFn: (p) => axios.post(`${API_URL}/emprunts`, p),
-        onSuccess: () => { qc.invalidateQueries(['emprunts']); setOpen(false); setF({ type: 'banque', preteur_nom: '', preteur_civilite: '', preteur_prenom: '', preteur_pays: 'France', date_contrat: '', duree_mois: '', date_fin: '', taux: '', montant: '' }); },
+        onSuccess: () => { qc.invalidateQueries(['emprunts']); setOpen(false); setErreur(''); setF({ type: 'banque', preteur_nom: '', preteur_civilite: '', preteur_prenom: '', preteur_pays: 'France', date_contrat: '', duree_mois: '', date_fin: '', taux: '', montant: '' }); },
+        onError: (err) => setErreur(messageErreur(err)),
     });
     const del = useMutation({ mutationFn: (id) => axios.delete(`${API_URL}/emprunts/${id}`), onSuccess: () => qc.invalidateQueries(['emprunts']) });
 
@@ -107,6 +109,7 @@ export function EmpruntsPage() {
                         <Input label="Durée (mois)" type="number" value={f.duree_mois} onChange={e => setF({ ...f, duree_mois: e.target.value })} />
                         <Input label="Taux d'intérêt (%)" type="number" value={f.taux} onChange={e => setF({ ...f, taux: e.target.value })} />
                     </div>
+                    {erreur && <p className="text-sm text-destructive">{erreur}</p>}
                     <div className="flex justify-end gap-2 pt-2">
                         <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
                         <Button onClick={submit} isLoading={add.isPending}>Créer</Button>

@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.36.0 — 2026-10-04 — Un enregistrement refusé se voit
+
+### Corrigé
+- Un enregistrement refusé par le serveur pouvait ne produire aucun signe visible : sur la soixantaine d'appels de l'application, la moitié n'affichait aucun message d'erreur. Deux bêta-testeurs en ont conclu « je n'ai pas réussi » devant un formulaire muet. Toute écriture qui échoue affiche désormais la raison, en bas de l'écran.
+- Le formulaire des emprunts affiche en plus le message dans le formulaire lui-même, là où l'erreur s'est produite.
+
 ## v0.35.0 — 2026-10-04 — Une campagne neuve est utilisable immédiatement
 
 ### Corrigé
