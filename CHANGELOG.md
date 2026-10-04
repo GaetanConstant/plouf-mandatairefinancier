@@ -10,6 +10,14 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.37.0 — 2026-10-04 — Le mandataire peut supprimer sa campagne
+
+### Corrigé
+- La suppression d'une campagne était réservée aux administrateurs : un bêta-testeur ne pouvait pas retirer sa propre campagne d'essai. Elle est désormais ouverte au mandataire financier de la campagne concernée. L'équipe de campagne et les personnes extérieures restent sans ce droit.
+
+### Sécurité
+- La suppression demande de saisir le nom exact de la campagne. L'action efface définitivement sa base — recettes, dépenses et justificatifs — et une confirmation d'un seul clic était trop légère.
+
 ## v0.36.0 — 2026-10-04 — Un enregistrement refusé se voit
 
 ### Corrigé

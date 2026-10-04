@@ -167,22 +167,27 @@ _PROPRIETAIRE = """
 
 @app.get("/campaigns")
 def list_my_campaigns(current_user: dict = Depends(get_current_user)):
-    colonnes = "c.id, c.name, COALESCE(MIN(pu.full_name), MIN(prop.username))"
+    colonnes = ("c.id, c.name, COALESCE(MIN(pu.full_name), MIN(prop.username)), "
+                "MIN(moi.role)")
+    mien = ("LEFT JOIN user_campaigns moi "
+            "ON moi.campaign_id = c.id AND moi.username = :moi")
     with get_central_db_connection() as conn:
         if current_user["role"] == "admin":
             campaigns = conn.execute(
-                f"SELECT {colonnes} FROM campaigns c {_PROPRIETAIRE} GROUP BY c.id, c.name"
-            ).fetchall()
+                f"SELECT {colonnes} FROM campaigns c {_PROPRIETAIRE} {mien} "
+                f"GROUP BY c.id, c.name", {"moi": current_user["username"]}).fetchall()
         else:
             campaigns = conn.execute(f"""
                 SELECT {colonnes}
                 FROM campaigns c
                 JOIN user_campaigns uc ON c.id = uc.campaign_id
                 {_PROPRIETAIRE}
-                WHERE uc.username = ?
+                {mien}
+                WHERE uc.username = :moi
                 GROUP BY c.id, c.name
-            """, [current_user["username"]]).fetchall()
-    return [{"id": c[0], "name": c[1], "proprietaire": c[2]} for c in campaigns]
+            """, {"moi": current_user["username"]}).fetchall()
+    return [{"id": c[0], "name": c[1], "proprietaire": c[2], "mon_role": c[3]}
+            for c in campaigns]
 
 @app.post("/campaigns")
 def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_current_user)):
@@ -245,11 +250,23 @@ def select_campaign(campaign_id: str, response: Response, current_user: dict = D
 
 @app.delete("/campaigns/{campaign_id}")
 def delete_campaign(campaign_id: str, current_user: dict = Depends(get_current_user)):
+    """Supprime une campagne, ses données et son fichier.
+
+    Ouvert au mandataire de cette campagne, pas seulement aux administrateurs :
+    un utilisateur qui crée sa campagne doit pouvoir la défaire. Restreindre
+    aux seuls administrateurs laissait les bêta-testeurs avec des campagnes
+    d'essai qu'ils ne pouvaient pas retirer.
+    """
     if current_user["role"] != "admin":
-        # Check if the user is at least linked to it? 
-        # For safety, let's say only admins can delete the whole campaign file.
-        raise HTTPException(status_code=403, detail="Seul un administrateur peut supprimer une campagne")
-    
+        with get_central_db_connection() as conn:
+            lien = conn.execute(
+                "SELECT role FROM user_campaigns WHERE username = ? AND campaign_id = ?",
+                [current_user["username"], campaign_id]).fetchone()
+        if not lien or lien[0] != ROLE_MANDATAIRE:
+            raise HTTPException(
+                status_code=403,
+                detail="Seul le mandataire financier de cette campagne peut la supprimer.")
+
     with get_central_db_connection() as conn:
         # Get db path before deleting
         res = conn.execute("SELECT db_path FROM campaigns WHERE id = ?", [campaign_id]).fetchone()

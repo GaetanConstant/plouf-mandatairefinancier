@@ -22,6 +22,8 @@ export function CampaignPage({ onSelect, user, onLogout }) {
     const [newCampaignName, setNewCampaignName] = useState('');
     const [isCreating, setIsCreating] = useState(false);
     const [campaignToDelete, setCampaignToDelete] = useState(null);
+    // Saisir le nom avant de détruire : l'action efface la base de la campagne.
+    const [confirmationNom, setConfirmationNom] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
 
     const handleSelect = async (campaign) => {
@@ -64,6 +66,7 @@ export function CampaignPage({ onSelect, user, onLogout }) {
             await axios.delete(`${API_URL}/campaigns/${campaignToDelete.id}`, { withCredentials: true });
             queryClient.invalidateQueries(['campaigns']);
             setCampaignToDelete(null);
+            setConfirmationNom('');
         } catch (err) {
             console.error("Deletion failed", err);
             alert(err.response?.data?.detail || "Erreur lors de la suppression de la campagne");
@@ -127,7 +130,7 @@ export function CampaignPage({ onSelect, user, onLogout }) {
 
             <Modal
                 isOpen={!!campaignToDelete}
-                onClose={() => setCampaignToDelete(null)}
+                onClose={() => { setCampaignToDelete(null); setConfirmationNom(''); }}
                 title="Supprimer la campagne"
             >
                 <div className="space-y-4">
@@ -137,12 +140,19 @@ export function CampaignPage({ onSelect, user, onLogout }) {
                     <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20 font-medium">
                         Attention : Cette action est irréversible et supprimera définitivement toutes les données de cette campagne (recettes, dépenses, justificatifs).
                     </p>
+                    <Input
+                        label={`Pour confirmer, saisissez : ${campaignToDelete?.name || ''}`}
+                        value={confirmationNom}
+                        onChange={e => setConfirmationNom(e.target.value)}
+                        placeholder={campaignToDelete?.name}
+                    />
                     <div className="flex justify-end gap-3 mt-6">
-                        <Button type="button" variant="ghost" onClick={() => setCampaignToDelete(null)}>
+                        <Button type="button" variant="ghost" onClick={() => { setCampaignToDelete(null); setConfirmationNom(''); }}>
                             Annuler
                         </Button>
                         <Button
                             variant="destructive"
+                            disabled={confirmationNom.trim() !== (campaignToDelete?.name || '').trim()}
                             onClick={handleDeleteCampaign}
                             isLoading={isDeleting}
                         >
@@ -192,7 +202,7 @@ export function CampaignPage({ onSelect, user, onLogout }) {
                                 )}
                             </button>
 
-                            {isAdmin && (
+                            {(isAdmin || campaign.mon_role === 'mandataire') && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
