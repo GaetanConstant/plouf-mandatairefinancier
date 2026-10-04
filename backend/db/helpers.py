@@ -10,10 +10,25 @@ from sqlalchemy import select
 from db.models import Election
 
 
-def election_id(session) -> Optional[int]:
-    """Id de l'unique Election de la campagne (None si pas encore créée)."""
+def election_id(session, creer: bool = True) -> Optional[int]:
+    """Id de l'unique Election de la campagne, créée au besoin.
+
+    Tout s'y rattache — candidat, mandataire, emprunts, colistiers — par une
+    clé étrangère obligatoire. Sans cette ligne, enregistrer un emprunt ou
+    déposer un récépissé échouait sur une contrainte d'intégrité, sur toute
+    campagne dont l'écran Identité n'avait jamais été enregistré. La créer à la
+    demande répare aussi les campagnes déjà dans cet état.
+    """
     e = session.scalars(select(Election)).first()
-    return e.id if e else None
+    if e is not None:
+        return e.id
+    if not creer:
+        return None
+    from db import enums
+    e = Election(type=enums.TypeElection.autre, libelle="Campagne")
+    session.add(e)
+    session.flush()
+    return e.id
 
 
 def fmt_date(d) -> Optional[str]:

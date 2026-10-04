@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.35.0 — 2026-10-04 — Une campagne neuve est utilisable immédiatement
+
+### Corrigé
+- Sur une campagne dont l'écran Identité n'avait jamais été enregistré, il était impossible d'enregistrer un emprunt ou de déposer un récépissé : l'opération échouait silencieusement. L'élection à laquelle tout se rattache n'existait pas encore en base. Elle naît désormais avec la campagne, et se crée au besoin sur les campagnes déjà dans cet état.
+- Déposer un récépissé avant d'avoir saisi l'identité crée la fiche correspondante à vide. Ses champs restent signalés comme manquants : le dépôt d'une pièce ne fait pas croire l'identité renseignée.
+
 ## v0.34.1 — 2026-10-04 — Les sénatoriales dans les types de scrutin
 
 ### Corrigé
