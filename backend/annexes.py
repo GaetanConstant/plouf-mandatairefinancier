@@ -200,6 +200,40 @@ def list_emprunts(campaign_id: str) -> list[dict]:
                 for e in rows]
 
 
+def _recette_de_l_emprunt(s, e: Emprunt) -> None:
+    """Inscrit l'emprunt en recette, pour qu'il entre dans la comptabilité.
+
+    Un emprunt saisi dans son onglet n'apparaissait ni dans les recettes ni
+    dans la main courante : les deux vivaient côte à côte sans se connaître.
+    Or un prêt est bien de l'argent entré sur le compte, et doit figurer en
+    rubrique 7030 comme n'importe quelle recette.
+    """
+    import comptes
+    import pieces
+    import validation as _validation
+
+    nom = (e.preteur_nom or "").strip() or "Prêteur à préciser"
+    if e.preteur_prenom:
+        nom = f"{nom} {e.preteur_prenom}".strip()
+    donateur = comptes._get_or_create_donateur(s, nom, None)
+    # Une banque ou un parti n'est pas une personne physique : le distinguer
+    # importe pour les contrôles de dons et la liste des donateurs.
+    donateur.est_personne_physique = (e.type == enums.TypeEmprunt.personne_physique)
+
+    r = Recette(
+        donateur=donateur,
+        categorie=enums.CategorieRecette.pret,
+        montant=e.montant,
+        date_versement=e.date_contrat or date.today(),
+        rubrique_imputation="7030",
+        emprunt_id=e.id,
+    )
+    _validation.estampiller(r, None, ROLE_MANDATAIRE)
+    s.add(r)
+    s.flush()
+    pieces.attribuer(s, r)
+
+
 def create_emprunt(campaign_id: str, payload: EmpruntIn) -> dict:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
@@ -218,13 +252,27 @@ def create_emprunt(campaign_id: str, payload: EmpruntIn) -> dict:
         )
         s.add(e)
         s.flush()
-        return {"id": e.id, "message": "Emprunt ajouté"}
+        _recette_de_l_emprunt(s, e)
+        return {"id": e.id,
+                "message": "Emprunt ajouté, et inscrit en recette."}
 
 
 def delete_emprunt(campaign_id: str, emprunt_id: int) -> dict:
+    """Supprime le contrat d'emprunt, et détache la recette qui en venait.
+
+    La recette n'est pas supprimée : l'argent est bien entré sur le compte, et
+    l'effacer d'office fausserait les totaux. Elle redevient un prêt ordinaire,
+    qu'on requalifie ou qu'on supprime séparément.
+    """
     ensure_campaign_db(campaign_id)
+    detachees = 0
     with campaign_session(campaign_id) as s:
         e = s.get(Emprunt, emprunt_id)
-        if e:
-            s.delete(e)
-    return {"message": "Emprunt supprimé"}
+        if not e:
+            return {"message": "Emprunt supprimé"}
+        for r in s.scalars(select(Recette).where(Recette.emprunt_id == emprunt_id)).all():
+            r.emprunt_id = None
+            detachees += 1
+        s.delete(e)
+    return {"message": "Emprunt supprimé."
+                       + (f" La recette correspondante est conservée." if detachees else "")}
