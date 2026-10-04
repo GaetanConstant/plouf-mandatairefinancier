@@ -376,6 +376,9 @@ def avances_a_rembourser(campaign_id: str) -> list[dict]:
                 "id": d.id, "num_piece": d.num_piece, "libelle": d.nature,
                 "fournisseur": d.fournisseur, "montant": d.montant_ttc,
                 "date": _fmt_date(d.date_facture),
+                # Déjà regroupée dans une note : suivie là-bas, pas à regrouper
+                # de nouveau. Le total reste complet, c'est bien ce qui est dû.
+                "note_frais_id": d.note_frais_id,
             })
         return sorted(par_personne.values(), key=lambda x: -x["total"])
 

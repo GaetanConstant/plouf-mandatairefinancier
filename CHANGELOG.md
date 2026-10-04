@@ -10,6 +10,13 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.40.0 — 2026-10-04 — Notes de frais
+
+### Ajouté
+- Un onglet « Notes de frais » regroupe les avances d'une même personne en un document unique. Une note s'établit d'un clic à partir des avances non remboursées, et se télécharge en PDF : liste des dépenses, total et emplacement de signature, à faire signer par la personne remboursée.
+- La preuve du remboursement — virement, reçu signé — se rattache à la note.
+- Une note passe à « remboursée » quand toutes ses lignes sont rapprochées au relevé. Un seul virement peut toutes les régler.
+
 ## v0.39.0 — 2026-10-04 — Dépenses avancées par une personne
 
 ### Ajouté

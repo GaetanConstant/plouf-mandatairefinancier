@@ -332,6 +332,8 @@ class Depense(Tracable, Base):
     # Personne ayant avancé l'argent, à rembourser. Distinct du fournisseur :
     # un colleur qui paie l'essence ne devient pas la station-service.
     avance_par: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    note_frais_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("note_frais.id"), nullable=True, index=True)
 
     evenements: Mapped[list["EvenementDepense"]] = relationship(back_populates="depense")
 
@@ -603,6 +605,25 @@ class ImputationBancaire(Base):
     montant: Mapped[float] = mapped_column(Float)
 
     transaction: Mapped["TransactionBancaire"] = relationship(back_populates="imputations")
+
+
+class NoteFrais(Base):
+    """Avances d'une même personne, regroupées en un document à signer.
+
+    Son état n'est pas stocké : la note est remboursée quand toutes ses
+    dépenses sont rapprochées au relevé. Une case cochée en plus du compte
+    finirait par le contredire.
+    """
+
+    __tablename__ = "note_frais"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    election_id: Mapped[int] = mapped_column(ForeignKey("election.id"))
+    personne: Mapped[str] = mapped_column(String(255))
+    date_creation: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    commentaire: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    justificatif_doc_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("document.id"), nullable=True)
 
 
 class ImputationRecette(Base):
