@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Check, Download, FileText, HandCoins, Plus, Trash2, Upload } from 'lucide-react';
-import { Button } from './ui/Components';
+import { Button, Modal } from './ui/Components';
+import { ExpenseForm } from './ExpenseForm';
 import { API_URL, messageErreur } from '../lib/api';
 
 const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -17,6 +18,9 @@ const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currenc
 export function NotesFraisPage() {
     const queryClient = useQueryClient();
     const [erreur, setErreur] = useState('');
+    // Saisie d'une dépense avancée sans quitter l'écran : c'est ici qu'on
+    // traite la pile de reçus qu'une personne vient de remettre.
+    const [saisie, setSaisie] = useState(null);
 
     const rafraichir = () => ['notes-frais', 'avances', 'depenses', 'completude']
         .forEach(k => queryClient.invalidateQueries([k]));
@@ -52,11 +56,16 @@ export function NotesFraisPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <header>
-                <h1 className="text-3xl font-bold tracking-tight">Notes de frais</h1>
-                <p className="text-muted-foreground">
-                    Les sommes avancées par une personne, regroupées en un document à signer.
-                </p>
+            <header className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Notes de frais</h1>
+                    <p className="text-muted-foreground">
+                        Les sommes avancées par une personne, regroupées en un document à signer.
+                    </p>
+                </div>
+                <Button className="gap-2" onClick={() => setSaisie({ avance_par: '' })}>
+                    <Plus className="h-4 w-4" /> Dépense avancée
+                </Button>
             </header>
 
             {erreur && <p className="text-sm text-destructive">{erreur}</p>}
@@ -76,11 +85,17 @@ export function NotesFraisPage() {
                                         {a.lignes.length} dépense{a.lignes.length > 1 ? 's' : ''} · {eur(a.total)}
                                     </span>
                                 </span>
-                                <Button variant="outline" className="gap-1.5"
-                                    isLoading={creer.isPending}
-                                    onClick={() => creer.mutate(a.personne)}>
-                                    <Plus className="h-3.5 w-3.5" /> Établir la note
-                                </Button>
+                                <div className="flex shrink-0 items-center gap-3">
+                                    <button type="button"
+                                        onClick={() => setSaisie({ avance_par: a.personne })}
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                        <Plus className="h-3 w-3" /> dépense
+                                    </button>
+                                    <Button variant="outline" isLoading={creer.isPending}
+                                        onClick={() => creer.mutate(a.personne)}>
+                                        Établir la note
+                                    </Button>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -88,9 +103,18 @@ export function NotesFraisPage() {
             )}
 
             {!notes?.length ? (
-                <div className="rounded-2xl border border-dashed border-border py-16 text-center">
+                <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
                     <FileText className="mx-auto mb-3 h-12 w-12 text-muted-foreground opacity-20" />
-                    <p className="italic text-muted-foreground">Aucune note de frais.</p>
+                    <p className="font-medium text-muted-foreground">Aucune note de frais.</p>
+                    <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground/80">
+                        Une note regroupe les dépenses dont quelqu'un a avancé le montant —
+                        l'essence d'un colleur, les menues dépenses du candidat. Saisissez la
+                        dépense en indiquant qui l'a avancée : elle apparaîtra ici, prête à
+                        être regroupée.
+                    </p>
+                    <Button className="mt-5 gap-2" onClick={() => setSaisie({ avance_par: '' })}>
+                        <Plus className="h-4 w-4" /> Saisir une dépense avancée
+                    </Button>
                 </div>
             ) : notes.map(note => (
                 <div key={note.id} className="rounded-xl border border-border bg-card">
@@ -144,6 +168,14 @@ export function NotesFraisPage() {
                     )}
                 </div>
             ))}
+            <Modal isOpen={Boolean(saisie)} onClose={() => setSaisie(null)}
+                title={saisie?.avance_par
+                    ? `Dépense avancée par ${saisie.avance_par}`
+                    : 'Dépense avancée'}>
+                {saisie && (
+                    <ExpenseForm prefilledData={saisie} onClose={() => setSaisie(null)} />
+                )}
+            </Modal>
         </div>
     );
 }
