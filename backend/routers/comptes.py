@@ -59,6 +59,13 @@ def ajouter_piece_recette(recette_id: int, payload: comptes.PieceIn,
                                          current_user["username"], role)
 
 
+@router.get("/avances")
+def avances_a_rembourser(campaign_id: str = Depends(get_campaign_conn),
+                         _garde: str = Depends(mandataire_ou_expert)):
+    """Sommes avancées par des personnes et pas encore remboursées."""
+    return comptes.avances_a_rembourser(campaign_id)
+
+
 @router.get("/depenses")
 def list_depenses(campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_ou_expert)):
     return comptes.list_depenses(campaign_id)

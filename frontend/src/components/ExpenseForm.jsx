@@ -29,7 +29,9 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
         statut: expense?.statut || STATUTS_DEPENSE[0].value,
         justificatif_path: expense?.justificatif_path || null,
         type_piece: expense?.type_piece || TYPES_PIECE[1].value,
-        is_nature: expense?.is_nature || false
+        is_nature: expense?.is_nature || false,
+        // Qui a avancé l'argent, s'il ne vient pas du compte de campagne.
+        avance_par: expense?.avance_par || ''
     });
     // Le fournisseur se choisit dans la liste des fournisseurs déjà saisis ;
     // `newSupplier` bascule le champ en saisie libre pour en créer un nouveau.
@@ -115,6 +117,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
             queryClient.invalidateQueries(['depenses']);
             queryClient.invalidateQueries(['stats']);
             queryClient.invalidateQueries(['completude']);
+            queryClient.invalidateQueries(['avances']);
             // Le coût d'un événement dépend de ces liaisons.
             queryClient.invalidateQueries(['evenements']);
             queryClient.invalidateQueries(['frise']);
@@ -275,6 +278,13 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
                     C'est un concours en nature (Don de prestation/matériel)
                 </label>
             </div>
+
+            <Input
+                label="Avancé par (à rembourser)"
+                placeholder="Laisser vide si payé directement par le compte de campagne"
+                value={formData.avance_par}
+                onChange={e => setFormData({ ...formData, avance_par: e.target.value })}
+            />
 
             <div className="space-y-3 rounded-lg border border-border/50 bg-muted/40 p-3">
                 <div className="flex items-center justify-between gap-2">

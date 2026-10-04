@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText, Pencil, Paperclip } from 'lucide-react';
+import { FileText, HandCoins, Pencil, Paperclip } from 'lucide-react';
 import { API_URL } from '../lib/api';
 import { Modal, Button, Select } from './ui/Components';
 import { TYPES_PIECE } from '../lib/constants';
@@ -14,6 +14,13 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
     // verser un justificatif, qui passera par la file de validation.
     const peutModifier = role === 'mandataire';
     const [depotPiece, setDepotPiece] = useState(null);
+    // Ce que la campagne doit aux personnes ayant avancé de l'argent : une
+    // dépense avancée est remboursée quand le compte l'a réglée, donc quand
+    // elle est rapprochée.
+    const { data: avances } = useQuery({
+        queryKey: ['avances'],
+        queryFn: async () => (await axios.get(`${API_URL}/avances`)).data,
+    });
     const { data: depenses, isLoading } = useQuery({
         queryKey: ['depenses'],
         queryFn: async () => {
@@ -39,6 +46,34 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
             <h2 className="text-2xl font-bold tracking-tight">Dépenses</h2>
+            {Boolean(avances?.length) && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                        <HandCoins className="h-4 w-4 text-amber-600" />
+                        <h3 className="text-sm font-bold text-amber-800">Avances à rembourser</h3>
+                    </div>
+                    <ul className="space-y-1">
+                        {avances.map(a => (
+                            <li key={a.personne} className="flex items-center justify-between text-sm">
+                                <span>
+                                    {a.personne}
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                        {a.lignes.length} dépense{a.lignes.length > 1 ? 's' : ''}
+                                    </span>
+                                </span>
+                                <span className="font-semibold tabular-nums">
+                                    {a.total.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 text-[11px] text-amber-700/80">
+                        Une avance disparaît d'ici une fois la dépense rapprochée au relevé :
+                        c'est le compte qui atteste du remboursement.
+                    </p>
+                </div>
+            )}
+
             <div className="rounded-md border border-border bg-card">
                 <div className="relative w-full overflow-auto">
                     <table className="w-full caption-bottom text-sm">
@@ -68,7 +103,14 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
                                             </span>
                                         )}
                                     </td>
-                                    <td className="p-4 align-middle">{depense.fournisseur}</td>
+                                    <td className="p-4 align-middle">
+                                        {depense.fournisseur}
+                                        {depense.avance_par && (
+                                            <span className="block text-[11px] text-amber-600">
+                                                avancé par {depense.avance_par}
+                                            </span>
+                                        )}
+                                    </td>
                                     <td className="p-4 align-middle"><span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{depense.categorie_cnccfp}</span></td>
                                     <td className="p-4 align-middle">{depense.statut}</td>
                                     <td className="p-4 align-middle text-right">{depense.montant_ttc.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</td>
@@ -171,6 +213,7 @@ function DepotJustificatif({ depense, onClose }) {
             queryClient.invalidateQueries(['depenses']);
             queryClient.invalidateQueries(['mes-soumissions']);
             queryClient.invalidateQueries(['completude']);
+            queryClient.invalidateQueries(['avances']);
             onClose();
         },
         onError: (err) => setErreur(err.response?.data?.detail || "Le dépôt a échoué."),
