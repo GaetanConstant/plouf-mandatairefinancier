@@ -36,6 +36,7 @@ from routers import (
     releves as releves_routes,
 )
 import os
+from sqlalchemy import select as sa_select
 from pathlib import Path
 import re
 import uuid
@@ -202,6 +203,18 @@ def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_c
 
     # Provisionne la base SQLite ORM de la campagne (tables + version Alembic).
     provision_campaign_db(campaign_id)
+
+    # L'élection naît avec la campagne : candidat, mandataire, emprunts et
+    # colistiers s'y rattachent par une clé obligatoire. L'attendre jusqu'au
+    # premier enregistrement de l'écran Identité faisait échouer tout le reste.
+    from db.session import campaign_session
+    from db.helpers import election_id as _creer_election
+    from db.models import Election
+    with campaign_session(campaign_id) as s:
+        _creer_election(s)
+        election = s.scalars(sa_select(Election)).first()
+        if election is not None and election.libelle == "Campagne":
+            election.libelle = campaign.name
 
     return {"id": campaign_id, "name": campaign.name}
 

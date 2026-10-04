@@ -212,6 +212,13 @@ class PieceDeclarativeIn(BaseModel):
 
 
 # Pièces déclaratives exigées en enveloppe B : à quel objet elles se rattachent.
+# Colonnes non nulles sans valeur par défaut, remplies à vide : « » n'est pas
+# considéré comme renseigné par la complétude, contrairement à un texte factice.
+_MINIMUM_REQUIS = {
+    Candidat: {"nom": "", "prenom": ""},
+    Mandataire: {"type": enums.TypeMandataire.physique},
+}
+
 PIECES_DECLARATIVES = {
     "recepisse-candidature": (Candidat, "recepisse_candidature_doc_id",
                               "Récépissé de déclaration de candidature"),
@@ -255,7 +262,12 @@ def save_piece_declarative(campaign_id: str, cle: str, payload: PieceDeclarative
 
     fichier = os.path.basename(payload.fichier)
     with campaign_session(campaign_id) as s:
-        objet = _get_or_create(s, modele, election_id=_election_id(s))
+        # Déposer le récépissé avant d'avoir saisi l'identité doit marcher :
+        # les champs obligatoires naissent vides, et restent donc signalés
+        # comme manquants par la complétude — une valeur de remplissage
+        # mentirait au décompte.
+        objet = _get_or_create(s, modele, election_id=_election_id(s),
+                               **_MINIMUM_REQUIS.get(modele, {}))
         doc = Document(type=enums.TypeDocument.recepisse, media_type=media_type(fichier),
                        fichier=fichier, enveloppe=enums.Enveloppe.B)
         validation.estampiller(doc, auteur, ROLE_MANDATAIRE)
