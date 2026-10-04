@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.37.0",
+    "date": "2026-10-04",
+    "dateAffichee": "4 octobre 2026",
+    "titre": "Le mandataire peut supprimer sa campagne",
+    "details": [
+      "La suppression d'une campagne était réservée aux administrateurs : un bêta-testeur ne pouvait pas retirer sa propre campagne d'essai. Elle est désormais ouverte au mandataire financier de la campagne concernée. L'équipe de campagne et les personnes extérieures restent sans ce droit.",
+      "La suppression demande de saisir le nom exact de la campagne. L'action efface définitivement sa base — recettes, dépenses et justificatifs — et une confirmation d'un seul clic était trop légère."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.36.0",
     "date": "2026-10-04",
     "dateAffichee": "4 octobre 2026",
