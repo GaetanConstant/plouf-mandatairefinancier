@@ -10,6 +10,14 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.41.0 — 2026-10-04 — Saisir une dépense avancée depuis les notes de frais
+
+### Ajouté
+- Une dépense avancée se saisit directement dans l'onglet Notes de frais, sans passer par l'écran des dépenses : c'est là qu'on traite la pile de reçus qu'une personne vient de remettre. Depuis le bloc d'une personne, son nom est prérempli.
+
+### Corrigé
+- L'onglet Notes de frais vide n'indiquait pas d'où venaient les notes : il affichait « Aucune note de frais » sans rien proposer. Il explique désormais qu'une note regroupe des dépenses avancées, et permet d'en saisir une.
+
 ## v0.40.0 — 2026-10-04 — Notes de frais
 
 ### Ajouté

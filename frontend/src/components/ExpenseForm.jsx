@@ -80,12 +80,19 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
     // Effect to populate form with scanned data
     useEffect(() => {
         if (prefilledData) {
+            // Chaque champ n'est écrasé que s'il est fourni : un préremplissage
+            // partiel — la seule personne qui a avancé, par exemple — ne doit
+            // pas vider le fournisseur ni le libellé.
             setFormData(prev => ({
                 ...prev,
                 date: prefilledData.date || prev.date,
                 montant_ttc: prefilledData.montant || prev.montant_ttc,
-                fournisseur: prefilledData.fournisseur !== "Inconnu" ? prefilledData.fournisseur : prev.fournisseur,
-                libelle: prefilledData.libelle !== "Dépense détectée" ? prefilledData.libelle : prev.libelle,
+                fournisseur: prefilledData.fournisseur && prefilledData.fournisseur !== "Inconnu"
+                    ? prefilledData.fournisseur : prev.fournisseur,
+                libelle: prefilledData.libelle && prefilledData.libelle !== "Dépense détectée"
+                    ? prefilledData.libelle : prev.libelle,
+                // Saisie depuis les notes de frais : la personne est connue.
+                avance_par: prefilledData.avance_par ?? prev.avance_par,
             }));
             if (prefilledData.file) {
                 setFile(prefilledData.file);
@@ -118,6 +125,7 @@ export function ExpenseForm({ onClose, prefilledData, expense }) {
             queryClient.invalidateQueries(['stats']);
             queryClient.invalidateQueries(['completude']);
             queryClient.invalidateQueries(['avances']);
+            queryClient.invalidateQueries(['notes-frais']);
             // Le coût d'un événement dépend de ces liaisons.
             queryClient.invalidateQueries(['evenements']);
             queryClient.invalidateQueries(['frise']);

@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.41.0",
+    "date": "2026-10-04",
+    "dateAffichee": "4 octobre 2026",
+    "titre": "Saisir une dépense avancée depuis les notes de frais",
+    "details": [
+      "Une dépense avancée se saisit directement dans l'onglet Notes de frais, sans passer par l'écran des dépenses : c'est là qu'on traite la pile de reçus qu'une personne vient de remettre. Depuis le bloc d'une personne, son nom est prérempli.",
+      "L'onglet Notes de frais vide n'indiquait pas d'où venaient les notes : il affichait « Aucune note de frais » sans rien proposer. Il explique désormais qu'une note regroupe des dépenses avancées, et permet d'en saisir une."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.40.0",
     "date": "2026-10-04",
     "dateAffichee": "4 octobre 2026",
