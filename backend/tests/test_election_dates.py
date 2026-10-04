@@ -108,3 +108,9 @@ if __name__ == "__main__":
             print(f"  ❌ {t.__name__} : {e!r}")
     print(f"\n{len(tests) - failures}/{len(tests)} tests OK")
     sys.exit(1 if failures else 0)
+
+
+def test_le_scrutin_senatorial_existe():
+    """Deux bêta-testeurs l'ont signalé : la liste n'offrait pas les sénatoriales."""
+    from db import enums
+    assert "senatoriale" in [e.value for e in enums.TypeElection]

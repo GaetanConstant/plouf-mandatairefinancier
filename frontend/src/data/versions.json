@@ -1,5 +1,15 @@
 [
   {
+    "version": "v0.34.1",
+    "date": "2026-10-04",
+    "dateAffichee": "4 octobre 2026",
+    "titre": "Les sénatoriales dans les types de scrutin",
+    "details": [
+      "Le type de scrutin « sénatoriale » manquait à la liste : une campagne sénatoriale devait se déclarer en « autre ». Signalé par deux bêta-testeurs."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.34.0",
     "date": "2026-10-03",
     "dateAffichee": "3 octobre 2026",

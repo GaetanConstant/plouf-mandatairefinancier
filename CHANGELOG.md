@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.34.1 — 2026-10-04 — Les sénatoriales dans les types de scrutin
+
+### Corrigé
+- Le type de scrutin « sénatoriale » manquait à la liste : une campagne sénatoriale devait se déclarer en « autre ». Signalé par deux bêta-testeurs.
+
 ## v0.34.0 — 2026-10-03 — Rapprocher une ligne au moment où on la saisit
 
 ### Ajouté
