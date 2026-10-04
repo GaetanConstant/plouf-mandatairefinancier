@@ -6,7 +6,7 @@ import { Button, Input, Select } from './ui/Components';
 import { API_URL } from '../lib/api';
 
 
-const TYPES_ELECTION = ['municipale', 'metropole', 'secteur', 'legislative', 'departementale', 'regionale', 'europeenne', 'autre']
+const TYPES_ELECTION = ['municipale', 'metropole', 'secteur', 'legislative', 'senatoriale', 'departementale', 'regionale', 'europeenne', 'autre']
     .map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
 
 const SECTIONS = [

@@ -15,6 +15,7 @@ class TypeElection(str, enum.Enum):
     metropole = "metropole"
     secteur = "secteur"
     legislative = "legislative"
+    senatoriale = "senatoriale"
     departementale = "departementale"
     regionale = "regionale"
     europeenne = "europeenne"
