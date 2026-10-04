@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.36.0",
+    "date": "2026-10-04",
+    "dateAffichee": "4 octobre 2026",
+    "titre": "Un enregistrement refusé se voit",
+    "details": [
+      "Un enregistrement refusé par le serveur pouvait ne produire aucun signe visible : sur la soixantaine d'appels de l'application, la moitié n'affichait aucun message d'erreur. Deux bêta-testeurs en ont conclu « je n'ai pas réussi » devant un formulaire muet. Toute écriture qui échoue affiche désormais la raison, en bas de l'écran.",
+      "Le formulaire des emprunts affiche en plus le message dans le formulaire lui-même, là où l'erreur s'est produite."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.35.0",
     "date": "2026-10-04",
     "dateAffichee": "4 octobre 2026",
