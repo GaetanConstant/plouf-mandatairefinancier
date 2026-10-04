@@ -41,7 +41,8 @@ import {
   ChevronDown,
   Sun,
   Moon,
-  ListChecks
+  ListChecks,
+  HandCoins
 } from 'lucide-react';
 import { cn } from './lib/utils'; // Keep this relative import!
 import { Modal, Button } from './components/ui/Components';
@@ -70,6 +71,7 @@ import { IdentitePage } from './components/IdentitePage';
 import { DepotPage } from './components/DepotPage';
 import { EvenementsPage } from './components/EvenementsPage';
 import { ResteAFairePage } from './components/ResteAFairePage';
+import { NotesFraisPage } from './components/NotesFraisPage';
 import { FrisePage } from './components/FrisePage';
 import { EcheancierPage } from './components/EcheancierPage';
 import { MutualisationPage } from './components/MutualisationPage';
@@ -90,6 +92,7 @@ const ACCES_ECRAN = {
   depenses: ['mandataire', 'expert_comptable', 'direction'],
   emprunts: ['mandataire'],
   justificatifs: ['mandataire', 'expert_comptable', 'direction'],
+  notesfrais: ['mandataire', 'expert_comptable'],
   attestations: ['mandataire'],
   carnets: ['mandataire'],
   evenements: ['mandataire', 'expert_comptable', 'direction', 'equipe'],
@@ -127,6 +130,7 @@ const GROUPES_NAV = [
     { key: 'depenses', label: 'Dépenses', icon: Receipt },
     { key: 'emprunts', label: 'Emprunts', icon: Landmark },
     { key: 'concours', label: 'Concours en nature', icon: Gift },
+    { key: 'notesfrais', label: 'Notes de frais', icon: HandCoins },
     { key: 'justificatifs', label: 'Justificatifs', icon: FileText },
   ]},
   { label: 'Dons & reçus', icon: BookOpen, items: [
@@ -677,6 +681,7 @@ function App() {
           {onglet === 'justificatifs' && peutVoir('justificatifs', roleCampagne) && <JustificatifsList />}
           {onglet === 'attestations' && peutVoir('attestations', roleCampagne) && <AttestationsPage campaignId={campaign.id} />}
           {onglet === 'carnets' && peutVoir('carnets', roleCampagne) && <CarnetsPage />}
+          {onglet === 'notesfrais' && peutVoir('notesfrais', roleCampagne) && <NotesFraisPage />}
           {onglet === 'restantafaire' && peutVoir('restantafaire', roleCampagne) && (
             <ResteAFairePage onNavigate={(tab, c) => { setCible(c); allerA(tab); }} />
           )}

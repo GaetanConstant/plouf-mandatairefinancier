@@ -34,6 +34,7 @@ from routers import (
     annexes as annexes_routes,
     validation as validation_routes,
     releves as releves_routes,
+    notes_frais as notes_frais_routes,
 )
 import os
 from sqlalchemy import select as sa_select
@@ -684,6 +685,7 @@ app.include_router(mutualisation_routes.router)
 app.include_router(annexes_routes.router)
 app.include_router(validation_routes.router)
 app.include_router(releves_routes.router)
+app.include_router(notes_frais_routes.router)
 
 
 if __name__ == "__main__":
