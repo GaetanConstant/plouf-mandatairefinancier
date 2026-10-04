@@ -329,6 +329,9 @@ class Depense(Tracable, Base):
     # Arbitrage explicite : cette dépense ne se rattache à aucun événement.
     # Distinct de « pas encore rattachée », que rien ne distinguerait sinon.
     hors_evenement: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Personne ayant avancé l'argent, à rembourser. Distinct du fournisseur :
+    # un colleur qui paie l'essence ne devient pas la station-service.
+    avance_par: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     evenements: Mapped[list["EvenementDepense"]] = relationship(back_populates="depense")
 

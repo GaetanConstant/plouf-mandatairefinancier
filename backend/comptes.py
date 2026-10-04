@@ -337,6 +337,7 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None
     return {
         "evenements": liaisons or [],
         "hors_evenement": d.hors_evenement,
+        "avance_par": d.avance_par,
         "id": d.id,
         "num_piece": d.num_piece,
         "date": _fmt_date(d.date_facture),
@@ -351,6 +352,32 @@ def _depense_to_legacy(d: Depense, doc_fichier: str | None, doc_type: str | None
         "prise_en_charge": d.prise_en_charge.value if d.prise_en_charge else "mandataire",
         "is_nature": d.statut == enums.StatutDepense.realise_nature,
     }
+
+
+def avances_a_rembourser(campaign_id: str) -> list[dict]:
+    """Sommes avancées par des personnes et pas encore remboursées.
+
+    Une dépense avancée est remboursée quand le compte l'a réglée : c'est le
+    rapprochement bancaire qui l'atteste, pas une case à cocher. Tant qu'elle
+    n'est pas rapprochée, la campagne doit l'argent.
+    """
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        par_personne: dict[str, dict] = {}
+        for d in s.scalars(_valides(select(Depense), Depense)
+                           .where(Depense.avance_par.is_not(None))
+                           .order_by(Depense.num_piece)).all():
+            if d.rapprochement:
+                continue
+            entree = par_personne.setdefault(
+                d.avance_par, {"personne": d.avance_par, "total": 0.0, "lignes": []})
+            entree["total"] = round(entree["total"] + (d.montant_ttc or 0.0), 2)
+            entree["lignes"].append({
+                "id": d.id, "num_piece": d.num_piece, "libelle": d.nature,
+                "fournisseur": d.fournisseur, "montant": d.montant_ttc,
+                "date": _fmt_date(d.date_facture),
+            })
+        return sorted(par_personne.values(), key=lambda x: -x["total"])
 
 
 def list_depenses(campaign_id: str) -> list[dict]:
@@ -399,6 +426,7 @@ def create_depense(campaign_id: str, dto, auteur: str | None = None,
             statut=statut,
             reglee=reglee,
             prise_en_charge=_prise_en_charge(getattr(dto, "prise_en_charge", None)),
+            avance_par=(getattr(dto, "avance_par", None) or "").strip() or None,
             facture_doc_id=facture_doc_id,
         )
         validation.estampiller(depense, auteur, role)
@@ -575,6 +603,7 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
         d.statut = statut
         d.reglee = reglee
         d.prise_en_charge = _prise_en_charge(getattr(dto, "prise_en_charge", None))
+        d.avance_par = (getattr(dto, "avance_par", None) or "").strip() or None
 
         liaisons = _liaisons_dto(dto)
         if liaisons is not None:

@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.39.0 — 2026-10-04 — Dépenses avancées par une personne
+
+### Ajouté
+- Une dépense peut indiquer qui en a avancé le montant : le candidat pour ses menues dépenses, un colleur pour son essence. Le fournisseur reste le vrai fournisseur — jusqu'ici il fallait inscrire la personne à sa place, ce qui faussait la nature de la dépense et le relevé des fournisseurs.
+- L'écran des dépenses récapitule ce que la campagne doit à chacun. Une avance en sort dès que la dépense est rapprochée au relevé : c'est le compte qui atteste du remboursement, pas une case à cocher.
+
 ## v0.38.0 — 2026-10-04 — Un emprunt entre dans la comptabilité
 
 ### Ajouté

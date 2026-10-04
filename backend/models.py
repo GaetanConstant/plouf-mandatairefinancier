@@ -35,6 +35,8 @@ class Depense(BaseModel):
     evenements: Optional[List["LiaisonEvenement"]] = None
     # Arbitrage explicite : aucune liaison à faire. `None` laisse en l'état.
     hors_evenement: Optional[bool] = None
+    # Personne ayant avancé l'argent, à rembourser.
+    avance_par: Optional[str] = None
 
 
 class LiaisonEvenement(BaseModel):
