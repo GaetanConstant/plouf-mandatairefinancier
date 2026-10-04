@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.38.0 — 2026-10-04 — Un emprunt entre dans la comptabilité
+
+### Ajouté
+- Enregistrer un emprunt crée la recette correspondante : elle apparaît dans les recettes et dans la main courante, en rubrique 7030. Les deux écrans vivaient jusqu'ici côte à côte sans se connaître, si bien qu'un emprunt saisi restait invisible du compte.
+- Le prêteur est enregistré comme personne morale lorsqu'il s'agit d'une banque ou d'un parti, ce qui le distingue des donateurs particuliers dans les contrôles.
+
+### Modifié
+- Supprimer un emprunt conserve la recette qui en venait, en la détachant : l'argent est entré sur le compte, l'effacer d'office fausserait les totaux.
+
 ## v0.37.0 — 2026-10-04 — Le mandataire peut supprimer sa campagne
 
 ### Corrigé

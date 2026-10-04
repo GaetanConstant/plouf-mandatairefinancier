@@ -1,5 +1,17 @@
 [
   {
+    "version": "v0.38.0",
+    "date": "2026-10-04",
+    "dateAffichee": "4 octobre 2026",
+    "titre": "Un emprunt entre dans la comptabilité",
+    "details": [
+      "Enregistrer un emprunt crée la recette correspondante : elle apparaît dans les recettes et dans la main courante, en rubrique 7030. Les deux écrans vivaient jusqu'ici côte à côte sans se connaître, si bien qu'un emprunt saisi restait invisible du compte.",
+      "Le prêteur est enregistré comme personne morale lorsqu'il s'agit d'une banque ou d'un parti, ce qui le distingue des donateurs particuliers dans les contrôles.",
+      "Supprimer un emprunt conserve la recette qui en venait, en la détachant : l'argent est entré sur le compte, l'effacer d'office fausserait les totaux."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.37.0",
     "date": "2026-10-04",
     "dateAffichee": "4 octobre 2026",
