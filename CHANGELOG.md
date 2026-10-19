@@ -10,6 +10,13 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.42.0 — 2026-10-19 — Doublons dans les relevés bancaires
+
+### Ajouté
+- Une ligne d'un relevé se retire individuellement, sans supprimer tout le relevé. Si elle était rapprochée, les écritures qu'elle réglait repassent en attente de paiement.
+- Les lignes importées deux fois sont signalées comme doublons probables, avec la ligne qu'elles répètent : l'export « opérations du jour » de La Banque Postale reprend à chaque téléchargement les opérations déjà exportées.
+- À l'import, les lignes déjà enregistrées sont décochées d'office dans l'aperçu ; on peut les recocher s'il s'agit bien de nouvelles opérations. Deux opérations identiques d'un même fichier restent deux opérations.
+
 ## v0.41.0 — 2026-10-04 — Saisir une dépense avancée depuis les notes de frais
 
 ### Ajouté

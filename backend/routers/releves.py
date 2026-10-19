@@ -31,14 +31,16 @@ async def lire_csv(file: UploadFile = File(...), campaign_id: str = Depends(get_
     L'import se fait en deux temps : on lit, on relit à l'écran, puis on valide.
     Un fichier bancaire mal découpé ne doit pas entrer directement au compte.
     """
-    return {"transactions": releves.lire_csv(await file.read())}
+    return {"transactions": releves.signaler_deja_presentes(
+        campaign_id, releves.lire_csv(await file.read()))}
 
 
 @router.post("/releves/lire-texte")
 def lire_texte(payload: TexteIn, campaign_id: str = Depends(get_campaign_conn),
                _garde: str = Depends(mandataire_requis)):
     """Aperçu depuis un copier-coller. Même principe que le CSV."""
-    return {"transactions": releves.lire_texte(payload.texte)}
+    return {"transactions": releves.signaler_deja_presentes(
+        campaign_id, releves.lire_texte(payload.texte))}
 
 
 @router.post("/releves/lire-image")
@@ -52,7 +54,8 @@ async def lire_image(file: UploadFile = File(...), campaign_id: str = Depends(ge
     from ocr_utils import extract_text_from_file
 
     texte = extract_text_from_file(await file.read(), file.filename or "releve.pdf")
-    return {"transactions": releves.lire_texte(texte), "texte_ocr": texte}
+    return {"transactions": releves.signaler_deja_presentes(campaign_id, releves.lire_texte(texte)),
+            "texte_ocr": texte}
 
 
 @router.post("/releves")
