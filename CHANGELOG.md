@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.43.1 — 2026-10-19 — Retirer un relevé PDF sans mois
+
+### Corrigé
+- Un relevé PDF sans mois indiqué peut être retiré du dossier : il n'y avait pas de moyen de supprimer un relevé versé en double.
+
 ## v0.43.0 — 2026-10-19 — Relevés PDF mensuels et recherche dans les dépenses
 
 ### Ajouté
