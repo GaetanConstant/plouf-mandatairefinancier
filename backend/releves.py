@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import csv
 import io
-import os
 import logging
 import re
 import unicodedata
@@ -27,14 +26,12 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from db.helpers import fmt_date as _fmt, media_type, valides as _valides
-from db.models import (Depense, Document, ImputationBancaire, ImputationRecette,
+from db.helpers import fmt_date as _fmt, valides as _valides
+from db.models import (Depense, ImputationBancaire, ImputationRecette,
                        Recette, Releve, TransactionBancaire)
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
-import validation
 from doublons_bancaires import doublons_en_base, marquer_lignes_lues
-from database import ROLE_MANDATAIRE
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +57,6 @@ class ReleveIn(BaseModel):
     source: str = "manuel"
     fichier: Optional[str] = None
     transactions: list[TransactionIn] = []
-
-
-class PieceReleveIn(BaseModel):
-    """Le relevé d'origine, scanné : pièce exigée en enveloppe B."""
-    fichier: str
 
 
 def _bornes(s, releve: Releve) -> None:
@@ -138,26 +130,6 @@ def supprimer_transaction(campaign_id: str, transaction_id: int) -> dict:
             s.refresh(releve)
             _bornes(s, releve)
     return {"message": "Ligne retirée du relevé."}
-
-
-def attacher_piece(campaign_id: str, releve_id: int, fichier: str, auteur: str) -> dict:
-    """Rattache le relevé scanné, quand les lignes ont été saisies à la main."""
-    ensure_campaign_db(campaign_id)
-    nom = os.path.basename(fichier)
-    with campaign_session(campaign_id) as s:
-        releve = s.get(Releve, releve_id)
-        if not releve:
-            raise HTTPException(status_code=404, detail="Relevé introuvable")
-        piece = Document(
-            type=enums.TypeDocument.releve_bancaire,
-            media_type=media_type(nom),
-            fichier=nom,
-            enveloppe=enums.Enveloppe.B,
-        )
-        validation.estampiller(piece, auteur, ROLE_MANDATAIRE)
-        s.add(piece)
-        releve.fichier = nom
-    return {"message": "Relevé rattaché au dossier."}
 
 
 class ImputationIn(BaseModel):
@@ -492,21 +464,9 @@ def create_releve(campaign_id: str, payload: ReleveIn, auteur: str) -> dict:
         raise HTTPException(status_code=400, detail="Une transaction porte une date illisible.")
 
     with campaign_session(campaign_id) as s:
-        # Le relevé lui-même est une pièce du dossier : le guide l'exige en
-        # enveloppe B, « eux seuls permettent de s'assurer du règlement effectif
-        # des dépenses ». Sans le fichier d'origine, l'import reste possible
-        # mais la pièce manquera au dépôt.
-        if payload.fichier:
-            fichier = os.path.basename(payload.fichier)
-            piece = Document(
-                type=enums.TypeDocument.releve_bancaire,
-                media_type=media_type(fichier),
-                fichier=fichier,
-                enveloppe=enums.Enveloppe.B,
-            )
-            validation.estampiller(piece, auteur, ROLE_MANDATAIRE)
-            s.add(piece)
-
+        # Le fichier importé (CSV, photo) reste attaché à l'import comme trace,
+        # sans devenir une pièce du dossier : la pièce de l'enveloppe B est le
+        # relevé PDF mensuel, déposé à part (voir releves_mensuels).
         releve = Releve(
             libelle=payload.libelle, source=source, fichier=payload.fichier,
             date_debut=min(jours), date_fin=max(jours),

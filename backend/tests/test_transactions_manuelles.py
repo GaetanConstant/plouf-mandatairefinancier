@@ -3,7 +3,6 @@
 import os
 import sys
 from datetime import date
-from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -12,7 +11,6 @@ from fastapi import HTTPException
 import completude
 import comptes
 import releves
-from database import UPLOADS_DIR
 from models import Depense
 from _fixture import fresh_campaign, teardown, run_tests
 
@@ -107,48 +105,6 @@ def test_un_montant_negatif_est_refuse():
             assert e.status_code == 400
         assert raised
     finally:
-        teardown(cid)
-
-
-def test_un_releve_sans_son_scan_est_signale():
-    """Le relevé compte deux fois : source des lignes, et pièce de l'enveloppe B."""
-    cid = fresh_campaign()
-    try:
-        _releve_vide(cid, libelle="Septembre 2026")
-        sec = _section(cid)
-        assert sec["requis"] == 1 and sec["remplis"] == 0, sec
-        assert "Septembre 2026" in sec["manquants"][0], sec["manquants"]
-        assert sec["actions"][0]["type"] == "releve_piece", sec["actions"]
-    finally:
-        teardown(cid)
-
-
-def test_attacher_le_scan_complete_le_releve():
-    cid = fresh_campaign()
-    nom = "test_releve_scan.pdf"
-    (Path(UPLOADS_DIR) / nom).write_bytes(b"%PDF-1.4 releve")
-    try:
-        r = _releve_vide(cid)
-        assert not _section(cid)["complet"]
-        releves.attacher_piece(cid, r["id"], nom, "gaetan")
-        assert _section(cid)["complet"]
-        # La pièce entre bien au dossier, en enveloppe B.
-        import depot
-        assert any(p["fichier"] == nom for p in depot.get_depot(cid)["pieces_B"])
-    finally:
-        (Path(UPLOADS_DIR) / nom).unlink(missing_ok=True)
-        teardown(cid)
-
-
-def test_un_releve_importe_avec_son_fichier_est_complet():
-    cid = fresh_campaign()
-    nom = "test_releve_direct.pdf"
-    (Path(UPLOADS_DIR) / nom).write_bytes(b"%PDF-1.4 releve")
-    try:
-        _releve_vide(cid, fichier=nom)
-        assert _section(cid)["complet"]
-    finally:
-        (Path(UPLOADS_DIR) / nom).unlink(missing_ok=True)
         teardown(cid)
 
 

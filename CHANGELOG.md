@@ -10,6 +10,17 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.43.0 — 2026-10-19 — Relevés PDF mensuels et recherche dans les dépenses
+
+### Ajouté
+- Les relevés PDF de la banque se déposent mois par mois, à part des imports : un relevé par mois de vie du compte, de l'ouverture à la clôture. Le mois en cours n'est pas exigé tant que le compte est ouvert.
+- Les dates d'ouverture et de clôture du compte se renseignent directement dans la page Relevés.
+- « Reste à faire » liste les mois sans relevé PDF et permet de le déposer sur place.
+- L'onglet Dépenses a une barre de recherche (n° de pièce, libellé, fournisseur, montant…) et un filtre par statut.
+
+### Modifié
+- Un fichier CSV importé ne devient plus une pièce du dossier : il sert seulement à reporter les lignes du compte. Les CSV déjà versés en enveloppe B en sont retirés.
+
 ## v0.42.0 — 2026-10-19 — Doublons dans les relevés bancaires
 
 ### Ajouté

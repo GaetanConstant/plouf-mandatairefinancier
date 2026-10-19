@@ -6,6 +6,7 @@ import { Button, Input, Modal, Select } from './ui/Components';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
 import { LIGNE_VIDE, SaisieLignes, lignesPretes } from './SaisieTransactions';
+import { RelevesMensuels } from './RelevesMensuels';
 
 const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
@@ -54,6 +55,8 @@ export function RelevesPage() {
                 </Button>
             </header>
 
+            <RelevesMensuels />
+
             {!releves?.length ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border p-12 text-center">
                     <Landmark className="mb-3 h-12 w-12 text-muted-foreground opacity-20" />
@@ -83,12 +86,6 @@ export function RelevesPage() {
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700"
                                 title="Lignes déjà présentes dans un autre import : à retirer">
                                 {r.nb_doublons} doublon(s) probable(s)
-                            </span>
-                        )}
-                        {!r.fichier && (
-                            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive"
-                                title="Le relevé scanné est exigé en enveloppe B">
-                                document manquant
                             </span>
                         )}
                         <button
@@ -284,8 +281,7 @@ function ImportReleve({ onClose }) {
 
     const saisies = lignesPretes(lignes);
     const aEnregistrer = voie === 'saisie' ? saisies
-        : (apercu ?? []).filter((_, i) => !ecartees.has(i))
-            .map(({ deja_present, ...t }) => t);
+        : (apercu ?? []).filter((_, i) => !ecartees.has(i));
 
     const enregistrer = useMutation({
         mutationFn: async () => axios.post(`${API_URL}/releves`, {
@@ -347,8 +343,8 @@ function ImportReleve({ onClose }) {
                         })}
                     />
                     <p className="text-[11px] text-muted-foreground">
-                        Le fichier est conservé comme pièce du dossier : le relevé bancaire
-                        est exigé en enveloppe B.
+                        Le fichier sert à reporter les lignes du compte. La pièce du dossier est le
+                        relevé PDF du mois, à déposer dans « Relevés PDF de la banque ».
                     </p>
                     {voie === 'ocr' && (
                         <p className="text-[11px] text-muted-foreground">

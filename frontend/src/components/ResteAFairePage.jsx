@@ -20,10 +20,10 @@ const DEPOTS = {
     contrat_pret: (a, chemin) =>
         axios.post(`${API_URL}/recettes/${a.id}/contrat-pret`,
                    { fichier: chemin, type_piece: 'contrat' }),
-    // Le relevé scanné est une pièce de l'enveloppe B, distincte de ses lignes :
-    // elles peuvent avoir été saisies à la main sans le document d'origine.
-    releve_piece: (a, chemin) =>
-        axios.post(`${API_URL}/releves/${a.id}/piece`, { fichier: chemin }),
+    // Le relevé PDF d'un mois de vie du compte, pièce de l'enveloppe B ;
+    // l'identifiant de l'action est le mois (AAAA-MM).
+    releve_mensuel: (a, chemin) =>
+        axios.post(`${API_URL}/releves-mensuels`, { fichier: chemin, periode: a.id }),
 };
 
 const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });

@@ -11,7 +11,7 @@ section de l'écran Identité, et le refus d'export du dossier officiel.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Optional
 
 from sqlalchemy import select
 
@@ -408,19 +408,21 @@ def evaluer(campaign_id: str) -> dict:
                       "id": None, "num_piece": None, "tiers": None, "montant": None},
                      _vers_ecran("releves", "Importer un fichier")],
         ))
-    else:
-        # Le relevé compte deux fois : comme source des transactions, et comme
-        # pièce de l'enveloppe B. Des lignes saisies à la main sans le relevé
-        # scanné laissent le dossier incomplet, ce que rien ne signalait.
-        sans_piece = [r for r in liste_releves if not r.get("fichier")]
+
+    # La pièce de l'enveloppe B est le relevé PDF de chaque mois de vie du
+    # compte, indépendamment des imports qui ont servi au rapprochement.
+    import releves_mensuels
+    mensuels = releves_mensuels.etat(campaign_id)
+    attendus = [m["periode"] for m in mensuels["mois"] if m["attendu"]]
+    if attendus:
+        manquants = mensuels["manquants"]
         sections.append(_section(
-            "releves", "Relevés bancaires", nb_releves, nb_releves - len(sans_piece),
-            [f"Relevé « {r['libelle']} » : le document d'origine manque"
-             for r in sans_piece],
-            actions=[{"type": "releve_piece", "id": r["id"], "libelle": r["libelle"],
+            "releves_pdf", "Relevés bancaires PDF", len(attendus), len(attendus) - len(manquants),
+            [f"Relevé PDF de {p} manquant" for p in manquants],
+            actions=[{"type": "releve_mensuel", "id": p, "libelle": f"Relevé de {p}",
                       "tiers": None, "montant": None, "num_piece": None}
-                     for r in sans_piece],
-            note=f"{nb_releves - len(sans_piece)}/{nb_releves} relevés au dossier",
+                     for p in manquants],
+            note=f"{len(attendus) - len(manquants)}/{len(attendus)} mois au dossier",
         ))
 
     # Compte toujours, relevé importé ou non : sans ce décompte, un dossier

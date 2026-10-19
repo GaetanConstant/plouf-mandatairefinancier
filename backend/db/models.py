@@ -526,6 +526,8 @@ class Document(Tracable, Base):
     date_ajout: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     checksum: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     evenement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("evenement.id"), nullable=True)
+    # Relevé bancaire PDF : mois couvert, « AAAA-MM ». Vide pour les autres pièces.
+    periode: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
 
 
 class DemandePiece(Base):
