@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText, HandCoins, Pencil, Paperclip } from 'lucide-react';
+import { FileText, HandCoins, Pencil, Paperclip, Search } from 'lucide-react';
 import { API_URL } from '../lib/api';
-import { Modal, Button, Select } from './ui/Components';
+import { Modal, Button, Input, Select } from './ui/Components';
 import { TYPES_PIECE } from '../lib/constants';
 import { ExpenseForm } from './ExpenseForm';
+
+// Recherche insensible à la casse et aux accents : « reglement » doit trouver
+// « Règlement ».
+const normaliser = (texte) => String(texte ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 
 export function DepensesList({ cible = null, onCibleConsommee, role = 'mandataire' }) {
@@ -28,6 +32,23 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
             return response.data;
         }
     });
+
+    const [recherche, setRecherche] = useState('');
+    const [statut, setStatut] = useState('');
+    // Les statuts proposés sont ceux réellement présents : un filtre qui ne
+    // renvoie rien n'aide pas à chercher.
+    const statuts = useMemo(
+        () => [...new Set((depenses ?? []).map(d => d.statut).filter(Boolean))].sort(),
+        [depenses]);
+    const affichees = useMemo(() => {
+        const mots = normaliser(recherche).split(/\s+/).filter(Boolean);
+        return (depenses ?? []).filter(d => {
+            if (statut && d.statut !== statut) return false;
+            const texte = normaliser([d.num_piece, d.libelle, d.fournisseur, d.avance_par,
+                d.categorie_cnccfp, d.date, d.montant_ttc?.toFixed(2).replace('.', ',')].join(' '));
+            return mots.every(m => texte.includes(m));
+        });
+    }, [depenses, recherche, statut]);
 
     // Une alerte de conformité a désigné une dépense : on l'ouvre en modification,
     // puis on libère la cible pour ne pas la rouvrir au prochain rendu.
@@ -74,6 +95,31 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
                 </div>
             )}
 
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="relative min-w-[16rem] flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        className="pl-9"
+                        placeholder="Rechercher : n° de pièce, libellé, fournisseur, montant…"
+                        value={recherche}
+                        onChange={e => setRecherche(e.target.value)}
+                    />
+                </div>
+                <div className="w-full sm:w-56">
+                    <Select
+                        value={statut}
+                        onChange={e => setStatut(e.target.value)}
+                        options={[{ value: '', label: 'Tous les statuts' },
+                                  ...statuts.map(s => ({ value: s, label: s }))]}
+                    />
+                </div>
+                {(recherche || statut) && (
+                    <p className="w-full text-xs text-muted-foreground">
+                        {affichees.length} dépense{affichees.length > 1 ? 's' : ''} sur {depenses?.length ?? 0}
+                    </p>
+                )}
+            </div>
+
             <div className="rounded-md border border-border bg-card">
                 <div className="relative w-full overflow-auto">
                     <table className="w-full caption-bottom text-sm">
@@ -91,7 +137,14 @@ export function DepensesList({ cible = null, onCibleConsommee, role = 'mandatair
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
-                            {depenses?.map((depense, i) => (
+                            {affichees.length === 0 && (
+                                <tr>
+                                    <td colSpan={9} className="p-6 text-center text-sm text-muted-foreground">
+                                        {depenses?.length ? 'Aucune dépense ne correspond à la recherche.' : 'Aucune dépense saisie.'}
+                                    </td>
+                                </tr>
+                            )}
+                            {affichees.map((depense, i) => (
                                 <tr key={i} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                                     <td className="p-4 align-middle font-mono text-xs text-muted-foreground whitespace-nowrap">{depense.num_piece || '—'}</td>
                                     <td className="p-4 align-middle whitespace-nowrap">{depense.date}</td>

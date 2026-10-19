@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 
 import releves
+import releves_mensuels
 from deps import (
     get_campaign_conn,
     get_current_user,
@@ -86,14 +87,35 @@ def supprimer_transaction(transaction_id: int,
     return releves.supprimer_transaction(campaign_id, transaction_id)
 
 
-@router.post("/releves/{releve_id}/piece")
-def attacher_piece(releve_id: int, payload: releves.PieceReleveIn,
-                   current_user: dict = Depends(get_current_user),
+@router.get("/releves-mensuels")
+def releves_mensuels_etat(campaign_id: str = Depends(get_campaign_conn)) -> dict:
+    """Mois de vie du compte et relevés PDF déposés pour chacun."""
+    return releves_mensuels.etat(campaign_id)
+
+
+@router.post("/releves-mensuels")
+def deposer_releve_mensuel(payload: releves_mensuels.ReleveMensuelIn,
+                           current_user: dict = Depends(get_current_user),
+                           campaign_id: str = Depends(get_campaign_conn),
+                           _garde: str = Depends(mandataire_requis)) -> dict:
+    """Verse le relevé PDF d'un mois au dossier (enveloppe B)."""
+    return releves_mensuels.deposer(campaign_id, payload, current_user["username"])
+
+
+@router.put("/releves-mensuels/{doc_id}/periode")
+def dater_releve_mensuel(doc_id: int, payload: releves_mensuels.DaterIn,
+                         campaign_id: str = Depends(get_campaign_conn),
+                         _garde: str = Depends(mandataire_requis)) -> dict:
+    """Indique le mois couvert par un relevé PDF déposé avant cette version."""
+    return releves_mensuels.dater(campaign_id, doc_id, payload)
+
+
+@router.put("/releves-mensuels/compte")
+def periode_compte(payload: releves_mensuels.PeriodeCompteIn,
                    campaign_id: str = Depends(get_campaign_conn),
-                   _garde: str = Depends(mandataire_requis)):
-    """Rattache le relevé scanné, quand les lignes ont été saisies à la main."""
-    return releves.attacher_piece(campaign_id, releve_id, payload.fichier,
-                                  current_user["username"])
+                   _garde: str = Depends(mandataire_requis)) -> dict:
+    """Dates d'ouverture et de clôture du compte, qui fixent les mois attendus."""
+    return releves_mensuels.enregistrer_periode_compte(campaign_id, payload)
 
 
 @router.get("/rapprochement/depenses")
