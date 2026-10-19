@@ -33,6 +33,7 @@ from db.models import (Depense, Document, ImputationBancaire, ImputationRecette,
 from db.session import campaign_session, ensure_campaign_db
 from db import enums
 import validation
+from doublons_bancaires import doublons_en_base, marquer_lignes_lues
 from database import ROLE_MANDATAIRE
 
 logger = logging.getLogger(__name__)
@@ -366,7 +367,7 @@ def _imputer_a_la_saisie(s, t: TransactionBancaire, depense_id: Optional[int],
         _actualiser_recette(s, r, t)
 
 
-def _transaction_dict(s, t: TransactionBancaire) -> dict:
+def _transaction_dict(s, t: TransactionBancaire, doublon_de: Optional[dict] = None) -> dict:
     # Un débit s'impute sur des dépenses, un crédit sur des recettes : une
     # seule des deux tables porte quelque chose pour une ligne donnée.
     credit = t.sens == enums.SensTransaction.credit
@@ -397,6 +398,7 @@ def _transaction_dict(s, t: TransactionBancaire) -> dict:
             "reste": round(t.montant - impute, 2),
             "rapprochee": abs(t.montant - impute) < TOLERANCE,
             "imputations": imputations,
+            "doublon_de": doublon_de,
         }
     for i in s.scalars(select(ImputationBancaire)
                        .where(ImputationBancaire.transaction_id == t.id)).all():
@@ -420,11 +422,14 @@ def _transaction_dict(s, t: TransactionBancaire) -> dict:
         "reste": round(t.montant - impute, 2),
         "rapprochee": abs(t.montant - impute) < TOLERANCE,
         "imputations": imputations,
+        "doublon_de": doublon_de,
     }
 
 
-def _releve_dict(s, r: Releve) -> dict:
-    transactions = [_transaction_dict(s, t) for t in s.scalars(
+def _releve_dict(s, r: Releve, doublons: Optional[dict[int, dict]] = None) -> dict:
+    if doublons is None:
+        doublons = doublons_en_base(s)
+    transactions = [_transaction_dict(s, t, doublons.get(t.id)) for t in s.scalars(
         select(TransactionBancaire)
         .where(TransactionBancaire.releve_id == r.id)
         .order_by(TransactionBancaire.date_operation)).all()]
@@ -446,6 +451,7 @@ def _releve_dict(s, r: Releve) -> dict:
         "nb_rapprochables": len(debits),
         "nb_rapprochees": rapprochees,
         "nb_orphelines": len(debits) - rapprochees,
+        "nb_doublons": sum(1 for t in transactions if t["doublon_de"]),
         "total_debit": round(sum(t["montant"] for t in transactions if t["sens"] == "debit"), 2),
         "total_credit": round(sum(t["montant"] for t in transactions if t["sens"] == "credit"), 2),
         "transactions": transactions,
@@ -456,7 +462,15 @@ def list_releves(campaign_id: str) -> list[dict]:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
         releves = s.scalars(select(Releve).order_by(Releve.date_debut.desc())).all()
-        return [_releve_dict(s, r) for r in releves]
+        doublons = doublons_en_base(s)
+        return [_releve_dict(s, r, doublons) for r in releves]
+
+
+def signaler_deja_presentes(campaign_id: str, lignes: list[dict]) -> list[dict]:
+    """Marque, dans un aperçu d'import, les lignes que la base porte déjà."""
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        return marquer_lignes_lues(s, lignes)
 
 
 def create_releve(campaign_id: str, payload: ReleveIn, auteur: str) -> dict:

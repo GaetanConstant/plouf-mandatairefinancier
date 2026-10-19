@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Landmark, Upload, ClipboardPaste, ScanLine, Keyboard, Link2, Plus, X, Trash2, Check } from 'lucide-react';
+import { Landmark, Upload, ClipboardPaste, ScanLine, Keyboard, Link2, Plus, X, Trash2, Check, Copy } from 'lucide-react';
 import { Button, Input, Modal, Select } from './ui/Components';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/api';
@@ -79,6 +79,12 @@ export function RelevesPage() {
                                 tout rapproché
                             </span>
                         )}
+                        {r.nb_doublons > 0 && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700"
+                                title="Lignes déjà présentes dans un autre import : à retirer">
+                                {r.nb_doublons} doublon(s) probable(s)
+                            </span>
+                        )}
                         {!r.fichier && (
                             <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive"
                                 title="Le relevé scanné est exigé en enveloppe B">
@@ -122,7 +128,17 @@ export function RelevesPage() {
                                             <span className="text-xs text-muted-foreground">reste {eur(t.reste)}</span>
                                         </Button>
                                     )}
+                                    <SupprimerLigneBouton transaction={t} />
                                 </div>
+
+                                {t.doublon_de && (
+                                    <p className="ml-24 mt-1 flex items-center gap-1 text-xs text-amber-700">
+                                        <Copy className="h-3 w-3" />
+                                        Doublon probable de la ligne du {t.doublon_de.date_operation}
+                                        {t.doublon_de.releve && <> (relevé « {t.doublon_de.releve} »)</>} :
+                                        à retirer.
+                                    </p>
+                                )}
 
                                 {t.imputations.length > 0 && (
                                     <ul className="ml-24 mt-2 space-y-1">
@@ -188,6 +204,32 @@ function DesimputerBouton({ imputationId, recette = false }) {
 }
 
 
+/** Retire une ligne du relevé : une ligne importée en double, ou mal lue. */
+function SupprimerLigneBouton({ transaction }) {
+    const queryClient = useQueryClient();
+    const retirer = useMutation({
+        mutationFn: async () => axios.delete(`${API_URL}/transactions/${transaction.id}`),
+        onSuccess: () => {
+            ['releves', 'rapprochement-depenses', 'rapprochement-recettes',
+             'main-courante', 'depenses', 'recettes', 'completude']
+                .forEach(k => queryClient.invalidateQueries([k]));
+        },
+    });
+    const confirmer = () => {
+        const message = transaction.imputations.length > 0
+            ? `Cette ligne est rapprochée : la retirer remet les écritures qu'elle règle en attente de paiement.\n\nRetirer « ${transaction.libelle} » ?`
+            : `Retirer la ligne « ${transaction.libelle} » du relevé ?`;
+        if (window.confirm(message)) retirer.mutate();
+    };
+    return (
+        <button onClick={confirmer} title="Retirer cette ligne du relevé"
+            className="text-muted-foreground transition-colors hover:text-destructive">
+            <Trash2 className="h-3.5 w-3.5" />
+        </button>
+    );
+}
+
+
 /** Import en deux temps : on lit, on relit à l'écran, puis on valide. */
 function ImportReleve({ onClose }) {
     const queryClient = useQueryClient();
@@ -201,6 +243,19 @@ function ImportReleve({ onClose }) {
     const echoue = (err) => setErreur(err.response?.data?.detail || 'Lecture impossible.');
 
     const [fichierDepose, setFichierDepose] = useState(null);
+    // Index des lignes de l'aperçu à ne pas enregistrer. Les lignes déjà en
+    // base (export du jour téléchargé deux fois) y sont mises d'office.
+    const [ecartees, setEcartees] = useState(new Set());
+    const montrerApercu = (transactions) => {
+        setApercu(transactions);
+        setEcartees(new Set(transactions.flatMap((t, i) => (t.deja_present ? [i] : []))));
+        setErreur('');
+    };
+    const basculer = (i) => setEcartees(prev => {
+        const suite = new Set(prev);
+        suite.has(i) ? suite.delete(i) : suite.add(i);
+        return suite;
+    });
 
     const lireFichier = useMutation({
         mutationFn: async ({ fichier, route }) => {
@@ -217,18 +272,20 @@ function ImportReleve({ onClose }) {
             });
             return { ...data, chemin: piece.path };
         },
-        onSuccess: (data) => { setApercu(data.transactions); setFichierDepose(data.chemin); setErreur(''); },
+        onSuccess: (data) => { montrerApercu(data.transactions); setFichierDepose(data.chemin); },
         onError: echoue,
     });
 
     const lireTexte = useMutation({
         mutationFn: async () => (await axios.post(`${API_URL}/releves/lire-texte`, { texte })).data,
-        onSuccess: (data) => { setApercu(data.transactions); setErreur(''); },
+        onSuccess: (data) => montrerApercu(data.transactions),
         onError: echoue,
     });
 
     const saisies = lignesPretes(lignes);
-    const aEnregistrer = voie === 'saisie' ? saisies : apercu;
+    const aEnregistrer = voie === 'saisie' ? saisies
+        : (apercu ?? []).filter((_, i) => !ecartees.has(i))
+            .map(({ deja_present, ...t }) => t);
 
     const enregistrer = useMutation({
         mutationFn: async () => axios.post(`${API_URL}/releves`, {
@@ -320,22 +377,41 @@ function ImportReleve({ onClose }) {
             {apercu && voie !== 'saisie' && (
                 <div className="space-y-2">
                     <p className="text-sm font-medium">{apercu.length} transaction(s) lues</p>
+                    {apercu.some(t => t.deja_present) && (
+                        <p className="text-xs text-amber-700">
+                            {apercu.filter(t => t.deja_present).length} ligne(s) déjà enregistrée(s) dans un
+                            autre import, décochée(s) pour ne pas les compter deux fois. Recochez-les s'il
+                            s'agit bien de nouvelles opérations.
+                        </p>
+                    )}
                     <div className="max-h-56 overflow-y-auto rounded-md border border-border">
                         {apercu.map((t, i) => (
-                            <div key={i} className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs last:border-0">
+                            <label key={i} className={cn('flex cursor-pointer items-center gap-2 border-b border-border px-3 py-1.5 text-xs last:border-0',
+                                ecartees.has(i) && 'opacity-50')}
+                                title={t.deja_present
+                                    ? `Déjà présente : ligne du ${t.deja_present.date_operation}${t.deja_present.releve ? ` (relevé « ${t.deja_present.releve} »)` : ''}`
+                                    : undefined}>
+                                <input type="checkbox" checked={!ecartees.has(i)} onChange={() => basculer(i)} />
                                 <span className="w-20 shrink-0 text-muted-foreground">{t.date_operation}</span>
                                 <span className="flex-1 truncate">{t.libelle}</span>
+                                {t.deja_present && (
+                                    <span className="shrink-0 rounded-full bg-amber-100 px-1.5 text-[10px] font-bold uppercase text-amber-700">
+                                        déjà là
+                                    </span>
+                                )}
                                 <span className={t.sens === 'debit' ? '' : 'text-emerald-600'}>
                                     {t.sens === 'debit' ? '−' : '+'}{eur(t.montant)}
                                 </span>
-                            </div>
+                            </label>
                         ))}
                     </div>
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={onClose}>Annuler</Button>
-                        <Button isLoading={enregistrer.isPending}
-                            onClick={() => libelle.trim() && enregistrer.mutate()}>
-                            Enregistrer le relevé
+                        <Button isLoading={enregistrer.isPending} disabled={aEnregistrer.length === 0}
+                            onClick={() => libelle.trim() && aEnregistrer.length > 0 && enregistrer.mutate()}>
+                            {aEnregistrer.length === 0
+                                ? 'Rien de nouveau à enregistrer'
+                                : `Enregistrer ${aEnregistrer.length} ligne${aEnregistrer.length > 1 ? 's' : ''}`}
                         </Button>
                     </div>
                     {!libelle.trim() && <p className="text-right text-xs text-muted-foreground">Donnez un nom au relevé.</p>}
