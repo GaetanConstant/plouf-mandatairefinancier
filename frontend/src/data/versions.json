@@ -1,5 +1,15 @@
 [
   {
+    "version": "v0.43.1",
+    "date": "2026-10-19",
+    "dateAffichee": "19 octobre 2026",
+    "titre": "Retirer un relevé PDF sans mois",
+    "details": [
+      "Un relevé PDF sans mois indiqué peut être retiré du dossier : il n'y avait pas de moyen de supprimer un relevé versé en double."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.43.0",
     "date": "2026-10-19",
     "dateAffichee": "19 octobre 2026",

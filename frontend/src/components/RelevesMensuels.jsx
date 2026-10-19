@@ -125,7 +125,9 @@ export function RelevesMensuels() {
                     </p>
                     {etat.a_dater.map(d => (
                         <ADater key={d.id} doc={d} mois={etat.mois.map(m => m.periode)}
-                            onDater={periode => dater.mutate({ id: d.id, periode })} />
+                            onDater={periode => dater.mutate({ id: d.id, periode })}
+                            onRetirer={() => window.confirm(`Retirer ${d.fichier} du dossier ?`)
+                                && retirer.mutate(d.fichier)} />
                     ))}
                 </div>
             )}
@@ -150,7 +152,7 @@ function FichierReleve({ doc, onRetirer }) {
 }
 
 
-function ADater({ doc, mois, onDater }) {
+function ADater({ doc, mois, onDater, onRetirer }) {
     const [periode, setPeriode] = useState(mois[0] ?? '');
     return (
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -161,6 +163,10 @@ function ADater({ doc, mois, onDater }) {
                     options={mois.map(p => ({ value: p, label: nomDuMois(p) }))} />
             </div>
             <Button variant="outline" disabled={!periode} onClick={() => onDater(periode)}>Classer</Button>
+            <button onClick={onRetirer} title="Retirer ce relevé du dossier"
+                className="text-muted-foreground transition-colors hover:text-destructive">
+                <Trash2 className="h-3.5 w-3.5" />
+            </button>
         </div>
     );
 }
