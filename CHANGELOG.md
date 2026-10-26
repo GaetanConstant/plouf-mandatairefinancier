@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.43.2 — 2026-10-26 — Rapprochement après correction d'une dépense
+
+### Corrigé
+- Corriger le montant d'une dépense déjà rapprochée recalcule son rapprochement : la main courante ne la marque plus « non rapprochée » alors que la ligne bancaire la couvre.
+
 ## v0.43.1 — 2026-10-19 — Retirer un relevé PDF sans mois
 
 ### Corrigé

@@ -617,6 +617,10 @@ def update_depense(campaign_id: str, depense_id: int, dto) -> dict:
                 d.hors_evenement = False
         if getattr(dto, "hors_evenement", None) is not None:
             d.hors_evenement = bool(dto.hors_evenement)
+        # Le relevé a le dernier mot sur le règlement d'une dépense rapprochée.
+        import releves
+        s.flush()
+        releves.resynchroniser_depense(s, d)
     return {"message": "Dépense mise à jour"}
 
 
