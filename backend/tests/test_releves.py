@@ -199,6 +199,35 @@ def test_supprimer_un_releve_defait_le_reglement_des_depenses():
         teardown(cid)
 
 
+def test_corriger_le_montant_apres_rapprochement_recalcule_le_reglement():
+    """Cas D014 : saisie à un montant erroné, rapprochée, puis corrigée au bon
+    montant. La main courante la disait « non rapprochée » alors que la ligne
+    bancaire la couvrait entièrement."""
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(22.33, "Bière"), "gconstant", ROLE_MANDATAIRE)
+        dep = comptes.list_depenses(cid)[0]
+        r = _releve(cid, [{"date_operation": "2026-10-19", "libelle": "VIR LOUPIOTE",
+                           "montant": 22.32, "sens": "debit"}], libelle="banque postale 2")
+        releves.imputer(cid, r["transactions"][0]["id"], releves.ImputationIn(depense_id=dep["id"]))
+        ligne = [l for l in maincourante.journal(cid) if l["sens"] == "depense"][0]
+        assert not ligne["rapprochement"], "un centime reste à régler"
+
+        comptes.update_depense(cid, dep["id"], _depense(22.32, "Bière"))
+        ligne = [l for l in maincourante.journal(cid) if l["sens"] == "depense"][0]
+        assert ligne["rapprochement"]
+        assert ligne["num_releve"] == "banque postale 2"
+        assert releves.depenses_a_rapprocher(cid) == []
+
+        comptes.update_depense(cid, dep["id"], _depense(30.0, "Bière"))
+        with campaign_session(cid) as s:
+            from db.models import Depense as D
+            d = s.get(D, dep["id"])
+            assert not d.rapprochement and not d.reglee, "la banque ne couvre plus tout"
+    finally:
+        teardown(cid)
+
+
 def test_un_encaissement_ne_peut_pas_regler_une_depense():
     """Un crédit est une recette. L'imputer à une dépense fausse le compte."""
     cid = fresh_campaign()

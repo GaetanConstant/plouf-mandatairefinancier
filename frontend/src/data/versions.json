@@ -1,5 +1,15 @@
 [
   {
+    "version": "v0.43.2",
+    "date": "2026-10-26",
+    "dateAffichee": "26 octobre 2026",
+    "titre": "Rapprochement après correction d'une dépense",
+    "details": [
+      "Corriger le montant d'une dépense déjà rapprochée recalcule son rapprochement : la main courante ne la marque plus « non rapprochée » alors que la ligne bancaire la couvre."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.43.1",
     "date": "2026-10-19",
     "dateAffichee": "19 octobre 2026",

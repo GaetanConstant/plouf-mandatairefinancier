@@ -681,6 +681,22 @@ def _actualiser_depense(s, depense: Depense, transaction: Optional[TransactionBa
             depense.statut = enums.StatutDepense.facture
 
 
+def resynchroniser_depense(s, depense: Depense) -> None:
+    """Recalcule l'état réglé d'une dépense déjà rapprochée après sa modification.
+
+    Corriger le montant d'une dépense rapprochée doit repasser par le relevé :
+    sinon elle reste « non rapprochée » alors que la banque la couvre, ou
+    l'inverse. Sans imputation, la saisie du formulaire fait foi.
+    """
+    derniere = s.scalars(
+        select(TransactionBancaire)
+        .join(ImputationBancaire, ImputationBancaire.transaction_id == TransactionBancaire.id)
+        .where(ImputationBancaire.depense_id == depense.id)
+        .order_by(TransactionBancaire.date_operation.desc())).first()
+    if derniere is not None:
+        _actualiser_depense(s, depense, derniere)
+
+
 def desimputer(campaign_id: str, imputation_id: int) -> dict:
     ensure_campaign_db(campaign_id)
     with campaign_session(campaign_id) as s:
