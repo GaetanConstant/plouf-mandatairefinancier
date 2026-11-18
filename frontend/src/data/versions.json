@@ -1,5 +1,17 @@
 [
   {
+    "version": "v0.44.0",
+    "date": "2026-11-18",
+    "dateAffichee": "18 novembre 2026",
+    "titre": "Pièce partagée et export d'un dossier incomplet",
+    "details": [
+      "Dans « Reste à faire », une dépense sans justificatif peut réutiliser une pièce déjà au dossier (bouton « Réutiliser une pièce ») : des frais bancaires se justifient par le relevé du mois, sans le dupliquer. Réservé au mandataire.",
+      "Une pièce partagée porte tous les numéros qu'elle justifie (« D025, D026… ») ; le bordereau indique, pour chaque dépense concernée, où trouver sa pièce.",
+      "Les exports (dossier ZIP et PDF, compte CNCCFP, bordereau) restent possibles quand le dossier est incomplet : une alerte rappelle les éléments manquants et le risque de rejet, et l'export se fait après confirmation."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.43.2",
     "date": "2026-10-26",
     "dateAffichee": "26 octobre 2026",

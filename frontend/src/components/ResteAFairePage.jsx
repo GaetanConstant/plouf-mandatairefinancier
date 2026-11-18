@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CalendarDays, CheckCircle2, ChevronRight, Keyboard, ListChecks, Upload } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronRight, Keyboard, Link2, ListChecks, Upload } from 'lucide-react';
 import { Button, Input } from './ui/Components';
 import { LIGNE_VIDE, SaisieLignes, lignesPretes } from './SaisieTransactions';
 import { API_URL } from '../lib/api';
@@ -303,12 +303,63 @@ function LigneFichier({ action }) {
                 {erreur && <p className="text-xs text-destructive">{erreur}</p>}
             </div>
 
-            <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary">
-                <Upload className="h-3.5 w-3.5" />
-                {deposer.isPending ? 'Envoi...' : 'Déposer la pièce'}
-                <input type="file" className="hidden" disabled={deposer.isPending}
-                    onChange={e => { setErreur(''); if (e.target.files[0]) deposer.mutate(e.target.files[0]); }} />
-            </label>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {action.type === 'depense' && <ReutiliserPiece action={action} onErreur={setErreur} />}
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary">
+                    <Upload className="h-3.5 w-3.5" />
+                    {deposer.isPending ? 'Envoi...' : 'Déposer la pièce'}
+                    <input type="file" className="hidden" disabled={deposer.isPending}
+                        onChange={e => { setErreur(''); if (e.target.files[0]) deposer.mutate(e.target.files[0]); }} />
+                </label>
+            </div>
         </div>
+    );
+}
+
+
+// Une dépense sans facture (frais bancaires) se justifie par une pièce déjà
+// au dossier, le relevé du mois : on la rattache sans la dupliquer.
+function ReutiliserPiece({ action, onErreur }) {
+    const queryClient = useQueryClient();
+    const [ouvert, setOuvert] = useState(false);
+
+    const { data: documents, isLoading, isError } = useQuery({
+        queryKey: ['documents'],
+        queryFn: async () => (await axios.get(`${API_URL}/documents`)).data,
+        enabled: ouvert,
+    });
+
+    const rattacher = useMutation({
+        mutationFn: async (documentId) => axios.post(
+            `${API_URL}/depenses/${action.id}/piece-existante`, { document_id: Number(documentId) }),
+        onSuccess: () => ['completude', 'depenses', 'documents', 'depot']
+            .forEach(k => queryClient.invalidateQueries([k])),
+        onError: (err) => onErreur(err.response?.data?.detail || 'Le rattachement a échoué.'),
+    });
+
+    if (!ouvert) {
+        return (
+            <button type="button" onClick={() => { onErreur(''); setOuvert(true); }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary">
+                <Link2 className="h-3.5 w-3.5" /> Réutiliser une pièce
+            </button>
+        );
+    }
+    if (isLoading) return <span className="text-xs text-muted-foreground">Chargement des pièces...</span>;
+    if (isError) return <span className="text-xs text-destructive">Pièces indisponibles.</span>;
+
+    // Les relevés d'abord : c'est le cas courant (frais bancaires).
+    const tries = [...(documents || [])].sort((a, b) =>
+        (a.type !== 'releve_bancaire') - (b.type !== 'releve_bancaire'));
+
+    return (
+        <select defaultValue="" disabled={rattacher.isPending}
+            className="h-8 max-w-[16rem] rounded-md border border-input bg-background px-2 text-xs"
+            onChange={e => { if (e.target.value) rattacher.mutate(e.target.value); }}>
+            <option value="" disabled>Choisir une pièce existante…</option>
+            {tries.map(d => (
+                <option key={d.id} value={d.id}>{d.type_label} · {d.fichier}</option>
+            ))}
+        </select>
     );
 }

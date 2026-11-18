@@ -10,6 +10,15 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.44.0 — 2026-11-18 — Pièce partagée et export d'un dossier incomplet
+
+### Ajouté
+- Dans « Reste à faire », une dépense sans justificatif peut réutiliser une pièce déjà au dossier (bouton « Réutiliser une pièce ») : des frais bancaires se justifient par le relevé du mois, sans le dupliquer. Réservé au mandataire.
+- Une pièce partagée porte tous les numéros qu'elle justifie (« D025, D026… ») ; le bordereau indique, pour chaque dépense concernée, où trouver sa pièce.
+
+### Modifié
+- Les exports (dossier ZIP et PDF, compte CNCCFP, bordereau) restent possibles quand le dossier est incomplet : une alerte rappelle les éléments manquants et le risque de rejet, et l'export se fait après confirmation.
+
 ## v0.43.2 — 2026-10-26 — Rapprochement après correction d'une dépense
 
 ### Corrigé
