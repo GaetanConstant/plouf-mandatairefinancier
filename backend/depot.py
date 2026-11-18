@@ -315,8 +315,34 @@ def _nom_dans_archive(enveloppe: str, rang: int, fichier: str,
     return f"Enveloppe_{enveloppe}/{prefixe}_{fichier}"
 
 
+def _tableurs_du_compte(campaign_id: str) -> list[tuple[str, bytes]]:
+    """Les tableurs qui partent avec le dossier, rangés à part des enveloppes.
+
+    Ce ne sont pas des pièces numérotées : ce sont le compte lui-même et ses
+    états (main courante, livre de comptes), que l'expert-comptable reçoit
+    avec les pièces pour n'avoir qu'un envoi. L'état des dépenses mutualisées
+    n'est joint que s'il y en a.
+    """
+    # Imports locaux : ces modules importent `depot` (index des pièces).
+    import export_cnccfp
+    import livre_comptes
+    import maincourante
+    import mutualisation
+
+    tableurs = [
+        ("compte_campagne_format_cnccfp.xlsx", export_cnccfp.generate_xlsx(campaign_id)),
+        ("main_courante_annexe8.xlsx", maincourante.export_annexe8_xlsx(campaign_id)),
+        ("livre_de_comptes.xlsx", livre_comptes.generate_xlsx(campaign_id)),
+    ]
+    if mutualisation.list_mutualisees(campaign_id):
+        tableurs.append(("etat_depenses_mutualisees.xlsx",
+                         mutualisation.export_etat_xlsx(campaign_id)))
+    return tableurs
+
+
 def export_dossier_zip(campaign_id: str) -> bytes:
-    """Dossier complet : bordereau en tête, puis les pièces classées par enveloppe.
+    """Dossier complet : bordereau en tête, les tableurs du compte (`Comptes/`),
+    puis les pièces classées par enveloppe.
 
     Les fichiers sont copiés tels quels — aucune recompression, aucune perte
     sur des justificatifs qui doivent rester lisibles par la commission.
@@ -324,6 +350,8 @@ def export_dossier_zip(campaign_id: str) -> bytes:
     tampon = io.BytesIO()
     with zipfile.ZipFile(tampon, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("0_bordereau_de_depot.pdf", export_bordereau_pdf(campaign_id))
+        for nom, contenu in _tableurs_du_compte(campaign_id):
+            zf.writestr(f"Comptes/{nom}", contenu)
 
         etat = get_depot(campaign_id)
         annexe = _calendrier_annexe(campaign_id)

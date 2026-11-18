@@ -51,7 +51,7 @@ export function DepotPage({ onNavigate }) {
             <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Dépôt du dossier</h1>
-                    <p className="text-muted-foreground">Classement des pièces par enveloppe (A / B) et bordereau de dépôt.</p>
+                    <p className="text-muted-foreground">Classement des pièces par enveloppe (A / B) et bordereau de dépôt. Le ZIP contient tout : bordereau, tableurs du compte et pièces.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <LienExport chemin="dossier-zip" complet={exportable} manquants={completude?.manquants}>
@@ -66,6 +66,9 @@ export function DepotPage({ onNavigate }) {
                     <LienExport chemin="export" complet={exportable} manquants={completude?.manquants}>
                         <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Bordereau (PDF)</Button>
                     </LienExport>
+                    <a href={`${API_URL}/main-courante/export`} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Main courante (Excel)</Button>
+                    </a>
                 </div>
             </header>
 

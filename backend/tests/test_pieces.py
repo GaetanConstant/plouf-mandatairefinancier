@@ -187,5 +187,23 @@ def test_reutiliser_refuse_une_piece_non_validee():
         teardown(cid)
 
 
+def test_zip_contient_les_tableurs_du_compte():
+    """Le ZIP est tout ce qu'on envoie : pièces, bordereau et tableurs."""
+    import io
+    import zipfile
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(justificatif="facture.pdf"))
+        comptes.create_recette(cid, _recette())
+        noms = zipfile.ZipFile(io.BytesIO(depot.export_dossier_zip(cid))).namelist()
+        assert "0_bordereau_de_depot.pdf" in noms, noms
+        comptes_zip = sorted(n for n in noms if n.startswith("Comptes/"))
+        assert comptes_zip == ["Comptes/compte_campagne_format_cnccfp.xlsx",
+                               "Comptes/livre_de_comptes.xlsx",
+                               "Comptes/main_courante_annexe8.xlsx"], comptes_zip
+    finally:
+        teardown(cid)
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))
