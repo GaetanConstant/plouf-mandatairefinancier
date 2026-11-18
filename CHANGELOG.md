@@ -10,6 +10,11 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.45.0 — 2026-11-18 — Le ZIP contient tout le dossier
+### Ajouté
+- Le « Dossier complet (ZIP) » contient désormais, dans un dossier `Comptes/`, le compte au format CNCCFP, la main courante (annexe 8) et le livre de comptes, ainsi que l'état des dépenses mutualisées s'il y en a : un seul fichier à envoyer.
+- Bouton « Main courante (Excel) » dans l'onglet Dépôt.
+
 ## v0.44.0 — 2026-11-18 — Pièce partagée et export d'un dossier incomplet
 
 ### Ajouté

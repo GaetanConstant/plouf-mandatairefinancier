@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.45.0",
+    "date": "2026-11-18",
+    "dateAffichee": "18 novembre 2026",
+    "titre": "Le ZIP contient tout le dossier",
+    "details": [
+      "Le « Dossier complet (ZIP) » contient désormais, dans un dossier `Comptes/`, le compte au format CNCCFP, la main courante (annexe 8) et le livre de comptes, ainsi que l'état des dépenses mutualisées s'il y en a : un seul fichier à envoyer.",
+      "Bouton « Main courante (Excel) » dans l'onglet Dépôt."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.44.0",
     "date": "2026-11-18",
     "dateAffichee": "18 novembre 2026",
