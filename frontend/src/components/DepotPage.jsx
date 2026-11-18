@@ -42,8 +42,8 @@ export function DepotPage({ onNavigate }) {
     if (isLoading) return <div>Chargement du dossier de dépôt...</div>;
 
     const pret = etat?.pret_a_deposer;
-    // Le serveur refuse ces exports en 409 : on désactive les boutons pour que
-    // le refus s'explique ici, plutôt que par un JSON brut dans un onglet.
+    // Dossier incomplet : l'export reste possible (envoi à l'expert-comptable),
+    // après une alerte qui liste les manques. Voir LienExport.
     const exportable = completude ? completude.complet : false;
 
     return (
@@ -53,38 +53,19 @@ export function DepotPage({ onNavigate }) {
                     <h1 className="text-3xl font-bold tracking-tight">Dépôt du dossier</h1>
                     <p className="text-muted-foreground">Classement des pièces par enveloppe (A / B) et bordereau de dépôt.</p>
                 </div>
-                <div className="flex gap-2">
-                    {exportable ? (
-                        <>
-                            <a href={`${API_URL}/depot/dossier-zip`} target="_blank" rel="noopener noreferrer">
-                                <Button className="gap-2"><Download className="w-4 h-4" /> Dossier complet (ZIP)</Button>
-                            </a>
-                            <a href={`${API_URL}/depot/dossier-pdf`} target="_blank" rel="noopener noreferrer">
-                                <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Dossier complet (PDF)</Button>
-                            </a>
-                            <a href={`${API_URL}/depot/export-cnccfp`} target="_blank" rel="noopener noreferrer">
-                                <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Compte CNCCFP (Excel)</Button>
-                            </a>
-                            <a href={`${API_URL}/depot/export`} target="_blank" rel="noopener noreferrer">
-                                <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Bordereau (PDF)</Button>
-                            </a>
-                        </>
-                    ) : (
-                        <>
-                            <Button disabled className="gap-2" title="Dossier incomplet">
-                                <Download className="w-4 h-4" /> Dossier complet (ZIP)
-                            </Button>
-                            <Button disabled variant="outline" className="gap-2" title="Dossier incomplet">
-                                <Download className="w-4 h-4" /> Dossier complet (PDF)
-                            </Button>
-                            <Button disabled variant="outline" className="gap-2" title="Dossier incomplet">
-                                <Download className="w-4 h-4" /> Compte CNCCFP (Excel)
-                            </Button>
-                            <Button disabled variant="outline" className="gap-2" title="Dossier incomplet">
-                                <Download className="w-4 h-4" /> Bordereau (PDF)
-                            </Button>
-                        </>
-                    )}
+                <div className="flex flex-wrap gap-2">
+                    <LienExport chemin="dossier-zip" complet={exportable} manquants={completude?.manquants}>
+                        <Button className="gap-2"><Download className="w-4 h-4" /> Dossier complet (ZIP)</Button>
+                    </LienExport>
+                    <LienExport chemin="dossier-pdf" complet={exportable} manquants={completude?.manquants}>
+                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Dossier complet (PDF)</Button>
+                    </LienExport>
+                    <LienExport chemin="export-cnccfp" complet={exportable} manquants={completude?.manquants}>
+                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Compte CNCCFP (Excel)</Button>
+                    </LienExport>
+                    <LienExport chemin="export" complet={exportable} manquants={completude?.manquants}>
+                        <Button variant="outline" className="gap-2"><Download className="w-4 h-4" /> Bordereau (PDF)</Button>
+                    </LienExport>
                 </div>
             </header>
 
@@ -95,11 +76,12 @@ export function DepotPage({ onNavigate }) {
                         <AlertTriangle className="w-6 h-6 shrink-0 text-red-600" />
                         <div>
                             <h2 className="font-bold text-red-700">
-                                Export impossible — dossier complété à {completude.pct} %
+                                Dossier incomplet — complété à {completude.pct} %
                             </h2>
                             <p className="text-sm text-red-700/80">
                                 {completude.manquants.length} élément{completude.manquants.length > 1 ? 's' : ''} manquant
-                                {completude.manquants.length > 1 ? 's' : ''} avant de pouvoir générer les pièces officielles.
+                                {completude.manquants.length > 1 ? 's' : ''}. L'export reste possible, mais un dossier
+                                déposé incomplet s'expose à un rejet.
                             </p>
                         </div>
                     </div>
@@ -268,5 +250,27 @@ function Devolution() {
                 </div>
             )}
         </div>
+    );
+}
+
+
+// Lien d'export. Dossier complet : téléchargement direct. Incomplet : on
+// rappelle ce qui manque et le risque, puis on exporte quand même si le
+// mandataire confirme (le serveur exige alors `forcer=true`).
+function LienExport({ chemin, complet, manquants, children }) {
+    const href = `${API_URL}/depot/${chemin}${complet ? '' : '?forcer=true'}`;
+    const confirmer = (e) => {
+        if (complet) return;
+        const liste = (manquants || []).slice(0, 10).map(m => `• ${m}`).join('\n');
+        const reste = (manquants?.length || 0) > 10 ? `\n… et ${manquants.length - 10} autre(s)` : '';
+        const message = "Le dossier n'est pas complet. Vous vous exposez à ce que le compte "
+            + "soit refusé ou réformé s'il est déposé en l'état.\n\n"
+            + `Éléments manquants :\n${liste}${reste}\n\nExporter quand même ?`;
+        if (!window.confirm(message)) e.preventDefault();
+    };
+    return (
+        <a href={href} target="_blank" rel="noopener noreferrer" onClick={confirmer}>
+            {children}
+        </a>
     );
 }

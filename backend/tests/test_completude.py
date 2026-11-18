@@ -251,6 +251,16 @@ def test_export_refuse_sur_dossier_incomplet():
         teardown(cid)
 
 
+def test_export_force_passe_sur_dossier_incomplet():
+    """Le mandataire peut exporter quand même, après l'alerte de l'écran."""
+    cid = fresh_campaign()
+    try:
+        assert not completude.evaluer(cid)["complet"]
+        _exiger_dossier_complet(cid, forcer=True)
+    finally:
+        teardown(cid)
+
+
 def test_export_pdf_assemble_bordereau_et_pieces():
     """Le PDF fusionné doit embarquer les pièces, pas seulement les annoncer."""
     import io

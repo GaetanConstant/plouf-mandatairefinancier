@@ -1,4 +1,5 @@
 import io
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -10,6 +11,8 @@ import devolution
 import export_cnccfp
 from auth import get_current_user
 from deps import get_campaign_conn, mandataire_ou_expert, mandataire_requis
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["depot"], dependencies=[Depends(mandataire_ou_expert)])
 
@@ -31,14 +34,21 @@ def update_document(doc_id: int, payload: DocumentUpdate, current_user: dict = D
     return depot.set_document(campaign_id, doc_id, payload.enveloppe, payload.type)
 
 
-def _exiger_dossier_complet(campaign_id: str) -> None:
-    """Refuse l'export d'une pièce officielle tant qu'il manque des données.
+def _exiger_dossier_complet(campaign_id: str, forcer: bool = False) -> None:
+    """Refuse l'export d'une pièce officielle tant qu'il manque des données,
+    sauf si le mandataire confirme vouloir exporter quand même (`forcer`).
 
     Le dossier part à la CNCCFP : un bordereau exporté avec un expert-comptable
-    vide devrait être refait. L'erreur porte la liste des manques pour que
-    l'écran puisse l'afficher telle quelle.
+    vide devrait être refait. Mais le premier usage de l'export est d'envoyer
+    le dossier en cours à l'expert-comptable : l'écran avertit, liste les
+    manques, et c'est le mandataire qui décide. Sans `forcer`, l'erreur porte
+    la liste des manques pour que l'écran puisse l'afficher telle quelle.
     """
     etat = completude.evaluer(campaign_id)
+    if not etat["complet"] and forcer:
+        logger.warning("Export d'un dossier incomplet (%s %%) confirmé par le mandataire : %s",
+                       etat["pct"], campaign_id)
+        return
     if not etat["complet"]:
         raise HTTPException(
             status_code=409,
@@ -56,8 +66,9 @@ def get_depot(current_user: dict = Depends(get_current_user), campaign_id: str =
 
 
 @router.get("/depot/export")
-def export_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
-    _exiger_dossier_complet(campaign_id)
+def export_depot(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis),
+        forcer: bool = False):
+    _exiger_dossier_complet(campaign_id, forcer)
     pdf = depot.export_bordereau_pdf(campaign_id)
     return StreamingResponse(
         io.BytesIO(pdf),
@@ -67,9 +78,10 @@ def export_depot(current_user: dict = Depends(get_current_user), campaign_id: st
 
 
 @router.get("/depot/dossier-zip")
-def export_dossier_zip(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
+def export_dossier_zip(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis),
+        forcer: bool = False):
     """Dossier complet : bordereau + contenu des enveloppes, fichiers d'origine."""
-    _exiger_dossier_complet(campaign_id)
+    _exiger_dossier_complet(campaign_id, forcer)
     archive = depot.export_dossier_zip(campaign_id)
     return StreamingResponse(
         io.BytesIO(archive),
@@ -79,9 +91,10 @@ def export_dossier_zip(current_user: dict = Depends(get_current_user), campaign_
 
 
 @router.get("/depot/dossier-pdf")
-def export_dossier_pdf(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
+def export_dossier_pdf(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis),
+        forcer: bool = False):
     """Dossier complet en un seul PDF paginé, pour l'impression ou l'envoi d'un bloc."""
-    _exiger_dossier_complet(campaign_id)
+    _exiger_dossier_complet(campaign_id, forcer)
     pdf = depot.export_dossier_pdf(campaign_id)
     return StreamingResponse(
         io.BytesIO(pdf),
@@ -91,8 +104,9 @@ def export_dossier_pdf(current_user: dict = Depends(get_current_user), campaign_
 
 
 @router.get("/depot/export-cnccfp")
-def export_cnccfp_xlsx(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis)):
-    _exiger_dossier_complet(campaign_id)
+def export_cnccfp_xlsx(current_user: dict = Depends(get_current_user), campaign_id: str = Depends(get_campaign_conn), _garde: str = Depends(mandataire_requis),
+        forcer: bool = False):
+    _exiger_dossier_complet(campaign_id, forcer)
     xlsx = export_cnccfp.generate_xlsx(campaign_id)
     return StreamingResponse(
         io.BytesIO(xlsx),

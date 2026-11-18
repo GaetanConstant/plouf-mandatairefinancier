@@ -493,6 +493,37 @@ def ajouter_piece(campaign_id: str, depense_id: int, payload, auteur: str,
                        if role != ROLE_MANDATAIRE else "Justificatif rattaché."}
 
 
+class PieceExistanteIn(BaseModel):
+    """Pièce déjà au dossier, réutilisée comme justificatif d'une dépense."""
+    document_id: int
+
+
+def reutiliser_piece(campaign_id: str, depense_id: int, document_id: int) -> dict:
+    """Justifie une dépense par une pièce déjà au dossier, sans la dupliquer.
+
+    Cas type : des frais bancaires n'ont pas de facture, le relevé du mois les
+    justifie. Le relevé reste une seule pièce, rangée une seule fois ; chaque
+    dépense pointe vers lui, et le bordereau renvoie de l'une à l'autre.
+
+    Réservé au mandataire : rattacher une pièce validée à une écriture, c'est
+    décider qu'elle la justifie.
+    """
+    ensure_campaign_db(campaign_id)
+    with campaign_session(campaign_id) as s:
+        d = s.get(Depense, depense_id)
+        if not d:
+            raise HTTPException(status_code=404, detail="Dépense introuvable")
+        doc = s.get(Document, document_id)
+        if not doc or not doc.fichier:
+            raise HTTPException(status_code=404, detail="Pièce introuvable")
+        if doc.statut_validation != enums.StatutValidation.valide:
+            raise HTTPException(status_code=409,
+                                detail="Cette pièce attend encore d'être validée.")
+        d.facture_doc_id = doc.id
+        logger.info("Dépense %s justifiée par la pièce existante %s", d.num_piece, doc.id)
+    return {"message": "Justificatif existant rattaché."}
+
+
 def ajouter_piece_recette(campaign_id: str, recette_id: int, payload, auteur: str,
                           role: str) -> dict:
     """Rattache un justificatif à une recette sans toucher à son montant.

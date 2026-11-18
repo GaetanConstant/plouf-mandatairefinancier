@@ -119,5 +119,73 @@ def test_rang_tolere_un_numero_illisible():
     assert pieces.rang("D042") == 42
 
 
+def _releve(cid, statut=None) -> int:
+    """Relevé PDF de l'enveloppe B, comme le dépose l'onglet Relevés."""
+    from db import enums
+    from db.models import Document
+    with campaign_session(cid) as s:
+        doc = Document(type=enums.TypeDocument.releve_bancaire, media_type="pdf",
+                       fichier="releve_octobre.pdf", enveloppe=enums.Enveloppe.B,
+                       periode="2026-10")
+        if statut:
+            doc.statut_validation = statut
+        s.add(doc)
+        s.flush()
+        return doc.id
+
+
+def test_releve_reutilise_justifie_plusieurs_frais():
+    """Un relevé qui justifie plusieurs frais bancaires reste une seule pièce.
+
+    Chaque dépense sort des manques ; la pièce n'est rangée qu'une fois, en B,
+    porte tous les numéros qu'elle justifie, et le bordereau renvoie vers elle.
+    """
+    import completude
+    import conformite
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(libelle="Frais ouverture"))
+        comptes.create_depense(cid, _depense(libelle="Cotisation carte"))
+        comptes.create_depense(cid, _depense(libelle="Facture", justificatif="facture.pdf"))
+        releve = _releve(cid)
+        for dep in comptes.list_depenses(cid):
+            if dep["libelle"] != "Facture":
+                comptes.reutiliser_piece(cid, dep["id"], releve)
+
+        section = {s["cle"]: s for s in completude.evaluer(cid)["sections"]}["justificatifs_depenses"]
+        assert section["complet"], section["manquants"]
+        codes = [a["code"] for a in conformite.run_checks(cid)["alertes"]]
+        assert "justificatif_manquant" not in codes, codes
+
+        etat = depot.get_depot(cid)
+        assert [p["fichier"] for p in etat["pieces_B"]] == ["releve_octobre.pdf"]
+        assert etat["pieces_B"][0]["num_pieces"] == ["D001", "D002"]
+        # La facture de D003 garde son propre numéro, pas celui du relevé.
+        assert [p["num_piece"] for p in etat["pieces_A"]] == ["D003"]
+        assert [r["num_piece"] for r in etat["renvois"]] == ["D001", "D002"]
+        assert all(r["enveloppe"] == "B" for r in etat["renvois"])
+    finally:
+        teardown(cid)
+
+
+def test_reutiliser_refuse_une_piece_non_validee():
+    """Une pièce encore « proposée » par l'équipe ne justifie rien."""
+    from fastapi import HTTPException
+    from db import enums
+    cid = fresh_campaign()
+    try:
+        comptes.create_depense(cid, _depense(libelle="Frais"))
+        releve = _releve(cid, statut=enums.StatutValidation.propose)
+        try:
+            comptes.reutiliser_piece(cid, comptes.list_depenses(cid)[0]["id"], releve)
+        except HTTPException as e:
+            assert e.status_code == 409
+        else:
+            raise AssertionError("une pièce non validée ne doit pas être réutilisable")
+        assert comptes.list_depenses(cid)[0]["justificatif_path"] is None
+    finally:
+        teardown(cid)
+
+
 if __name__ == "__main__":
     sys.exit(run_tests(globals()))

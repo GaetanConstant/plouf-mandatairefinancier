@@ -84,6 +84,14 @@ def ajouter_piece(depense_id: int, payload: comptes.PieceIn,
     return comptes.ajouter_piece(campaign_id, depense_id, payload, current_user["username"], role)
 
 
+@router.post("/depenses/{depense_id}/piece-existante")
+def reutiliser_piece(depense_id: int, payload: comptes.PieceExistanteIn,
+                     campaign_id: str = Depends(get_campaign_conn),
+                     _garde: str = Depends(mandataire_requis)) -> dict:
+    """Justifie une dépense par une pièce déjà au dossier (un relevé, par exemple)."""
+    return comptes.reutiliser_piece(campaign_id, depense_id, payload.document_id)
+
+
 @router.get("/fournisseurs")
 def list_fournisseurs(campaign_id: str = Depends(get_campaign_conn),
                       _garde: str = Depends(tout_role)):

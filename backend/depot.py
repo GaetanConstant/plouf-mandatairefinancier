@@ -15,7 +15,7 @@ import logging
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -91,7 +91,13 @@ def _classement_comptable(campaign_id: str) -> dict[int, tuple]:
 
     rangs: dict[int, tuple] = {}
     with campaign_session(campaign_id) as s:
-        for d in s.scalars(select(Depense).where(Depense.facture_doc_id.is_not(None))).all():
+        depenses = s.scalars(select(Depense).where(Depense.facture_doc_id.is_not(None))).all()
+        partages = _documents_partages(depenses)
+        for d in depenses:
+            # Une pièce partagée (un relevé qui justifie plusieurs frais) n'est
+            # la facture d'aucune dépense en particulier : elle garde sa place.
+            if d.facture_doc_id in partages:
+                continue
             rangs[d.facture_doc_id] = (
                 _ORDRE_PRISE_EN_CHARGE.get(
                     d.prise_en_charge.value if d.prise_en_charge else "mandataire", 9),
@@ -100,6 +106,17 @@ def _classement_comptable(campaign_id: str) -> dict[int, tuple]:
                 d.id,
             )
     return rangs
+
+
+def _documents_partages(depenses: Iterable[Depense]) -> set[int]:
+    """Documents qui servent de justificatif à plusieurs dépenses."""
+    vus: set[int] = set()
+    partages: set[int] = set()
+    for d in depenses:
+        if d.facture_doc_id in vus:
+            partages.add(d.facture_doc_id)
+        vus.add(d.facture_doc_id)
+    return partages
 
 
 def list_documents(campaign_id: str) -> list[dict]:
@@ -125,23 +142,50 @@ def set_document(campaign_id: str, doc_id: int, enveloppe: str | None, type_: st
         return _doc_dict(d)
 
 
-def numeros_par_document(campaign_id: str) -> dict[int, str]:
-    """Numéro de pièce de l'écriture dont chaque document est le justificatif.
+def numeros_par_document(campaign_id: str) -> dict[int, list[str]]:
+    """Numéros des écritures dont chaque document est le justificatif.
 
     C'est ce qui relie une pièce de l'enveloppe à sa ligne du journal : sans
     cette table, le bordereau annonce un nom de fichier que rien ne rattache à
-    la main courante.
+    la main courante. Une pièce réutilisée (un relevé qui justifie plusieurs
+    frais bancaires) porte tous les numéros qu'elle justifie, dans l'ordre.
     """
     with campaign_session(campaign_id) as s:
-        numeros: dict[int, str] = {}
+        numeros: dict[int, list[str]] = {}
         for modele, lien in ((Depense, Depense.facture_doc_id),
                              (Recette, Recette.justificatif_doc_id)):
             for doc_id, numero in s.execute(
                 select(lien, modele.num_piece)
                 .where(lien.is_not(None), modele.num_piece.is_not(None))
             ).all():
-                numeros[doc_id] = numero
-        return numeros
+                numeros.setdefault(doc_id, []).append(numero)
+        return {doc_id: sorted(nums) for doc_id, nums in numeros.items()}
+
+
+def renvois_pieces_partagees(campaign_id: str) -> list[dict]:
+    """Dépenses justifiées par une pièce qu'elles partagent avec d'autres.
+
+    Celui qui dépouille l'enveloppe A cherche la facture de D025 et ne la
+    trouve pas : le bordereau doit lui dire qu'elle est le relevé rangé en
+    enveloppe B.
+    """
+    with campaign_session(campaign_id) as s:
+        depenses = s.scalars(_valides(select(Depense), Depense)
+                             .where(Depense.facture_doc_id.is_not(None))
+                             .order_by(Depense.num_piece)).all()
+        partages = _documents_partages(depenses)
+        renvois = []
+        for d in depenses:
+            if d.facture_doc_id not in partages:
+                continue
+            doc = s.get(Document, d.facture_doc_id)
+            renvois.append({
+                "num_piece": d.num_piece,
+                "fichier": doc.fichier if doc else None,
+                "type_label": _TYPE_LABEL.get(doc.type, "Autre") if doc else None,
+                "enveloppe": doc.enveloppe.value if doc and doc.enveloppe else None,
+            })
+        return renvois
 
 
 def get_depot(campaign_id: str) -> dict:
@@ -150,7 +194,9 @@ def get_depot(campaign_id: str) -> dict:
     docs = list_documents(campaign_id)
     numeros = numeros_par_document(campaign_id)
     for d in docs:
-        d["num_piece"] = numeros.get(d["id"])
+        nums = numeros.get(d["id"])
+        d["num_piece"] = ", ".join(nums) if nums else None
+        d["num_pieces"] = nums or []
     # Ordre du bordereau : les justificatifs par numéro de pièce, les pièces
     # déclaratives ensuite. Sans ce tri, l'enveloppe annonce D001 puis D004 :
     # celui qui la dépouille ne peut pas suivre la main courante.
@@ -163,6 +209,7 @@ def get_depot(campaign_id: str) -> dict:
         "compteurs": conf["compteurs"],
         "alertes_bloquantes": [a for a in conf["alertes"] if a["niveau"] == "bloquant"],
         "pret_a_deposer": conf["pret_a_deposer"],
+        "renvois": renvois_pieces_partagees(campaign_id),
     }
 
 
@@ -286,8 +333,9 @@ def export_dossier_zip(campaign_id: str) -> bytes:
             for rang, piece in enumerate(pieces, start=1):
                 chemin = Path(UPLOADS_DIR) / (piece["fichier"] or "")
                 if chemin.is_file():
-                    zf.write(chemin, _nom_dans_archive(enveloppe, rang, chemin.name,
-                                                       piece.get("num_piece")))
+                    zf.write(chemin, _nom_dans_archive(
+                        enveloppe, rang, chemin.name,
+                        "-".join(piece.get("num_pieces") or []) or None))
                 else:
                     logger.warning("Pièce absente du disque, ignorée à l'export : %s",
                                    piece.get("fichier"))
@@ -428,6 +476,13 @@ def export_bordereau_pdf(campaign_id: str) -> bytes:
             pdf.multi_cell(printable, 6, _safe(f"  {repere} [{p['type_label']}] {p['fichier']}"))
 
     _section("ENVELOPPE A - Formulaire + pièces justificatives des dépenses", etat["pieces_A"])
+    if etat["renvois"]:
+        pdf.set_font("helvetica", "I", 9)
+        pdf.multi_cell(printable, 6, _safe("  Dépenses justifiées par une pièce partagée :"))
+        for r in etat["renvois"]:
+            ou = f"enveloppe {r['enveloppe']}" if r["enveloppe"] else "non classée"
+            pdf.multi_cell(printable, 6, _safe(
+                f"    {r['num_piece']} -> voir {r['type_label']} {r['fichier']} ({ou})", 140))
     _section("ENVELOPPE B - Annexes", etat["pieces_B"])
     # Annexe régénérée à chaque export : elle ne figure pas parmi les documents
     # stockés, mais elle est bien dans l'enveloppe.
