@@ -1,5 +1,16 @@
 [
   {
+    "version": "v0.46.0",
+    "date": "2026-11-27",
+    "dateAffichee": "27 novembre 2026",
+    "titre": "Indemnités kilométriques et leur justificatif",
+    "details": [
+      "Bouton « Indemnité kilométrique » dans l'onglet Notes de frais : on saisit le trajet (bénéficiaire, véhicule, puissance fiscale, date, départ, arrivée, aller-retour, kilomètres, objet, événement) et l'application calcule le montant au barème fiscal, majoré de 20 % pour un véhicule électrique.",
+      "Le trajet devient une dépense D1 avancée par la personne, à rembourser par note de frais, avec sa pièce générée automatiquement : l'état de frais kilométriques, carte grise en annexe, cases de signature et visa du mandataire (désactivables)."
+    ],
+    "majeur": false
+  },
+  {
     "version": "v0.45.0",
     "date": "2026-11-18",
     "dateAffichee": "18 novembre 2026",

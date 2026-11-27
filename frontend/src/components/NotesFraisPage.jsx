@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Check, Download, FileText, HandCoins, Plus, Trash2, Upload } from 'lucide-react';
+import { Car, Check, Download, FileText, HandCoins, Plus, Trash2, Upload } from 'lucide-react';
 import { Button, Modal } from './ui/Components';
 import { ExpenseForm } from './ExpenseForm';
+import { IndemniteKmForm } from './IndemniteKmForm';
 import { API_URL, messageErreur } from '../lib/api';
 
 const eur = (v) => (v ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -21,6 +22,8 @@ export function NotesFraisPage() {
     // Saisie d'une dépense avancée sans quitter l'écran : c'est ici qu'on
     // traite la pile de reçus qu'une personne vient de remettre.
     const [saisie, setSaisie] = useState(null);
+    // Trajet en voiture personnelle : dépense D1 + état de frais kilométriques.
+    const [trajet, setTrajet] = useState(false);
 
     const rafraichir = () => ['notes-frais', 'avances', 'depenses', 'completude']
         .forEach(k => queryClient.invalidateQueries([k]));
@@ -63,9 +66,14 @@ export function NotesFraisPage() {
                         Les sommes avancées par une personne, regroupées en un document à signer.
                     </p>
                 </div>
-                <Button className="gap-2" onClick={() => setSaisie({ avance_par: '' })}>
-                    <Plus className="h-4 w-4" /> Dépense avancée
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" className="gap-2" onClick={() => setTrajet(true)}>
+                        <Car className="h-4 w-4" /> Indemnité kilométrique
+                    </Button>
+                    <Button className="gap-2" onClick={() => setSaisie({ avance_par: '' })}>
+                        <Plus className="h-4 w-4" /> Dépense avancée
+                    </Button>
+                </div>
             </header>
 
             {erreur && <p className="text-sm text-destructive">{erreur}</p>}
@@ -175,6 +183,9 @@ export function NotesFraisPage() {
                 {saisie && (
                     <ExpenseForm prefilledData={saisie} onClose={() => setSaisie(null)} />
                 )}
+            </Modal>
+            <Modal isOpen={trajet} onClose={() => setTrajet(false)} title="Indemnité kilométrique">
+                {trajet && <IndemniteKmForm onClose={() => setTrajet(false)} />}
             </Modal>
         </div>
     );

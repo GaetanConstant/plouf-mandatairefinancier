@@ -35,6 +35,7 @@ from routers import (
     validation as validation_routes,
     releves as releves_routes,
     notes_frais as notes_frais_routes,
+    indemnites_km as indemnites_km_routes,
 )
 import os
 from sqlalchemy import select as sa_select
@@ -113,9 +114,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # adresses de donateurs, des factures, des relevés. Ils passent par une route
 # authentifiée, cloisonnée par campagne — voir `servir_piece` plus bas.
 
-# Signature scannée du mandataire : hors git (donnée personnelle), déposée à
-# côté des données en production. Surchargeable par SIGNATURE_PATH.
-SIGNATURE_PATH = os.getenv("SIGNATURE_PATH") or os.path.join(ROOT_DIR, "signature mandataire.png")
+from config import SIGNATURE_PATH  # noqa: E402 — partagé avec indemnites_km
 
 @app.get("/health")
 def health():
@@ -686,6 +685,7 @@ app.include_router(annexes_routes.router)
 app.include_router(validation_routes.router)
 app.include_router(releves_routes.router)
 app.include_router(notes_frais_routes.router)
+app.include_router(indemnites_km_routes.router)
 
 
 if __name__ == "__main__":

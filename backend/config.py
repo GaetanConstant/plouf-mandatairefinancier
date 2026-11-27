@@ -33,3 +33,8 @@ CORS_ORIGINS = [
     for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
     if origin.strip()
 ]
+
+# Signature scannée du mandataire : hors git (donnée personnelle), déposée à
+# côté des données en production. Surchargeable par SIGNATURE_PATH.
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SIGNATURE_PATH = os.getenv("SIGNATURE_PATH") or os.path.join(_ROOT_DIR, "signature mandataire.png")
