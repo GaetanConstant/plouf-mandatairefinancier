@@ -10,6 +10,12 @@ marque un palier majeur et s'affiche en évidence.
 
 Historique reconstitué depuis l'historique Git du dépôt.
 
+## v0.46.0 — 2026-11-27 — Indemnités kilométriques et leur justificatif
+
+### Ajouté
+- Bouton « Indemnité kilométrique » dans l'onglet Notes de frais : on saisit le trajet (bénéficiaire, véhicule, puissance fiscale, date, départ, arrivée, aller-retour, kilomètres, objet, événement) et l'application calcule le montant au barème fiscal, majoré de 20 % pour un véhicule électrique.
+- Le trajet devient une dépense D1 avancée par la personne, à rembourser par note de frais, avec sa pièce générée automatiquement : l'état de frais kilométriques, carte grise en annexe, cases de signature et visa du mandataire (désactivables).
+
 ## v0.45.0 — 2026-11-18 — Le ZIP contient tout le dossier
 ### Ajouté
 - Le « Dossier complet (ZIP) » contient désormais, dans un dossier `Comptes/`, le compte au format CNCCFP, la main courante (annexe 8) et le livre de comptes, ainsi que l'état des dépenses mutualisées s'il y en a : un seul fichier à envoyer.

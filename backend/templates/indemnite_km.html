@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<title>Justificatif IK {{ num_piece }}</title>
+<style>
+  @page { size: A4; margin: 12mm 15mm 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; }
+  header .camp { font-size: 9pt; line-height: 1.45; }
+  header .piece { text-align: right; min-width: 32mm; }
+  header .piece b { display: block; font-size: 20pt; letter-spacing: .5px; }
+  header .piece span { font-size: 8.5pt; color: #555; }
+  h1 { font-size: 15pt; margin: 12px 0 2px; }
+  .sous { color: #555; font-size: 9pt; margin-bottom: 10px; }
+  h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: .6px; margin: 11px 0 5px; color: #333; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1px solid #bbb; padding: 4px 8px; vertical-align: top; text-align: left; }
+  th { background: #f1f1f1; font-weight: 600; width: 32%; }
+  .calc td, .calc th { text-align: right; }
+  .calc th { width: auto; text-align: center; }
+  .calc .total td { font-weight: 700; background: #f7f7f7; }
+  .note { font-size: 8.5pt; color: #555; margin-top: 5px; line-height: 1.4; }
+  .attest { margin-top: 10px; font-size: 9.5pt; line-height: 1.5; }
+  .sig { display: flex; gap: 14px; margin-top: 8px; }
+  .sig > div { flex: 1; border: 1px solid #bbb; padding: 8px 10px; height: 40mm; position: relative; }
+  .sig .t { font-weight: 600; font-size: 9.5pt; }
+  .sig .l { font-size: 8.5pt; color: #555; margin-top: 3px; line-height: 1.4; }
+  .sig img { position: absolute; left: 14px; bottom: 8px; height: 24mm; }
+  footer { margin-top: 12px; font-size: 8pt; color: #777; border-top: 1px solid #ddd; padding-top: 5px; }
+  .annexe { page-break-before: always; text-align: center; }
+  .annexe h2 { text-align: left; }
+  .annexe img { max-width: 100%; max-height: 245mm; }
+</style></head>
+<body>
+<header>
+  <div class="camp">
+    {% if entete.election %}<b>{{ entete.election }}</b><br>{% endif %}
+    {% if entete.liste %}Liste « {{ entete.liste }} »<br>{% endif %}
+    {% if entete.candidat %}Candidat : {{ entete.candidat }}<br>{% endif %}
+    {% if entete.mandataire %}Mandataire financier : {{ entete.mandataire }}{% endif %}
+  </div>
+  <div class="piece"><span>Pièce justificative</span><b>{{ num_piece }}</b><span>Rubrique D1 — déplacements</span></div>
+</header>
+
+<h1>État de frais kilométriques</h1>
+<div class="sous">Indemnités kilométriques au barème fiscal, pour l'usage d'un véhicule personnel dans le cadre de la campagne</div>
+
+<h2>Bénéficiaire</h2>
+<table>
+  <tr><th>Nom</th><td>{{ p.beneficiaire }}</td></tr>
+  {% if p.qualite %}<tr><th>Qualité</th><td>{{ p.qualite }}</td></tr>{% endif %}
+  {% if p.adresse %}<tr><th>Adresse</th><td>{{ p.adresse }}</td></tr>{% endif %}
+</table>
+
+<h2>Véhicule</h2>
+<table>
+  <tr><th>Marque et modèle</th><td>{{ p.vehicule }}</td></tr>
+  <tr><th>Immatriculation</th><td>{{ p.immatriculation }}</td></tr>
+  <tr><th>Puissance fiscale</th><td>{{ p.puissance_cv }} CV{% if p.electrique %}, 100 % électrique{% endif %}</td></tr>
+  <tr><th>Propriété</th><td>Véhicule personnel du bénéficiaire{% if carte_grise or p.carte_grise_path %} — copie du certificat d'immatriculation jointe{% endif %}</td></tr>
+</table>
+
+<h2>Déplacement</h2>
+<table>
+  <tr><th>Date</th><td>{{ date }}</td></tr>
+  <tr><th>Lieu de départ</th><td>{{ p.depart }}</td></tr>
+  <tr><th>Lieu d'arrivée</th><td>{{ p.arrivee }}</td></tr>
+  <tr><th>Trajet</th><td>{% if p.aller_retour %}Aller-retour, retour au lieu de départ{% else %}Aller simple{% endif %}</td></tr>
+  <tr><th>Objet</th><td>{{ p.objet }}</td></tr>
+</table>
+
+<h2>Calcul</h2>
+<table class="calc">
+  {% if p.aller_retour %}
+  <tr><th>Aller</th><th>Retour</th><th>Distance totale</th><th>Barème ({{ p.puissance_cv }} CV, ≤ 5 000 km)</th><th>Montant</th></tr>
+  <tr class="total"><td>{{ km_aller }} km</td><td>{{ km_aller }} km</td><td>{{ km_total }} km</td><td>d × {{ taux }} €</td><td>{{ montant }} €</td></tr>
+  {% else %}
+  <tr><th>Distance</th><th>Barème ({{ p.puissance_cv }} CV, ≤ 5 000 km)</th><th>Montant</th></tr>
+  <tr class="total"><td>{{ km_total }} km</td><td>d × {{ taux }} €</td><td>{{ montant }} €</td></tr>
+  {% endif %}
+</table>
+<div class="note">
+  Barème kilométrique fiscal (arrêté annuel), tranche jusqu'à 5 000 km{% if p.electrique %}, majoré de 20 % pour un véhicule électrique{% endif %}.
+  Les indemnités kilométriques ne sont pas soumises à la TVA. Montant arrondi au centime.
+</div>
+
+<div class="attest">
+  Je soussigné(e), {{ p.beneficiaire }}, certifie avoir effectué ce déplacement avec mon véhicule personnel
+  pour les besoins de la campagne électorale, et ne pas en avoir obtenu le remboursement par ailleurs.
+</div>
+
+{% if p.visa_mandataire %}
+<div class="sig">
+  <div><div class="t">Le bénéficiaire</div><div class="l">{{ p.beneficiaire }}<br>Date et signature</div></div>
+  <div><div class="t">Visa du mandataire financier</div><div class="l">{{ entete.mandataire }}<br>Bon pour remboursement de {{ montant }} €</div>
+    {% if signature %}<img src="{{ signature }}" alt="Signature du mandataire">{% endif %}</div>
+</div>
+{% endif %}
+
+<footer>{% if carte_grise or p.carte_grise_path %}Pièce jointe : certificat d'immatriculation {{ p.immatriculation }}. {% endif %}Montant inscrit au compte de campagne, rubrique D1, pièce {{ num_piece }}.</footer>
+
+{% if carte_grise %}
+<section class="annexe"><h2>Annexe — certificat d'immatriculation {{ p.immatriculation }}</h2>
+<img src="{{ carte_grise }}" alt="Carte grise"></section>
+{% endif %}
+</body></html>
